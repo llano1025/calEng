@@ -10,6 +10,7 @@ import CopperLossCalculator from './electrical/CopperLossCalculator';
 import MaxCopperResistanceCalculator from './electrical/MaxCopperResistanceCalculator';
 import ProtectionCoordinationCalculator from './electrical/ProtectionCoordinationCalculator';
 import FuseOperationTimeCalculator from './electrical/FuseOperationTimeCalculator';
+import CableContainmentCalculator from './electrical/CableContainmentCalculator';
 import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
@@ -52,6 +53,8 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
         return <ProtectionCoordinationCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'fuseOperationTime':
         return <FuseOperationTimeCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'cableContainment':
+        return <CableContainmentCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -183,6 +186,18 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
           >
             <h3 className="font-medium text-lg">Power Factor</h3>
             <p className="text-sm mt-1 text-gray-600">Capacitor sizing</p>
+          </button>
+
+          <button
+            className={`p-4 rounded-lg text-center transition-colors border ${
+              calculatorType === 'cableContainment'
+                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
+                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+            }`}
+            onClick={() => setCalculatorType('cableContainment')}
+          >
+            <h3 className="font-medium text-lg">Cable Containment</h3>
+            <p className="text-sm mt-1 text-gray-600">Conduit & trunking capacity</p>
           </button>
 
         </div>
