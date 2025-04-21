@@ -7,11 +7,6 @@ type ConduitLength = 'short' | 'long'; // short <= 3m, long > 3m
 type ConductorType = 'solid' | 'stranded';
 type CalculationMethod = 'table' | 'space-factor';
 
-// Specific types for state variables used as keys
-type ConduitDiameterType = '16' | '20' | '25' | '32';
-type NumberOfBendsType = 0 | 1 | 2;
-// Run length will be derived as string
-
 interface Cable {
   id: string;
   conductorType: ConductorType;
@@ -19,48 +14,23 @@ interface Cable {
   quantity: number;
   factor?: number; // Cable factor from tables
   outerDiameter?: number; // Outer diameter in mm for 45% rule
-  description?: string; // Added for space factor method clarity
 }
 
 interface CableContainmentCalculatorProps {
   onShowTutorial?: () => void;
 }
 
-// --- Type Definition for conduitFactorLong ---
-// Defines the structure for factors based on run length (string keys)
-type RunLengthFactors = { [key: string]: number }; 
-
-// Defines the structure for factors based on number of bends (numeric literal keys)
-type BendFactors = {
-  [key in NumberOfBendsType]: RunLengthFactors;
-};
-
-// Defines the overall structure for conduitFactorLong (string literal keys for diameter)
-type ConduitFactorLongType = {
-  [key in ConduitDiameterType]: BendFactors;
-};
-// --- End Type Definition ---
-
-
 const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({ onShowTutorial }) => {
   // State for calculator inputs
   const [containmentType, setContainmentType] = useState<ContainmentType>('conduit');
   const [calculationMethod, setCalculationMethod] = useState<CalculationMethod>('table');
   const [conduitLength, setConduitLength] = useState<ConduitLength>('short');
-  // Use the specific type for conduitDiameter state
-  const [conduitDiameter, setConduitDiameter] = useState<ConduitDiameterType>('16'); 
-  // Use the specific type for numberOfBends state
-  const [numberOfBends, setNumberOfBends] = useState<NumberOfBendsType>(0); 
-  const [customConduitLength, setCustomConduitLength] = useState<number>(3); // Actual length in meters
+  const [conduitDiameter, setConduitDiameter] = useState<string>('16');
+  const [numberOfBends, setNumberOfBends] = useState<number>(0);
+  const [customConduitLength, setCustomConduitLength] = useState<number>(3);
   const [trunkingSize, setTrunkingSize] = useState<string>('50x37.5');
-  // State for manual trunking dimensions (used in space factor method)
-  const [trunkingWidth, setTrunkingWidth] = useState<number>(50);
-  const [trunkingHeight, setTrunkingHeight] = useState<number>(37.5);
-  // State for manual conduit diameter (used in space factor method)
-  const [manualConduitDiameter, setManualConduitDiameter] = useState<number>(16); 
-
   const [cables, setCables] = useState<Cable[]>([
-    { id: '1', conductorType: 'stranded', csa: '1.5', quantity: 1, outerDiameter: 2.5, description: 'Example Cable' }
+    { id: '1', conductorType: 'stranded', csa: '1.5', quantity: 1, outerDiameter: 2.5 }
   ]);
   
   // Results state
@@ -69,39 +39,86 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
   const [totalCableFactor, setTotalCableFactor] = useState<number>(0);
   const [containmentFactor, setContainmentFactor] = useState<number>(0);
   const [spaceFactorPercentage, setSpaceFactorPercentage] = useState<number>(0);
-  const [totalCableArea, setTotalCableArea] = useState<number>(0);
-  const [containmentArea, setContainmentArea] = useState<number>(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // For displaying errors
 
   // Available options for dropdowns
   const csaOptions = ['1', '1.5', '2.5', '4', '6', '10'];
-  // Use specific types for options to match state
-  const conduitDiameterOptions: ConduitDiameterType[] = ['16', '20', '25', '32']; 
-  const bendOptions: NumberOfBendsType[] = [0, 1, 2];
+  const conduitDiameterOptions = ['16', '20', '25', '32'];
+  const bendOptions = [0, 1, 2];
   const trunkingSizeOptions = [
     '50x37.5', '50x50', '75x25', '75x37.5', '75x50', 
     '75x75', '100x25', '100x37.5', '100x50', '100x75', '100x100'
   ];
 
-  // --- Table Data ---
-  // Cable factors (unchanged)
+  // Table data
   const cableFactor: {
-    short: { [key in ConductorType]: { [csa: string]: number } };
-    long: { [key in ConductorType]: { [csa: string]: number } };
-    trunking: { [key in ConductorType]: { [csa: string]: number } };
+    short: {
+      [conductorType: string]: {[key: string]: number}
+    },
+    long: {
+      [conductorType: string]: {[key: string]: number}
+    },
+    trunking: {
+      [conductorType: string]: {[key: string]: number}
+    }
   } = {
-    short: { solid: { '1': 22, '1.5': 27, '2.5': 39 }, stranded: { '1.5': 31, '2.5': 43, '4': 58, '6': 88, '10': 146 } },
-    long: { solid: { '1': 16, '1.5': 22, '2.5': 30, '4': 43, '6': 58, '10': 105 }, stranded: { '1': 16, '1.5': 22, '2.5': 30, '4': 43, '6': 58, '10': 105 } },
-    trunking: { solid: { '1.5': 7.1, '2.5': 10.2 }, stranded: { '1.5': 8.1, '2.5': 11.4, '4': 15.2, '6': 22.9, '10': 36.3 } }
+    short: { // Straight runs not exceeding 3m
+      solid: {
+        '1': 22,
+        '1.5': 27,
+        '2.5': 39
+      },
+      stranded: {
+        '1.5': 31,
+        '2.5': 43,
+        '4': 58,
+        '6': 88,
+        '10': 146
+      }
+    },
+    long: { // Exceeding 3m or with bends
+      solid: {
+        '1': 16,
+        '1.5': 22,
+        '2.5': 30,
+        '4': 43,
+        '6': 58,
+        '10': 105
+      },
+      stranded: {
+        '1': 16,
+        '1.5': 22,
+        '2.5': 30,
+        '4': 43,
+        '6': 58,
+        '10': 105
+      }
+    },
+    trunking: {
+      solid: {
+        '1.5': 7.1,
+        '2.5': 10.2
+      },
+      stranded: {
+        '1.5': 8.1,
+        '2.5': 11.4,
+        '4': 15.2,
+        '6': 22.9,
+        '10': 36.3
+      }
+    }
   };
 
   // Conduit factors for straight runs <= 3m
-  const conduitFactorShort: { [key in ConduitDiameterType]: number } = {
-    '16': 290, '20': 460, '25': 800, '32': 1400
+  const conduitFactorShort: {[key: string]: number} = {
+    '16': 290,
+    '20': 460,
+    '25': 800,
+    '32': 1400
   };
 
-  // Conduit factors for runs > 3m or with bends - Apply the specific type
-  const conduitFactorLong: ConduitFactorLongType = {
+  // Conduit factors for runs > 3m or with bends
+  const conduitFactorLong = {
+    // [diameter, bends] => factor
     '16': {
       0: { '3': 167, '3.5': 179, '4': 177, '4.5': 174, '5': 171, '6': 167, '7': 162, '8': 158, '9': 154, '10': 150 },
       1: { '1': 188, '1.5': 182, '2': 177, '2.5': 171, '3': 167, '3.5': 162, '4': 158, '4.5': 154, '5': 150, '6': 143, '7': 136, '8': 130, '9': 125, '10': 120 },
@@ -125,570 +142,571 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
   };
 
   // Trunking factors
-  const trunkingFactor: { [key: string]: number } = {
-    '50x37.5': 767, '50x50': 1037, '75x25': 738, '75x37.5': 1146, '75x50': 1555, 
-    '75x75': 2371, '100x25': 993, '100x37.5': 1542, '100x50': 2091, '100x75': 3189, 
+  const trunkingFactor: {[key: string]: number} = {
+    '50x37.5': 767,
+    '50x50': 1037,
+    '75x25': 738,
+    '75x37.5': 1146,
+    '75x50': 1555,
+    '75x75': 2371,
+    '100x25': 993,
+    '100x37.5': 1542,
+    '100x50': 2091,
+    '100x75': 3189,
     '100x100': 4252
   };
-  // --- End Table Data ---
+
+  // Cable cross-sectional areas (approximate for space factor calculation)
+  const cableCsa: {[key: string]: number} = {
+    '1': 3.5,
+    '1.5': 4.5,
+    '2.5': 6.5,
+    '4': 9.5,
+    '6': 13.5,
+    '10': 20.5
+  };
+
+  // Containment internal areas (in mm²)
+  const conduitArea: {[key: string]: number} = {
+    '16': 201,
+    '20': 314,
+    '25': 491,
+    '32': 804
+  };
+
+  const trunkingArea: {[key: string]: number} = {
+    '50x37.5': 1875,
+    '50x50': 2500,
+    '75x25': 1875,
+    '75x37.5': 2812.5,
+    '75x50': 3750,
+    '75x75': 5625,
+    '100x25': 2500,
+    '100x37.5': 3750,
+    '100x50': 5000,
+    '100x75': 7500,
+    '100x100': 10000
+  };
 
   // Add a new cable to the list
   const addCable = () => {
-    const newId = Date.now().toString(); // Use timestamp for unique ID
-    const newCable: Cable = calculationMethod === 'table'
-      ? { id: newId, conductorType: 'stranded', csa: '1.5', quantity: 1 }
-      : { id: newId, conductorType: 'stranded', csa: '1.5', quantity: 1, outerDiameter: 2.5, description: '' };
-    setCables([...cables, newCable]);
-    resetCalculation(); // Reset results when cables change
+    const newId = (cables.length + 1).toString();
+    if (calculationMethod === 'table') {
+      setCables([...cables, { id: newId, conductorType: 'stranded', csa: '1.5', quantity: 1 }]);
+    } else {
+      setCables([...cables, { id: newId, conductorType: 'stranded', csa: '1.5', quantity: 1, outerDiameter: 2.5 }]);
+    }
   };
 
   // Remove a cable from the list
   const removeCable = (id: string) => {
     if (cables.length > 1) {
       setCables(cables.filter(cable => cable.id !== id));
-      resetCalculation(); // Reset results when cables change
     }
   };
 
   // Update a cable property
   const updateCable = (id: string, field: keyof Cable, value: any) => {
-    // Ensure quantity and outerDiameter are numbers
-    let processedValue = value;
-    if (field === 'quantity') {
-        processedValue = parseInt(value, 10) || 1; // Default to 1 if parsing fails
-        if (processedValue < 1) processedValue = 1; // Ensure quantity is at least 1
-    } else if (field === 'outerDiameter') {
-        processedValue = parseFloat(value) || undefined; // Store as number or undefined
-        if (processedValue !== undefined && processedValue <= 0) processedValue = undefined; // Ensure positive diameter
-    }
-
     setCables(cables.map(cable => 
-      cable.id === id ? { ...cable, [field]: processedValue } : cable
+      cable.id === id ? { ...cable, [field]: value } : cable
     ));
-    resetCalculation(); // Reset results when cables change
+  };
+
+  // Helper to get run length from conduit length state and numeric input
+  const getRunLength = (): number => {
+    if (conduitLength === 'short') return 3;
+    
+    // Use custom conduit length (already set by dropdown)
+    return customConduitLength;
   };
   
-  // Helper function to calculate CSA from diameter (Area = π * (d/2)^2)
+  // Helper function to calculate CSA from diameter
   const calculateCsaFromDiameter = (diameter: number): number => {
     if (!diameter || diameter <= 0) return 0;
-    return Math.PI * Math.pow(diameter / 2, 2);
+    
+    // Calculate CSA using πr²
+    const radius = diameter / 2;
+    return Math.PI * Math.pow(radius, 2);
   };
 
-  // --- Calculate Compliance ---
+  // Calculate compliance
   const calculateCompliance = () => {
-    setIsCalculated(false); // Reset calculation state initially
-    setErrorMessage(null); // Clear previous errors
-    let calculatedIsCompliant = false;
-    let calculatedTotalFactor = 0;
-    let calculatedContainmentFactor = 0;
-    let calculatedSpaceFactor = 0;
-    let calculatedTotalCableArea = 0;
-    let calculatedContainmentArea = 0;
-
-    try { // Wrap calculation in try/catch for robustness
-        if (calculationMethod === 'table') {
-            // --- Table Lookup Method ---
-            let runningTotalFactor = 0;
-            const updatedCables = cables.map(cable => {
-                let factor = 0;
-                const factorTable = containmentType === 'conduit' 
-                    ? (conduitLength === 'short' ? cableFactor.short : cableFactor.long)
-                    : cableFactor.trunking;
-
-                // Check if conductor type and csa exist in the selected table
-                if (factorTable?.[cable.conductorType]?.[cable.csa]) {
-                    factor = factorTable[cable.conductorType][cable.csa];
-                } else {
-                    // Handle missing factor data gracefully
-                    console.warn(`Factor not found for: ${containmentType}, ${conduitLength}, ${cable.conductorType}, ${cable.csa}`);
-                    // Optionally throw an error or set a default factor
-                }
-                
-                const cableTotalFactor = factor * cable.quantity;
-                runningTotalFactor += cableTotalFactor;
-                return { ...cable, factor: cableTotalFactor }; // Store calculated factor per cable item
-            });
-            
-            setCables(updatedCables); // Update state with calculated factors per cable
-            calculatedTotalFactor = runningTotalFactor;
-
-            // Get containment factor
-            if (containmentType === 'conduit') {
-                if (conduitLength === 'short') {
-                    calculatedContainmentFactor = conduitFactorShort[conduitDiameter] || 0;
-                } else {
-                    // --- FIX APPLIED HERE ---
-                    // Use the specific types for indexing conduitFactorLong
-                    const runLengthKey = customConduitLength.toString();
-                    
-                    // Check existence safely using optional chaining and direct access
-                    const factorValue = conduitFactorLong?.[conduitDiameter]?.[numberOfBends]?.[runLengthKey];
-
-                    if (factorValue !== undefined) {
-                        calculatedContainmentFactor = factorValue;
-                    } else {
-                        // Handle case where the specific combination is not in the table
-                        console.warn(`Conduit factor not found for diameter: ${conduitDiameter}, bends: ${numberOfBends}, length: ${runLengthKey}`);
-                        calculatedContainmentFactor = 0; // Set a default or throw error
-                        setErrorMessage(`Conduit factor data missing for ${conduitDiameter}mm, ${numberOfBends} bends, ${runLengthKey}m length.`);
-                    }
-                    // --- END FIX ---
-                }
-            } else { // Trunking
-                calculatedContainmentFactor = trunkingFactor[trunkingSize] || 0;
-                if (calculatedContainmentFactor === 0 && trunkingSize) {
-                     console.warn(`Trunking factor not found for size: ${trunkingSize}`);
-                     setErrorMessage(`Trunking factor data missing for size ${trunkingSize}.`);
-                }
-            }
-            
-            // Check compliance: containment factor >= total cable factor
-            calculatedIsCompliant = calculatedContainmentFactor > 0 && calculatedContainmentFactor >= calculatedTotalFactor;
-            if (calculatedContainmentFactor <= 0 && !errorMessage) {
-                 setErrorMessage("Containment factor could not be determined. Check inputs or data tables.");
-            }
-
+    if (calculationMethod === 'table') {
+      // Table lookup method
+      let totalFactor = 0;
+      
+      // Calculate total cable factor
+      cables.forEach(cable => {
+        let factor = 0;
+        if (containmentType === 'conduit') {
+          // Use appropriate conduit factor table
+          const factorTable = conduitLength === 'short' ? cableFactor.short : cableFactor.long;
+          if (factorTable[cable.conductorType][cable.csa]) {
+            factor = factorTable[cable.conductorType][cable.csa] * cable.quantity;
+          }
         } else {
-            // --- 45% Space Factor Method ---
-            let runningTotalCableArea = 0;
-            let missingDiameter = false;
-            cables.forEach(cable => {
-                if (cable.outerDiameter && cable.outerDiameter > 0) {
-                    const cableArea = calculateCsaFromDiameter(cable.outerDiameter);
-                    runningTotalCableArea += cableArea * cable.quantity;
-                } else {
-                    missingDiameter = true; // Flag if any cable is missing diameter
-                }
-            });
-
-            if (missingDiameter) {
-                setErrorMessage("Please enter a valid outer diameter (mm) for all cables.");
-                // Reset results and stop calculation if data is missing
-                setTotalCableArea(0);
-                setContainmentArea(0);
-                setSpaceFactorPercentage(0);
-                setIsCompliant(false);
-                setIsCalculated(true); // Show results section with the error message
-                return; 
-            }
-            
-            calculatedTotalCableArea = runningTotalCableArea;
-
-            // Get containment area based on type and inputs
-            if (containmentType === 'conduit') {
-                if (manualConduitDiameter > 0) {
-                    calculatedContainmentArea = calculateCsaFromDiameter(manualConduitDiameter);
-                } else {
-                     setErrorMessage("Please enter a valid conduit diameter (mm).");
-                }
-            } else { // Trunking
-                if (trunkingWidth > 0 && trunkingHeight > 0) {
-                    calculatedContainmentArea = trunkingWidth * trunkingHeight;
-                } else {
-                     setErrorMessage("Please enter valid trunking width and height (mm).");
-                }
-            }
-
-            // Calculate space factor percentage
-            if (calculatedContainmentArea > 0) {
-                calculatedSpaceFactor = (calculatedTotalCableArea / calculatedContainmentArea) * 100;
-                // Check compliance: space factor <= 45%
-                calculatedIsCompliant = calculatedSpaceFactor <= 45;
-            } else {
-                calculatedSpaceFactor = 0; // Avoid division by zero
-                calculatedIsCompliant = false; // Cannot be compliant if containment area is zero
-                 if (!errorMessage) setErrorMessage("Containment area is zero. Please check conduit/trunking dimensions.");
-            }
+          // Use trunking factor table
+          if (cableFactor.trunking[cable.conductorType][cable.csa]) {
+            factor = cableFactor.trunking[cable.conductorType][cable.csa] * cable.quantity;
+          }
         }
-
-    } catch (error) {
-        console.error("Calculation Error:", error);
-        setErrorMessage("An unexpected error occurred during calculation.");
-        calculatedIsCompliant = false; // Ensure non-compliant on error
-    } finally {
-        // Update all result states at once
-        setTotalCableFactor(calculatedTotalFactor);
-        setContainmentFactor(calculatedContainmentFactor);
-        setTotalCableArea(calculatedTotalCableArea);
-        setContainmentArea(calculatedContainmentArea);
-        setSpaceFactorPercentage(calculatedSpaceFactor);
-        setIsCompliant(calculatedIsCompliant);
-        setIsCalculated(true); // Mark calculation as complete (even if errors occurred)
+        
+        // Update cable with its factor for display
+        updateCable(cable.id, 'factor', factor);
+        totalFactor += factor;
+      });
+      
+      setTotalCableFactor(totalFactor);
+      
+      // Get containment factor
+      let factor = 0;
+      if (containmentType === 'conduit') {
+        if (conduitLength === 'short') {
+          factor = conduitFactorShort[conduitDiameter] || 0;
+        } else {
+          // Use run length from custom input
+          const runLength = customConduitLength.toString();
+          if (conduitFactorLong?.[conduitDiameter]?.[numberOfBends]?.[runLength]) {
+            factor = conduitFactorLong[conduitDiameter][numberOfBends][runLength];
+          }
+        }
+      } else {
+        factor = trunkingFactor[trunkingSize] || 0;
+      }
+      
+      setContainmentFactor(factor);
+      
+      // Check compliance: containment factor should be >= total cable factor
+      setIsCompliant(factor >= totalFactor);
+    } else {
+      // 45% space factor method
+      let totalCableArea = 0;
+      
+      // Calculate total cable area from outer diameters
+      cables.forEach(cable => {
+        if (cable.outerDiameter && cable.outerDiameter > 0) {
+          const cableArea = calculateCsaFromDiameter(cable.outerDiameter);
+          totalCableArea += cableArea * cable.quantity;
+        }
+      });
+      
+      // Get containment area based on type
+      let containmentArea = 0;
+      
+      if (containmentType === 'conduit') {
+        // Calculate area from user-input diameter
+        const diameter = parseFloat(conduitDiameter) || 0;
+        if (diameter > 0) {
+          containmentArea = calculateCsaFromDiameter(diameter);
+        }
+      } else {
+        // Get width and height from inputs
+        const widthInput = document.getElementById('trunkingWidth') as HTMLInputElement;
+        const heightInput = document.getElementById('trunkingHeight') as HTMLInputElement;
+        
+        if (widthInput && heightInput && widthInput.value && heightInput.value) {
+          const width = parseFloat(widthInput.value);
+          const height = parseFloat(heightInput.value);
+          
+          if (!isNaN(width) && !isNaN(height)) {
+            containmentArea = width * height;
+          }
+        }
+      }
+      
+      // Calculate space factor percentage
+      const spaceFactor = containmentArea > 0 ? (totalCableArea / containmentArea) * 100 : 100;
+      setSpaceFactorPercentage(spaceFactor);
+      
+      // Check compliance: space factor should be <= 45%
+      setIsCompliant(spaceFactor <= 45);
     }
+    
+    setIsCalculated(true);
   };
-  // --- End Calculate Compliance ---
 
-
-  // Clear calculation results and error messages
+  // Clear calculation results
   const resetCalculation = () => {
     setIsCalculated(false);
-    setErrorMessage(null);
-    // Optionally reset factors shown in the table
-    setCables(cables.map(c => ({ ...c, factor: undefined }))); 
   };
 
-  // Reset form/results when major inputs change
+  // Reset form when calculation method changes
   useEffect(() => {
     resetCalculation();
-  }, [calculationMethod, containmentType, conduitLength, conduitDiameter, numberOfBends, trunkingSize, customConduitLength, manualConduitDiameter, trunkingWidth, trunkingHeight]); // Added dependencies
+  }, [calculationMethod, containmentType, conduitLength, conduitDiameter, numberOfBends, trunkingSize]);
   
-  // Effect to manage default customConduitLength based on bends (for table method)
+  // Set default conduit lengths based on number of bends
   useEffect(() => {
-    // Only adjust if using table method and long conduit
-    if (calculationMethod === 'table' && containmentType === 'conduit' && conduitLength === 'long') {
-      // Check if current custom length is valid for the selected number of bends
-      const validLengths = Object.keys(conduitFactorLong[conduitDiameter][numberOfBends]);
-      
-      // If current length is not valid, set to the first valid length for that bend count
-      if (!validLengths.includes(customConduitLength.toString())) {
-          // Find the smallest valid length for the current bend configuration
-          const smallestValidLength = Math.min(...validLengths.map(Number));
-          setCustomConduitLength(smallestValidLength);
+    if (conduitLength === 'long') {
+      // Set a valid default length based on the number of bends
+      if (numberOfBends === 0) {
+        setCustomConduitLength(3);
+      } else {
+        setCustomConduitLength(numberOfBends === 1 ? 1 : 1);
       }
     }
-  }, [numberOfBends, conduitLength, conduitDiameter, calculationMethod, containmentType]); // Added dependencies
+  }, [numberOfBends, conduitLength]);
 
-  // --- Render Logic ---
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6 border-b pb-4">
-        <h2 className="text-2xl font-semibold text-gray-800">Cable Containment Calculator</h2>
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold">Cable Containment Calculator</h2>
         {onShowTutorial && (
           <button
             onClick={onShowTutorial}
-            className="text-blue-600 hover:text-blue-800 flex items-center text-sm"
+            className="text-blue-600 hover:text-blue-800 flex items-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-             Tutorial
+            <span className="w-5 h-5 mr-1">ⓘ</span> Tutorial
           </button>
         )}
       </div>
 
-      {/* Input Sections in Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        {/* Column 1: Containment Type & Calculation Method */}
-        <div className="space-y-6">
-          {/* Containment Type Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              1. Select Containment Type:
-            </label>
-            <div className="flex space-x-3">
-              <button
-                className={`flex-1 py-3 px-4 rounded-lg text-center transition-all duration-150 text-sm font-medium border ${
-                  containmentType === 'conduit'
-                    ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300 hover:border-gray-400'
-                }`}
-                onClick={() => setContainmentType('conduit')}
-              >
-                Conduit
-              </button>
-              <button
-                className={`flex-1 py-3 px-4 rounded-lg text-center transition-all duration-150 text-sm font-medium border ${
-                  containmentType === 'trunking'
-                    ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300 hover:border-gray-400'
-                }`}
-                onClick={() => setContainmentType('trunking')}
-              >
-                Trunking
-              </button>
-            </div>
-          </div>
-
-          {/* Calculation Method Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              2. Select Calculation Method:
-            </label>
-            <div className="flex space-x-3">
-              <button
-                className={`flex-1 py-3 px-4 rounded-lg text-center transition-all duration-150 text-sm font-medium border ${
-                  calculationMethod === 'table'
-                    ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300 hover:border-gray-400'
-                }`}
-                onClick={() => setCalculationMethod('table')}
-              >
-                Table Lookup
-              </button>
-              <button
-                className={`flex-1 py-3 px-4 rounded-lg text-center transition-all duration-150 text-sm font-medium border ${
-                  calculationMethod === 'space-factor'
-                    ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300 hover:border-gray-400'
-                }`}
-                onClick={() => setCalculationMethod('space-factor')}
-              >
-                45% Space Factor
-              </button>
-            </div>
-             <p className="text-xs text-gray-500 mt-2">
-                {calculationMethod === 'table' 
-                 ? "Uses predefined factors based on BS 7671 Appendix 4 tables."
-                 : "Calculates based on cable/containment areas (max 45% fill)."
-                }
-            </p>
-          </div>
-        </div>
-
-        {/* Column 2: Containment Details */}
-        <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-md font-semibold mb-3 text-gray-700 border-b pb-2">
-              3. {containmentType === 'conduit' ? 'Conduit Details' : 'Trunking Details'} ({calculationMethod === 'table' ? 'Table Lookup' : 'Space Factor'})
-            </h3>
-            
-            {/* Conduit Inputs */}
-            {containmentType === 'conduit' && (
-              <>
-                {calculationMethod === 'table' ? (
-                  // Conduit - Table Lookup Inputs
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="conduitDiameterSelect" className="block text-sm font-medium text-gray-700 mb-1">
-                        Conduit Diameter (mm)
-                      </label>
-                      <select
-                        id="conduitDiameterSelect"
-                        value={conduitDiameter}
-                        // Use type assertion for onChange event
-                        onChange={(e) => setConduitDiameter(e.target.value as ConduitDiameterType)} 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                      >
-                        {conduitDiameterOptions.map((size) => (
-                          <option key={size} value={size}> {size} mm </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Conduit Length / Bends
-                      </label>
-                      <div className="flex space-x-2">
-                        <button
-                          className={`flex-1 py-2 px-3 rounded-md text-center transition-colors text-xs font-medium border ${
-                            conduitLength === 'short'
-                              ? 'bg-blue-100 text-blue-800 border-blue-300'
-                              : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-                          }`}
-                          onClick={() => setConduitLength('short')}
-                        >
-                          ≤ 3m (Straight)
-                        </button>
-                        <button
-                          className={`flex-1 py-2 px-3 rounded-md text-center transition-colors text-xs font-medium border ${
-                            conduitLength === 'long'
-                              ? 'bg-blue-100 text-blue-800 border-blue-300'
-                              : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-                          }`}
-                          onClick={() => setConduitLength('long')}
-                        >
-                           3m or With Bends
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Inputs only shown for 'long' conduit runs */}
-                    {conduitLength === 'long' && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Number of Bends
-                          </label>
-                           <div className="flex space-x-2">
-                            {bendOptions.map(bendCount => (
-                                <button
-                                  key={bendCount}
-                                  className={`flex-1 py-2 px-3 rounded-md text-center transition-colors text-xs font-medium border ${
-                                    numberOfBends === bendCount
-                                      ? 'bg-blue-100 text-blue-800 border-blue-300'
-                                      : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-                                  }`}
-                                  onClick={() => setNumberOfBends(bendCount)}
-                                >
-                                  {bendCount === 0 ? 'No Bends' : `${bendCount} Bend${bendCount > 1 ? 's' : ''}`}
-                                </button>
-                            ))}
-                           </div>
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="customConduitLengthSelect" className="block text-sm font-medium text-gray-700 mb-1">
-                            Actual Conduit Length (m)
-                          </label>
-                          <select
-                            id="customConduitLengthSelect"
-                            value={customConduitLength.toString()} // Value must be string for select
-                            onChange={(e) => setCustomConduitLength(parseFloat(e.target.value))}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                          >
-                            {/* Dynamically generate options based on valid lengths for the selected diameter/bends */}
-                            {Object.keys(conduitFactorLong[conduitDiameter][numberOfBends]).map((length) => (
-                              <option key={length} value={length}>
-                                {length} m
-                              </option>
-                            ))}
-                          </select>
-                           <p className="text-xs text-gray-500 mt-1">Select the actual run length.</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  // Conduit - 45% Space Factor Input
-                  <div>
-                    <label htmlFor="manualConduitDiameterInput" className="block text-sm font-medium text-gray-700 mb-1">
-                      Conduit Internal Diameter (mm)
-                    </label>
-                    <input
-                      id="manualConduitDiameterInput"
-                      type="number"
-                      min="1"
-                      step="0.1"
-                      placeholder="e.g., 13.5"
-                      value={manualConduitDiameter || ''}
-                      onChange={(e) => setManualConduitDiameter(parseFloat(e.target.value) || 0)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Enter the internal diameter for area calculation.</p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Trunking Inputs */}
-            {containmentType === 'trunking' && (
-              <>
-                {calculationMethod === 'table' ? (
-                  // Trunking Size - Table Lookup
-                  <div>
-                    <label htmlFor="trunkingSizeSelect" className="block text-sm font-medium text-gray-700 mb-1">
-                      Trunking Size (mm)
-                    </label>
-                    <select
-                      id="trunkingSizeSelect"
-                      value={trunkingSize}
-                      onChange={(e) => setTrunkingSize(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                    >
-                      {trunkingSizeOptions.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  // Trunking Size - Manual Input for 45% Rule
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Trunking Internal Dimensions (mm)
-                    </label>
-                    <div className="flex space-x-3">
-                      <div className="flex-1">
-                        <label htmlFor="trunkingWidthInput" className="block text-xs text-gray-500 mb-1">Width</label>
-                        <input
-                          id="trunkingWidthInput"
-                          type="number"
-                          min="1"
-                          placeholder="Width"
-                          value={trunkingWidth || ''}
-                           onChange={(e) => setTrunkingWidth(parseFloat(e.target.value) || 0)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label htmlFor="trunkingHeightInput" className="block text-xs text-gray-500 mb-1">Height</label>
-                        <input
-                          id="trunkingHeightInput"
-                          type="number"
-                          min="1"
-                          placeholder="Height"
-                          value={trunkingHeight || ''}
-                          onChange={(e) => setTrunkingHeight(parseFloat(e.target.value) || 0)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-                        />
-                      </div>
-                    </div>
-                     <p className="text-xs text-gray-500 mt-1">Enter internal dimensions for area calculation.</p>
-                  </div>
-                )}
-              </>
-            )}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Containment Type:
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            className={`p-4 rounded-lg text-center transition-colors ${
+              containmentType === 'conduit'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+            onClick={() => setContainmentType('conduit')}
+          >
+            Conduit
+          </button>
+          <button
+            className={`p-4 rounded-lg text-center transition-colors ${
+              containmentType === 'trunking'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+            onClick={() => setContainmentType('trunking')}
+          >
+            Trunking
+          </button>
         </div>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Calculation Method:
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            className={`p-4 rounded-lg text-center transition-colors ${
+              calculationMethod === 'table'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+            onClick={() => setCalculationMethod('table')}
+          >
+            Table Lookup Method
+          </button>
+          <button
+            className={`p-4 rounded-lg text-center transition-colors ${
+              calculationMethod === 'space-factor'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+            onClick={() => setCalculationMethod('space-factor')}
+          >
+            45% Space Factor Rule
+          </button>
+        </div>
+      </div>
+
+      {/* Containment Details */}
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-3">
+          {containmentType === 'conduit' ? 'Conduit Details' : 'Trunking Details'}
+        </h3>
+        
+        {containmentType === 'conduit' ? (
+          <>
+            {calculationMethod === 'table' ? (
+              <div className="space-y-4">
+                {/* Conduit Diameter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Conduit Diameter (mm)
+                  </label>
+                  <select
+                    value={conduitDiameter}
+                    onChange={(e) => setConduitDiameter(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  >
+                    {conduitDiameterOptions.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Conduit Length */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Conduit Length
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      className={`p-3 rounded-lg text-center transition-colors ${
+                        conduitLength === 'short'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                      }`}
+                      onClick={() => setConduitLength('short')}
+                    >
+                      ≤ 3m (Straight)
+                    </button>
+                    <button
+                      className={`p-3 rounded-lg text-center transition-colors ${
+                        conduitLength === 'long'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                      }`}
+                      onClick={() => setConduitLength('long')}
+                    >
+                       3m or With Bends
+                    </button>
+                  </div>
+                </div>
+
+                {/* Number of Bends (only if long) */}
+                {conduitLength === 'long' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Number of Bends
+                      </label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <button
+                          className={`p-3 rounded-lg text-center transition-colors ${
+                            numberOfBends === 0
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}
+                          onClick={() => setNumberOfBends(0)}
+                        >
+                          No Bends
+                        </button>
+                        <button
+                          className={`p-3 rounded-lg text-center transition-colors ${
+                            numberOfBends === 1
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}
+                          onClick={() => setNumberOfBends(1)}
+                        >
+                          One Bend
+                        </button>
+                        <button
+                          className={`p-3 rounded-lg text-center transition-colors ${
+                            numberOfBends === 2
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}
+                          onClick={() => setNumberOfBends(2)}
+                        >
+                          Two Bends
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Conduit Length (m)
+                      </label>
+                      <select
+                        value={customConduitLength.toString()}
+                        onChange={(e) => setCustomConduitLength(parseFloat(e.target.value))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                      >
+                        {numberOfBends === 0 && <option value="3">3</option>}
+                        {numberOfBends === 0 && <option value="3.5">3.5</option>}
+                        {numberOfBends === 0 && <option value="4">4</option>}
+                        {numberOfBends === 0 && <option value="4.5">4.5</option>}
+                        {numberOfBends === 0 && <option value="5">5</option>}
+                        {numberOfBends === 0 && <option value="6">6</option>}
+                        {numberOfBends === 0 && <option value="7">7</option>}
+                        {numberOfBends === 0 && <option value="8">8</option>}
+                        {numberOfBends === 0 && <option value="9">9</option>}
+                        {numberOfBends === 0 && <option value="10">10</option>}
+                        
+                        {numberOfBends === 1 && <option value="1">1</option>}
+                        {numberOfBends === 1 && <option value="1.5">1.5</option>}
+                        {numberOfBends === 1 && <option value="2">2</option>}
+                        {numberOfBends === 1 && <option value="2.5">2.5</option>}
+                        {numberOfBends === 1 && <option value="3">3</option>}
+                        {numberOfBends === 1 && <option value="3.5">3.5</option>}
+                        {numberOfBends === 1 && <option value="4">4</option>}
+                        {numberOfBends === 1 && <option value="4.5">4.5</option>}
+                        {numberOfBends === 1 && <option value="5">5</option>}
+                        {numberOfBends === 1 && <option value="6">6</option>}
+                        {numberOfBends === 1 && <option value="7">7</option>}
+                        {numberOfBends === 1 && <option value="8">8</option>}
+                        {numberOfBends === 1 && <option value="9">9</option>}
+                        {numberOfBends === 1 && <option value="10">10</option>}
+                        
+                        {numberOfBends === 2 && <option value="1">1</option>}
+                        {numberOfBends === 2 && <option value="1.5">1.5</option>}
+                        {numberOfBends === 2 && <option value="2">2</option>}
+                        {numberOfBends === 2 && <option value="2.5">2.5</option>}
+                        {numberOfBends === 2 && <option value="3">3</option>}
+                        {numberOfBends === 2 && <option value="3.5">3.5</option>}
+                        {numberOfBends === 2 && <option value="4">4</option>}
+                        {numberOfBends === 2 && <option value="4.5">4.5</option>}
+                        {numberOfBends === 2 && <option value="5">5</option>}
+                        {numberOfBends === 2 && <option value="6">6</option>}
+                        {numberOfBends === 2 && <option value="7">7</option>}
+                        {numberOfBends === 2 && <option value="8">8</option>}
+                        {numberOfBends === 2 && <option value="9">9</option>}
+                        {numberOfBends === 2 && <option value="10">10</option>}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              // 45% Space Factor - Manual Conduit Input
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conduit Diameter (mm)
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="100"
+                  placeholder="Enter diameter"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setConduitDiameter(val);
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter the exact conduit diameter in mm</p>
+              </div>
+            )}
+          </>
+        ) : (
+          // Trunking
+          <>
+            {calculationMethod === 'table' ? (
+              // Trunking Size - Table Lookup
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Trunking Size (mm)
+                </label>
+                <select
+                  value={trunkingSize}
+                  onChange={(e) => setTrunkingSize(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                >
+                  {trunkingSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              // Trunking Size - Manual Input for 45% Rule
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Trunking Dimensions (mm)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Width (mm)</label>
+                    <input
+                      type="number"
+                      min="25"
+                      max="300"
+                      placeholder="Width"
+                      id="trunkingWidth"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Height (mm)</label>
+                    <input
+                      type="number"
+                      min="25"
+                      max="300"
+                      placeholder="Height"
+                      id="trunkingHeight"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Cables Section */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4 border-b pb-3">
-          <h3 className="text-lg font-semibold text-gray-800">4. Cable Details</h3>
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-medium">Cables</h3>
           <button
             onClick={addCable}
-            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ease-in-out duration-150"
+            className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:shadow-outline-blue active:bg-blue-700 transition ease-in-out duration-150"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-             Add Cable
+            <span className="w-4 h-4 mr-1">+</span> Add Cable
           </button>
         </div>
 
-        {/* Cable Table */}
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-left text-gray-600">
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white">
+            <thead>
+              <tr className="bg-gray-100">
                 {calculationMethod === 'table' ? (
-                  // Headers for Table Lookup
                   <>
-                    <th className="px-4 py-2 font-medium">Conductor Type</th>
-                    <th className="px-4 py-2 font-medium">CSA (mm²)</th>
-                    <th className="px-4 py-2 font-medium text-center">Quantity</th>
-                    {isCalculated && <th className="px-4 py-2 font-medium text-right">Cable Factor</th>}
+                    <th className="px-4 py-2 text-left">Conductor Type</th>
+                    <th className="px-4 py-2 text-left">CSA (mm²)</th>
+                    <th className="px-4 py-2 text-left">Quantity</th>
+                    {isCalculated && <th className="px-4 py-2 text-left">Factor</th>}
                   </>
                 ) : (
-                  // Headers for Space Factor
                   <>
-                    <th className="px-4 py-2 font-medium">Description</th>
-                    <th className="px-4 py-2 font-medium">Outer Dia. (mm)</th>
-                    <th className="px-4 py-2 font-medium text-center">Quantity</th>
-                    {isCalculated && <th className="px-4 py-2 font-medium text-right">Area (mm²)</th>}
+                    <th className="px-4 py-2 text-left">Cable Description</th>
+                    <th className="px-4 py-2 text-left">Outer Dia. (mm)</th>
+                    <th className="px-4 py-2 text-left">Quantity</th>
+                    {isCalculated && <th className="px-4 py-2 text-left">CSA (mm²)</th>}
                   </>
                 )}
-                <th className="px-4 py-2 font-medium text-center">Action</th>
+                <th className="px-4 py-2 text-left">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {cables.map((cable, index) => (
-                <tr key={cable.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+            <tbody>
+              {cables.map((cable) => (
+                <tr key={cable.id} className="border-t">
                   {calculationMethod === 'table' ? (
-                    // Inputs for Table Lookup
                     <>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-2">
                         <select
                           value={cable.conductorType}
                           onChange={(e) => 
                             updateCable(cable.id, 'conductorType', e.target.value as ConductorType)
                           }
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 text-sm py-1"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                         >
                           <option value="solid">Solid</option>
                           <option value="stranded">Stranded</option>
                         </select>
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-2">
                         <select
                           value={cable.csa}
                           onChange={(e) => updateCable(cable.id, 'csa', e.target.value)}
-                           className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 text-sm py-1"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                         >
-                          {/* Filter CSA options based on conductor type and method */}
-                          {Object.keys(containmentType === 'trunking' ? cableFactor.trunking[cable.conductorType] : cableFactor.short[cable.conductorType] ?? {}).map((size) => (
+                          {csaOptions.map((size) => (
                             <option key={size} value={size}>
                               {size}
                             </option>
@@ -697,70 +715,62 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
                       </td>
                     </>
                   ) : (
-                    // Inputs for Space Factor
                     <>
                       <td className="px-4 py-2">
                         <input
                           type="text"
-                          placeholder="e.g., 2.5mm² T&E"
-                          value={cable.description || ''}
-                          onChange={(e) => updateCable(cable.id, 'description', e.target.value)}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 text-sm py-1"
+                          placeholder="Cable description"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                         />
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-2">
                         <input
                           type="number"
-                          min="0.1"
+                          min="0.5"
                           step="0.1"
-                          placeholder="e.g., 9.2"
+                          placeholder="Diameter"
                           value={cable.outerDiameter || ''}
                           onChange={(e) => 
-                            updateCable(cable.id, 'outerDiameter', e.target.value) // Pass string for parsing in updateCable
+                            updateCable(cable.id, 'outerDiameter', parseFloat(e.target.value))
                           }
-                          className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 text-sm py-1"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                         />
                       </td>
                     </>
                   )}
-                  {/* Quantity Input (Common) */}
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-4 py-2">
                     <input
                       type="number"
                       min="1"
                       value={cable.quantity}
                       onChange={(e) => 
-                        updateCable(cable.id, 'quantity', e.target.value) // Pass string for parsing
+                        updateCable(cable.id, 'quantity', parseInt(e.target.value))
                       }
-                      className="block w-16 mx-auto rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 text-sm py-1 text-center"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                     />
                   </td>
-                  {/* Calculated Value (Factor or Area) */}
                   {isCalculated && (
-                    <td className="px-4 py-2 text-right whitespace-nowrap text-gray-700">
-                      {calculationMethod === 'table' 
-                        ? cable.factor?.toFixed(1) ?? '-' // Show calculated factor
-                        : cable.outerDiameter 
-                          ? (calculateCsaFromDiameter(cable.outerDiameter) * cable.quantity).toFixed(2) // Show total area for this cable type
-                          : '-'
-                      }
-                    </td>
+                    calculationMethod === 'table' ? (
+                      <td className="px-4 py-2">{cable.factor}</td>
+                    ) : (
+                      <td className="px-4 py-2">
+                        {cable.outerDiameter ? 
+                          calculateCsaFromDiameter(cable.outerDiameter).toFixed(2) 
+                          : '0'}
+                      </td>
+                    )
                   )}
-                  {/* Remove Button */}
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-4 py-2">
                     <button
                       onClick={() => removeCable(cable.id)}
                       disabled={cables.length === 1}
-                      className={`p-1 rounded-md transition-colors ${
+                      className={`inline-flex items-center p-1 rounded-md ${
                         cables.length === 1
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'text-red-500 hover:text-red-700 hover:bg-red-100'
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-red-600 hover:text-red-800'
                       }`}
-                      title="Remove Cable"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <span className="text-xs">Remove</span>
                     </button>
                   </td>
                 </tr>
@@ -768,96 +778,72 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
             </tbody>
           </table>
         </div>
-         {cables.length === 0 && <p className="text-center text-gray-500 mt-4">Please add at least one cable.</p>}
       </div>
 
       {/* Calculate Button */}
       <div className="flex justify-center mb-6">
         <button
           onClick={calculateCompliance}
-          disabled={cables.length === 0} // Disable if no cables
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base leading-6 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 active:bg-blue-800 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:shadow-outline-blue active:bg-blue-700 transition ease-in-out duration-150"
         >
-          <Icons.Calculator className="w-5 h-5 mr-2" /> Calculate Compliance
+          {Icons.Calculator && <Icons.Calculator className="w-5 h-5 mr-2" />} Calculate
         </button>
       </div>
 
-      {/* --- Results Section --- */}
+      {/* Results Section */}
       {isCalculated && (
-        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Calculation Results</h3>
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h3 className="text-lg font-medium mb-3">Results</h3>
           
-          {/* Error Message Display */}
-          {errorMessage && (
-             <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md text-sm">
-                <strong>Error:</strong> {errorMessage}
-            </div>
-          )}
-
-          {/* Results Grid */}
-          <div className={`grid grid-cols-1 ${calculationMethod === 'table' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-4`}>
-            
-            {/* Result Cards - Common Status Card */}
-             <div className={`p-4 rounded-lg shadow-md border ${isCompliant ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                <p className="text-sm font-medium text-gray-600 mb-1">Compliance Status</p>
-                <p className={`text-2xl font-bold ${isCompliant ? 'text-green-700' : 'text-red-700'}`}>
+          {calculationMethod === 'table' ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-white p-3 rounded shadow">
+                <p className="text-sm text-gray-500">Total Cable Factor</p>
+                <p className="text-2xl font-bold">{totalCableFactor.toFixed(1)}</p>
+              </div>
+              <div className="bg-white p-3 rounded shadow">
+                <p className="text-sm text-gray-500">Containment Factor</p>
+                <p className="text-2xl font-bold">{containmentFactor}</p>
+              </div>
+              <div className={`p-3 rounded shadow ${isCompliant ? 'bg-green-50' : 'bg-red-50'}`}>
+                <p className="text-sm text-gray-500">Status</p>
+                <p className={`text-2xl font-bold ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
                   {isCompliant ? 'Compliant' : 'Non-Compliant'}
                 </p>
-                 <p className={`text-xs mt-1 ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
-                    {isCompliant 
-                        ? 'Installation meets requirements.' 
-                        : calculationMethod === 'table' 
-                            ? 'Containment factor is less than total cable factor.' 
-                            : 'Space factor exceeds 45% limit.'
-                    }
-                    {!isCompliant && errorMessage && ' (See error above)'}
-                 </p>
               </div>
-
-            {/* Result Cards - Method Specific */}
-            {calculationMethod === 'table' ? (
-              // Table Method Results
-              <>
-                <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                  <p className="text-sm font-medium text-gray-600 mb-1">Total Cable Factor</p>
-                  <p className="text-2xl font-bold text-gray-800">{totalCableFactor.toFixed(1)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Sum of factors for all cables.</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                  <p className="text-sm font-medium text-gray-600 mb-1">{containmentType === 'conduit' ? 'Conduit' : 'Trunking'} Factor</p>
-                  <p className="text-2xl font-bold text-gray-800">{containmentFactor}</p>
-                   <p className="text-xs text-gray-500 mt-1">Capacity factor of the selected containment.</p>
-                </div>
-              </>
-            ) : (
-              // Space Factor Method Results
-              <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                <p className="text-sm font-medium text-gray-600 mb-1">Space Factor Used</p>
-                <p className="text-2xl font-bold text-gray-800">{spaceFactorPercentage.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  (Total Cable Area: {totalCableArea.toFixed(1)} mm² / Containment Area: {containmentArea.toFixed(1)} mm²)
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="bg-white p-3 rounded shadow">
+                <p className="text-sm text-gray-500">Space Factor</p>
+                <p className="text-2xl font-bold">{spaceFactorPercentage.toFixed(1)}%</p>
+                <p className="text-xs text-gray-500">
+                  (Maximum allowed: 45%)
                 </p>
-                 <p className="text-xs text-gray-500 mt-1">Maximum allowed: 45%</p>
               </div>
-            )}
-          </div>
-          
-          {/* Summary Message */}
-          {!errorMessage && (
-             <div className="mt-4 text-sm text-gray-700">
-                {isCompliant 
-                    ? `The selected ${containmentType} (${calculationMethod === 'table' ? 'Factor: ' + containmentFactor : 'Area: ' + containmentArea.toFixed(1) + 'mm²'}) has sufficient capacity for the specified cables.`
-                    : `The selected ${containmentType} (${calculationMethod === 'table' ? 'Factor: ' + containmentFactor : 'Area: ' + containmentArea.toFixed(1) + 'mm²'}) does not have sufficient capacity. Consider a larger size, different type, or reducing the number/size of cables.`
-                }
+              <div className={`p-3 rounded shadow ${isCompliant ? 'bg-green-50' : 'bg-red-50'}`}>
+                <p className="text-sm text-gray-500">Status</p>
+                <p className={`text-2xl font-bold ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
+                  {isCompliant ? 'Compliant' : 'Non-Compliant'}
+                </p>
+              </div>
             </div>
           )}
+          
+          <div className="mt-4">
+            <p className="text-sm text-gray-600">
+              {isCompliant 
+                ? 'The cable installation is compliant with the requirements.'
+                : calculationMethod === 'table'
+                  ? 'The containment factor must be equal to or greater than the total cable factor.'
+                  : 'The space factor must not exceed 45% of the containment cross-sectional area.'
+              }
+            </p>
+          </div>
         </div>
       )}
-      {/* --- End Results Section --- */}
-
-    </div> // End main container
+    </div>
   );
 };
 
 export default CableContainmentCalculator;
-
