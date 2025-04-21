@@ -1,0 +1,42 @@
+/* Inject Tailwind CSS base styles, component classes, and utility classes */
+@import "tailwindcss";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Define base styles for the body or html if needed */
+/* Tailwind's preflight usually handles most base styling */
+/*
+body {
+  font-family: 'Inter', sans-serif; /* Example: Ensure consistent font */
+/* -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+*/
+
+/* Custom Animations */
+@layer utilities {
+  /* Define the fadeIn animation */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px); /* Optional: Add slight upward movement */
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Create a utility class to apply the animation */
+  /* Note: The React code previously used inline style tag for this.
+     If you prefer using a utility class, add this class instead of
+     the inline style tag in App.tsx */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-in-out;
+  }
+}
+
+/* Add any other global custom CSS classes below */
+
