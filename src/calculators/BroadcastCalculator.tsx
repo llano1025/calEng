@@ -1040,29 +1040,43 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
 
       {/* Calculator Type Selection */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Select Calculator Type</h2>
+        <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">Select Calculator Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
-            className={`p-4 rounded-lg text-center transition-colors ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'signalStrength'
-                ? 'bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-1'
-                : 'bg-gray-200 hover:bg-gray-300'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('signalStrength')}
           >
-            <h3 className="font-medium text-lg">TV Signal Strength</h3>
-            <p className="text-sm mt-1">Calculate signal based on components</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'signalStrength' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">TV Signal Strength</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'signalStrength' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate signal based on components
+              </p>
+            </div>
           </button>
           <button
-            className={`p-4 rounded-lg text-center transition-colors ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'opticalFiber'
-                ? 'bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-1'
-                : 'bg-gray-200 hover:bg-gray-300'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('opticalFiber')}
           >
-            <h3 className="font-medium text-lg">Optical Fiber Power Budget</h3>
-            <p className="text-sm mt-1">Calculate power budget for fiber systems</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'opticalFiber' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Optical Fiber Power Budget</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'opticalFiber' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate power budget for fiber systems
+              </p>
+            </div>
           </button>
         </div>
       </div>

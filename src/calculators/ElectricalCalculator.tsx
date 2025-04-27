@@ -11,6 +11,7 @@ import MaxCopperResistanceCalculator from './electrical/MaxCopperResistanceCalcu
 import ProtectionCoordinationCalculator from './electrical/ProtectionCoordinationCalculator';
 import FuseOperationTimeCalculator from './electrical/FuseOperationTimeCalculator';
 import CableContainmentCalculator from './electrical/CableContainmentCalculator';
+import UPSCalculator from './electrical/UPSCalculator';
 import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
@@ -21,7 +22,7 @@ interface ElectricalCalculatorProps {
 // The main Electrical Installation Calculator component that coordinates the sub-calculators
 const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) => {
   // State for the selected calculator type and display mode
-  const [calculatorType, setCalculatorType] = useState<string>(''); // 'cableSizing', 'powerFactor', 'circuitProtection', 'lightingControl', 'lpd', 'loadBalancing', 'copperLoss', 'maxResistance', or 'protectionCoordination'
+  const [calculatorType, setCalculatorType] = useState<string>(''); // 'cableSizing', 'powerFactor', etc.
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
 
   // Render the selected calculator
@@ -55,6 +56,8 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
         return <FuseOperationTimeCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'cableContainment':
         return <CableContainmentCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'ups':
+        return <UPSCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -76,130 +79,229 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
         Electrical Installation
       </h1>
 
-      {/* Calculator Type Selection */}
+      {/* Calculator Type Selection - UPDATED STYLING */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Select Calculator Type</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+        <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">Select Calculator Type</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Cable Sizing */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'cableSizing'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('cableSizing')}
           >
-            <h3 className="font-medium text-lg">Cable Sizing</h3>
-            <p className="text-sm mt-1 text-gray-600">Calculate cable size</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'cableSizing' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Cable Sizing</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'cableSizing' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate cable size
+              </p>
+            </div>
           </button>
 
+          {/* Copper Loss */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'copperLoss'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('copperLoss')}
           >
-            <h3 className="font-medium text-lg">Copper Loss</h3>
-            <p className="text-sm mt-1 text-gray-600">Circuit copper loss calculation</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'copperLoss' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Copper Loss</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'copperLoss' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Circuit copper loss calculation
+              </p>
+            </div>
           </button>
 
+          {/* Max Copper Resistance */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'maxResistance'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('maxResistance')}
           >
-            <h3 className="font-medium text-lg">Max Copper Resistance</h3>
-            <p className="text-sm mt-1 text-gray-600">Calculate maximum allowable resistance</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'maxResistance' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Max Copper Resistance</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'maxResistance' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Maximum allowable resistance
+              </p>
+            </div>
           </button>
 
+          {/* Load Balancing */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'loadBalancing'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('loadBalancing')}
           >
-            <h3 className="font-medium text-lg">Load Balancing</h3>
-            <p className="text-sm mt-1 text-gray-600">Phase unbalance checker</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'loadBalancing' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Load Balancing</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'loadBalancing' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Phase unbalance checker
+              </p>
+            </div>
           </button>
 
+          {/* Lighting Control */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'lightingControl'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('lightingControl')}
           >
-            <h3 className="font-medium text-lg">Lighting Control</h3>
-            <p className="text-sm mt-1 text-gray-600">Control points calculator</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'lightingControl' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Lighting Control</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'lightingControl' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Control points calculator
+              </p>
+            </div>
           </button>
 
+          {/* Lighting Power Density */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'lpd'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('lpd')}
           >
-            <h3 className="font-medium text-lg">Lighting Power Density</h3>
-            <p className="text-sm mt-1 text-gray-600">LPD calculation & compliance</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'lpd' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Lighting Power Density</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'lpd' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> LPD calculation & compliance
+              </p>
+            </div>
           </button>
 
+          {/* Protection Coordination */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'protectionCoordination'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('protectionCoordination')}
           >
-            <h3 className="font-medium text-lg">Circuit Protection</h3>
-            <p className="text-sm mt-1 text-gray-600">Main Incoming Circuit</p>
-          </button>
-          
-          <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
-              calculatorType === 'circuitProtection'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
-            }`}
-            onClick={() => setCalculatorType('circuitProtection')}
-          >
-            <h3 className="font-medium text-lg">Circuit Protection</h3>
-            <p className="text-sm mt-1 text-gray-600">Cable thermal check</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'protectionCoordination' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'protectionCoordination' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Main Incoming Circuit
+              </p>
+            </div>
           </button>
 
+          {/* Power Factor */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'powerFactor'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('powerFactor')}
           >
-            <h3 className="font-medium text-lg">Power Factor</h3>
-            <p className="text-sm mt-1 text-gray-600">Capacitor sizing</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'powerFactor' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Power Factor</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'powerFactor' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Capacitor sizing
+              </p>
+            </div>
           </button>
 
+          {/* Circuit Protection */}
           <button
-            className={`p-4 rounded-lg text-center transition-colors border ${
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'circuitProtection'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('circuitProtection')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'circuitProtection' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Cable thermal check
+              </p>
+            </div>
+          </button>
+
+          {/* Cable Containment */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'cableContainment'
-                ? 'bg-blue-100 border-blue-600 ring-2 ring-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
             onClick={() => setCalculatorType('cableContainment')}
           >
-            <h3 className="font-medium text-lg">Cable Containment</h3>
-            <p className="text-sm mt-1 text-gray-600">Conduit & trunking capacity</p>
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'cableContainment' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Cable Containment</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'cableContainment' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Conduit & trunking capacity
+              </p>
+            </div>
           </button>
 
+          {/* UPS Calculator - New addition */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'ups'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('ups')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'ups' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Uninterruptible Power Supply</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'ups' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> UPS & battery calculations
+              </p>
+            </div>
+          </button>
         </div>
       </div>
 
