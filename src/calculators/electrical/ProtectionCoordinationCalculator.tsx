@@ -204,7 +204,7 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
       `HV source impedance referred to LV side = ${srcImpedance.toFixed(4)} × (${LV_VOLTAGE * 1000}/${voltage * 1000})² = ${srcImpedanceLV.toFixed(4)} Ω = ${srcImpedanceLVmOhm.toFixed(3)} mΩ`,
       ' ',
       `Transformer impedance = ${transformerImpedance}%`,
-      `Transformer impedance referred to LV side = ${transformerImpedance}% × ${LV_VOLTAGE}²/${incomingTransformerRating/1000*100} = ${transImpedanceOhms.toFixed(4)} Ω = ${transImpedanceOhmsmOhm.toFixed(3)} mΩ`,
+      `Transformer impedance referred to LV side = ${transformerImpedance}% × ${LV_VOLTAGE*1000}²/${incomingTransformerRating*1000} = ${transImpedanceOhms.toFixed(4)} Ω = ${transImpedanceOhmsmOhm.toFixed(3)} mΩ`,
       `The estimated impedance of each Circuit Breaker = ${cbImpedancemOhm.toFixed(1)} mΩ`,
       ' ',
       `Total source impedance at the LV side = ${srcImpedanceLVmOhm.toFixed(3)} + ${transImpedanceOhmsmOhm.toFixed(3)} + ${cbImpedancemOhm.toFixed(1)} × 2 = ${totalImpedancemOhm.toFixed(3)} mΩ`,
