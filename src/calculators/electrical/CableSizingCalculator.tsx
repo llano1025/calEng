@@ -33,6 +33,17 @@ interface CalculationResults {
   error?: string;
 }
 
+interface ProtectiveConductorResults {
+  conductorType: string;
+  material: string;
+  phaseSize: string;
+  minCrossSectionalArea: string;
+  formula: string;
+  kPhaseConductor: number;
+  kProtectiveConductor: number;
+  calculationMethod: string;
+}
+
 // Define props type for the component
 interface CableSizingCalculatorProps {
   onShowTutorial: () => void; // Function to show tutorial
@@ -63,8 +74,17 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     cableConfig: 'standard', // 'standard', 'flat', 'trefoil' (for single-core cables)
   });
 
+  // State for protective conductor inputs
+  const [protectiveConductorInputs, setProtectiveConductorInputs] = useState({
+    conductorType: 'separate', // 'separate', 'cable_incorporated', 'sheath_armour', 'conduit', 'bare'
+    material: 'copper', // 'copper', 'aluminium', 'steel', 'lead'
+    insulation: 'pvc', // 'pvc' (70°C), 'xlpe' (90°C), 'thermosetting' (90°C)
+    conditions: 'normal', // 'restricted', 'normal', 'fire'
+  });
+
   // State for calculation results
   const [cableSizingResults, setCableSizingResults] = useState<any>(null);
+  const [protectiveConductorResults, setProtectiveConductorResults] = useState<ProtectiveConductorResults | null>(null);
   
   // State for lookup details
   const [lookupDetails, setLookupDetails] = useState<any>(null);
@@ -74,10 +94,16 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     setCableSizingInputs({ ...cableSizingInputs, [e.target.name]: e.target.value });
     setCableSizingResults(null); // Clear results on input change
     setLookupDetails(null);
+    setProtectiveConductorResults(null); // Clear protective conductor results
+  };
+
+  // Handler for protective conductor input changes
+  const handleProtectiveConductorInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setProtectiveConductorInputs({ ...protectiveConductorInputs, [e.target.name]: e.target.value });
+    setProtectiveConductorResults(null); // Clear results on input change
   };
 
   // Filter installation methods based on selected cable properties
-  // Update the getAvailableMethods function
   const getAvailableMethods = () => {
     const { cableArrangement, cableType, armoured } = cableSizingInputs;
     const isSingleCore = cableArrangement === 'singleCore';
@@ -181,6 +207,79 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     return [{ value: 'standard', label: 'Standard' }];
   };
 
+  // Get available protective conductor types based on selected inputs
+  const getAvailableProtectiveConductorTypes = () => {
+    return [
+      { value: 'separate', label: 'Separate Insulated Conductor' },
+      { value: 'cable_incorporated', label: 'Incorporated in Cable' },
+      { value: 'sheath_armour', label: 'Cable Sheath or Armour' },
+      { value: 'conduit', label: 'Steel Conduit/Trunking' },
+      { value: 'bare', label: 'Bare Conductor' }
+    ];
+  };
+
+  // Get available materials based on protective conductor type
+  const getAvailableMaterials = () => {
+    const { conductorType } = protectiveConductorInputs;
+    
+    switch (conductorType) {
+      case 'separate':
+      case 'bare':
+        return [
+          { value: 'copper', label: 'Copper' },
+          { value: 'aluminium', label: 'Aluminium' },
+          { value: 'steel', label: 'Steel' }
+        ];
+      case 'cable_incorporated':
+        return [
+          { value: 'copper', label: 'Copper' },
+          { value: 'aluminium', label: 'Aluminium' }
+        ];
+      case 'sheath_armour':
+        return [
+          { value: 'aluminium', label: 'Aluminium' },
+          { value: 'steel', label: 'Steel' },
+          { value: 'lead', label: 'Lead' }
+        ];
+      case 'conduit':
+        return [{ value: 'steel', label: 'Steel' }];
+      default:
+        return [{ value: 'copper', label: 'Copper' }];
+    }
+  };
+
+  // Get available insulation types based on protective conductor type
+  const getAvailableInsulations = () => {
+    const { conductorType } = protectiveConductorInputs;
+    
+    if (conductorType === 'bare') {
+      return [
+        { value: 'restricted', label: 'Visible in Restricted Areas' },
+        { value: 'normal', label: 'Normal Conditions' },
+        { value: 'fire', label: 'Fire Risk' }
+      ];
+    } else if (conductorType === 'conduit') {
+      return [
+        { value: 'tp_70', label: '70°C Thermoplastic' },
+        { value: 'tp_90', label: '90°C Thermoplastic' },
+        { value: 'ts_90', label: '90°C Thermosetting' }
+      ];
+    } else if (conductorType === 'sheath_armour') {
+      return [
+        { value: 'tp_70', label: '70°C Thermoplastic' },
+        { value: 'tp_90', label: '90°C Thermoplastic' },
+        { value: 'ts_90', label: '90°C Thermosetting' }
+      ];
+    } else {
+      // For separate or cable incorporated
+      return [
+        { value: 'tp_70', label: '70°C Thermoplastic' },
+        { value: 'tp_90', label: '90°C Thermoplastic' },
+        { value: 'ts_90', label: '90°C Thermosetting' }
+      ];
+    }
+  };
+
   // Reset installation method if current selection becomes invalid
   useEffect(() => {
     const availableMethods = getAvailableMethods();
@@ -206,6 +305,28 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       setCableSizingInputs(prev => ({ ...prev, numberOfLoadedConductors: '2' }));
     }
   }, [cableSizingInputs.systemType]);
+
+  // Reset protective conductor material if current selection becomes invalid
+  useEffect(() => {
+    const availableMaterials = getAvailableMaterials();
+    const currentMaterialIsValid = availableMaterials.some(m => m.value === protectiveConductorInputs.material);
+    if (!currentMaterialIsValid) {
+      setProtectiveConductorInputs(prev => ({ ...prev, material: availableMaterials[0].value }));
+    }
+  }, [protectiveConductorInputs.conductorType]);
+
+  // Reset protective conductor insulation if current selection becomes invalid
+  useEffect(() => {
+    const availableInsulations = getAvailableInsulations();
+    const currentInsulationIsValid = availableInsulations.some(i => i.value === protectiveConductorInputs.insulation);
+    if (!currentInsulationIsValid) {
+      if (protectiveConductorInputs.conductorType === 'bare') {
+        setProtectiveConductorInputs(prev => ({ ...prev, insulation: 'normal' }));
+      } else {
+        setProtectiveConductorInputs(prev => ({ ...prev, insulation: availableInsulations[0].value }));
+      }
+    }
+  }, [protectiveConductorInputs.conductorType]);
 
   // Cable sizing calculation function
   const calculateCableSize = () => {
@@ -318,7 +439,6 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       }
     }
     
-    // REVISED METHOD F & G MAPPING LOGIC to match updated table structure
     // REVISED METHOD F & G MAPPING LOGIC to match updated table structure
     let adjustedMethodKey = installMethodKey;
 
@@ -834,6 +954,192 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       systemType: systemType,
       tableDetails: tableDetails
     });
+
+    // Calculate protective conductor now that we have the phase conductor size
+    calculateProtectiveConductor(finalCableSize);
+  };
+
+  // Calculate protective conductor size based on the phase conductor
+  const calculateProtectiveConductor = (phaseConductorSize: string) => {
+    if (!phaseConductorSize || phaseConductorSize === "Not Found") {
+      setProtectiveConductorResults(null);
+      return;
+    }
+
+    const conductorType = protectiveConductorInputs.conductorType;
+    const material = protectiveConductorInputs.material;
+    const insulation = protectiveConductorInputs.insulation;
+    const phaseMaterial = cableSizingInputs.conductorType; // Always copper in this implementation
+    const phaseInsulation = cableSizingInputs.cableType; // 'pvc' or 'xlpe'
+    const phaseSizeMm2 = parseFloat(phaseConductorSize);
+
+    // Get k values from tables based on the images provided
+    // k1 is for the phase conductor
+    let k1 = getPhaseK(phaseMaterial, phaseInsulation);
+    
+    // k2 is for the protective conductor
+    let k2 = getProtectiveK(conductorType, material, insulation);
+
+    let minProtectiveSize: string;
+    let formula: string;
+    let calculationMethod: string;
+
+    // Calculate based on the rules in table (a)
+    if (phaseSizeMm2 <= 16) {
+      // S ≤ 16 mm²
+      if (material === phaseMaterial) {
+        // Same material - S
+        minProtectiveSize = phaseConductorSize;
+        formula = `S = ${phaseConductorSize} mm²`;
+        calculationMethod = "Direct match (S ≤ 16 mm²)";
+      } else {
+        // Different material - k1*S/k2
+        const calculatedSize = (k1 * phaseSizeMm2) / k2;
+        minProtectiveSize = calculatedSize.toFixed(1);
+        formula = `(${k1} × ${phaseSizeMm2}) ÷ ${k2} = ${calculatedSize.toFixed(1)} mm²`;
+        calculationMethod = "k1×S/k2 (S ≤ 16 mm²)";
+      }
+    } else if (phaseSizeMm2 <= 35) {
+      // 16 < S ≤ 35 mm²
+      if (material === phaseMaterial) {
+        // Same material - 16 mm²
+        minProtectiveSize = "16";
+        formula = "16 mm²";
+        calculationMethod = "Fixed value (16 < S ≤ 35 mm²)";
+      } else {
+        // Different material - k1*16/k2
+        const calculatedSize = (k1 * 16) / k2;
+        minProtectiveSize = calculatedSize.toFixed(1);
+        formula = `(${k1} × 16) ÷ ${k2} = ${calculatedSize.toFixed(1)} mm²`;
+        calculationMethod = "k1×16/k2 (16 < S ≤ 35 mm²)";
+      }
+    } else {
+      // S > 35 mm²
+      if (material === phaseMaterial) {
+        // Same material - S/2
+        const calculatedSize = phaseSizeMm2 / 2;
+        minProtectiveSize = calculatedSize.toFixed(1);
+        formula = `${phaseSizeMm2} ÷ 2 = ${calculatedSize.toFixed(1)} mm²`;
+        calculationMethod = "S/2 (S > 35 mm²)";
+      } else {
+        // Different material - k1*S/k2/2
+        const calculatedSize = (k1 * phaseSizeMm2) / (k2 * 2);
+        minProtectiveSize = calculatedSize.toFixed(1);
+        formula = `(${k1} × ${phaseSizeMm2}) ÷ (${k2} × 2) = ${calculatedSize.toFixed(1)} mm²`;
+        calculationMethod = "k1×S/(k2×2) (S > 35 mm²)";
+      }
+    }
+
+    // Round up to standard cross-sectional areas
+    const standardSizes = [1, 1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400, 500, 630];
+    let standardSize = standardSizes[standardSizes.length - 1]; // Default to largest size
+    
+    for (const size of standardSizes) {
+      if (size >= parseFloat(minProtectiveSize)) {
+        standardSize = size;
+        break;
+      }
+    }
+
+    // Set results
+    setProtectiveConductorResults({
+      conductorType: conductorType,
+      material: material,
+      phaseSize: `${phaseConductorSize} mm²`,
+      minCrossSectionalArea: `${minProtectiveSize} mm² (Standard: ${standardSize} mm²)`,
+      formula: formula,
+      kPhaseConductor: k1,
+      kProtectiveConductor: k2,
+      calculationMethod: calculationMethod
+    });
+  };
+
+  // Helper function to get k value for phase conductor (table g)
+  const getPhaseK = (material: string, insulation: string): number => {
+    if (material === 'copper') {
+      if (insulation === 'pvc') return 115;
+      if (insulation === 'xlpe') return 143;
+    } else if (material === 'aluminium') {
+      if (insulation === 'pvc') return 76;
+      if (insulation === 'xlpe') return 94;
+    }
+    return 143; // Default to copper/XLPE if unknown
+  };
+
+  // Helper function to get k value for protective conductor
+  const getProtectiveK = (conductorType: string, material: string, insulation: string): number => {
+    // For separate insulated conductors (table b)
+    if (conductorType === 'separate') {
+      if (material === 'copper') {
+        if (insulation === 'tp_70') return 143;
+        if (insulation === 'tp_90') return 143;
+        if (insulation === 'ts_90') return 176;
+      } else if (material === 'aluminium') {
+        if (insulation === 'tp_70') return 95;
+        if (insulation === 'tp_90') return 95;
+        if (insulation === 'ts_90') return 116;
+      } else if (material === 'steel') {
+        if (insulation === 'tp_70') return 52;
+        if (insulation === 'tp_90') return 52;
+        if (insulation === 'ts_90') return 64;
+      }
+    }
+    
+    // For conductors incorporated in a cable (table c)
+    else if (conductorType === 'cable_incorporated') {
+      if (material === 'copper') {
+        if (insulation === 'tp_70') return 115;
+        if (insulation === 'tp_90') return 100;
+        if (insulation === 'ts_90') return 143;
+      } else if (material === 'aluminium') {
+        if (insulation === 'tp_70') return 76;
+        if (insulation === 'tp_90') return 66;
+        if (insulation === 'ts_90') return 94;
+      }
+    }
+    
+    // For cable sheath or armour (table d)
+    else if (conductorType === 'sheath_armour') {
+      if (material === 'aluminium') {
+        if (insulation === 'tp_70') return 93;
+        if (insulation === 'tp_90') return 85;
+        if (insulation === 'ts_90') return 85;
+      } else if (material === 'steel') {
+        if (insulation === 'tp_70') return 51;
+        if (insulation === 'tp_90') return 46;
+        if (insulation === 'ts_90') return 46;
+      } else if (material === 'lead') {
+        if (insulation === 'tp_70') return 26;
+        if (insulation === 'tp_90') return 23;
+        if (insulation === 'ts_90') return 23;
+      }
+    }
+    
+    // For steel conduit (table e)
+    else if (conductorType === 'conduit') {
+      if (insulation === 'tp_70') return 47;
+      if (insulation === 'tp_90') return 44;
+      if (insulation === 'ts_90') return 58;
+    }
+    
+    // For bare conductors (table f)
+    else if (conductorType === 'bare') {
+      if (material === 'copper') {
+        if (insulation === 'restricted') return 228;
+        if (insulation === 'normal') return 159;
+        return 138; // fire risk
+      } else if (material === 'aluminium') {
+        if (insulation === 'restricted') return 125;
+        if (insulation === 'normal') return 105;
+        return 91; // fire risk
+      } else if (material === 'steel') {
+        if (insulation === 'restricted') return 82;
+        if (insulation === 'normal') return 58;
+        return 50; // fire risk
+      }
+    }
+    
+    return 115; // Default value if not found
   };
 
   // Function to show the relevant table in the modal
@@ -912,8 +1218,28 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
         </div>
       </div>
       <p className="mb-4 text-gray-600">
-        Enhanced calculator with DC/AC options, cable configuration selection, and detailed lookup results.
+        Enhanced calculator with DC/AC options, cable configuration selection, and protective conductor sizing.
       </p>
+
+      {/* Tabs for Phase and Protective Conductor */}
+      {/* <div className="mb-4 border-b">
+        <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
+          <li className="mr-2">
+            <button 
+              className="inline-block p-4 border-b-2 border-blue-600 rounded-t-lg text-blue-600 font-semibold"
+            >
+              Phase Conductor Sizing
+            </button>
+          </li>
+          <li className="mr-2">
+            <button 
+              className="inline-block p-4 rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+            >
+              Protective Conductor Sizing
+            </button>
+          </li>
+        </ul>
+      </div> */}
 
       {/* Input Fields - Now in a 3-column grid, removed advanced section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -1095,18 +1421,68 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
         </div>
       </div>
 
+      {/* Protective Conductor Inputs Section */}
+      <div className="mb-6 bg-gray-50 p-4 rounded-md border">
+        <h3 className="font-medium text-blue-700 mb-2">Protective Conductor Properties</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block font-medium mb-1 text-sm">Conductor Type</label>
+            <select
+              name="conductorType"
+              value={protectiveConductorInputs.conductorType}
+              onChange={handleProtectiveConductorInputChange}
+              className="w-full p-2 border rounded-md text-sm bg-white"
+            >
+              {getAvailableProtectiveConductorTypes().map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block font-medium mb-1 text-sm">Material</label>
+            <select
+              name="material"
+              value={protectiveConductorInputs.material}
+              onChange={handleProtectiveConductorInputChange}
+              className="w-full p-2 border rounded-md text-sm bg-white"
+            >
+              {getAvailableMaterials().map(material => (
+                <option key={material.value} value={material.value}>{material.label}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block font-medium mb-1 text-sm">
+              {protectiveConductorInputs.conductorType === 'bare' ? 'Conditions' : 'Insulation Type'}
+            </label>
+            <select
+              name="insulation"
+              value={protectiveConductorInputs.insulation}
+              onChange={handleProtectiveConductorInputChange}
+              className="w-full p-2 border rounded-md text-sm bg-white"
+            >
+              {getAvailableInsulations().map(insulation => (
+                <option key={insulation.value} value={insulation.value}>{insulation.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Calculate Button */}
       <button
         onClick={calculateCableSize}
         className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
       >
-        Calculate Cable Size
+        Calculate Cable & Protective Conductor Size
       </button>
 
       {/* Results Display - Enhanced with more details */}
       {cableSizingResults && !cableSizingResults.error && (
         <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-          <h3 className="text-lg font-semibold mb-2">Results (Based on CoP Appendix 6)</h3>
+          <h3 className="text-lg font-semibold mb-2">Phase Conductor Results (Based on CoP Appendix 6)</h3>
 
           <div className="mb-4">
             <h4 className="font-medium text-blue-800 mb-1">Cable Selection</h4>
@@ -1143,6 +1519,49 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
               </div>
             </div>
           </div>
+
+          {/* Protective Conductor Results Section */}
+          {protectiveConductorResults && (
+            <div className="mt-6 bg-green-50 p-4 rounded-lg border-l-4 border-green-600">
+              <h3 className="text-lg font-semibold mb-2">Protective Conductor Results</h3>
+              
+              <div className="mb-4">
+                <h4 className="font-medium text-green-800 mb-1">Conductor Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-y-2 text-sm">
+                  <div><span className="font-medium">Phase Conductor Size:</span> {protectiveConductorResults.phaseSize}</div>
+                  <div><span className="font-medium">Protective Conductor Type:</span> {
+                    protectiveConductorResults.conductorType === 'separate' ? 'Separate Insulated' :
+                    protectiveConductorResults.conductorType === 'cable_incorporated' ? 'Cable Incorporated' :
+                    protectiveConductorResults.conductorType === 'sheath_armour' ? 'Sheath/Armour' :
+                    protectiveConductorResults.conductorType === 'conduit' ? 'Steel Conduit' : 'Bare Conductor'
+                  }</div>
+                  <div><span className="font-medium">Material:</span> {
+                    protectiveConductorResults.material.charAt(0).toUpperCase() + 
+                    protectiveConductorResults.material.slice(1)
+                  }</div>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <h4 className="font-medium text-green-800 mb-1">Size Calculation</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 text-sm">
+                  <div><span className="font-medium">Calculation Method:</span> {protectiveConductorResults.calculationMethod}</div>
+                  <div><span className="font-medium">Formula Applied:</span> {protectiveConductorResults.formula}</div>
+                  <div><span className="font-medium">k Value (Phase):</span> {protectiveConductorResults.kPhaseConductor}</div>
+                  <div><span className="font-medium">k Value (Protective):</span> {protectiveConductorResults.kProtectiveConductor}</div>
+                </div>
+              </div>
+              
+              <div className="font-bold text-green-700 text-center p-2 bg-green-100 rounded-md">
+                <span className="font-medium text-black">Required Protective Conductor Size:</span> {protectiveConductorResults.minCrossSectionalArea}
+              </div>
+              
+              <div className="mt-3 text-xs text-gray-600 border-t pt-2">
+                <p>Note: Calculation is based on BS 7671 minimum cross-sectional area requirements for protective conductors.</p>
+                <p>The k values are determined by conductor material, insulation type, and conditions as per tables in CoP Appendix 6.</p>
+              </div>
+            </div>
+          )}
 
           {/* Table Lookup Details */}
           {lookupDetails && (
