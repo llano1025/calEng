@@ -3,7 +3,7 @@ import { Icons } from '../../components/Icons';
 
 // Define props type for the component
 interface PowerFactorCalculatorProps {
-  onShowTutorial: () => void; // Function to show tutorial
+  onShowTutorial?: () => void; // Function to show tutorial
 }
 
 // Power Factor Calculator Component
@@ -79,138 +79,194 @@ const PowerFactorCalculator: React.FC<PowerFactorCalculatorProps> = ({ onShowTut
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Power Factor Correction Calculator</h2>
-        <button onClick={onShowTutorial} className="flex items-center text-blue-600 hover:text-blue-800">
-          <Icons.InfoInline /> Tutorial
-        </button>
-      </div>
-      <p className="mb-4 text-gray-600">
-        Calculates required capacitor bank size for power factor correction.
-      </p>
-
-      {/* Input Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block font-medium mb-1 text-sm">Load Power (kW)</label>
-          <input
-            type="number"
-            name="loadPower"
-            value={powerFactorInputs.loadPower}
-            onChange={handlePowerFactorInputChange}
-            className="w-full p-2 border rounded-md text-sm"
-          />
-        </div>
-        <div>
-          <label className="block font-medium mb-1 text-sm">Initial Displacement Power Factor</label>
-          <input
-            type="number"
-            name="initialPowerFactor"
-            value={powerFactorInputs.initialPowerFactor}
-            onChange={handlePowerFactorInputChange}
-            className="w-full p-2 border rounded-md text-sm"
-            min="0.1"
-            max="1"
-            step="0.01"
-          />
-        </div>
-        <div>
-          <label className="block font-medium mb-1 text-sm">Target Power Factor</label>
-          <input
-            type="number"
-            name="targetPowerFactor"
-            value={powerFactorInputs.targetPowerFactor}
-            onChange={handlePowerFactorInputChange}
-            className="w-full p-2 border rounded-md text-sm"
-            min="0.1"
-            max="1"
-            step="0.01"
-          />
-        </div>
-        <div>
-          <label className="block font-medium mb-1 text-sm">Harmonic Distortion (THD %)</label>
-          <input
-            type="number"
-            name="harmonicDistortion"
-            value={powerFactorInputs.harmonicDistortion}
-            onChange={handlePowerFactorInputChange}
-            className="w-full p-2 border rounded-md text-sm"
-          />
-        </div>
+        
+        {onShowTutorial && (
+          <button 
+            onClick={onShowTutorial} 
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
+          </button>
+        )}
       </div>
 
-      {/* Calculate Button */}
-      <button
-        onClick={calculatePowerFactor}
-        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-      >
-        Calculate Power Factor Correction
-      </button>
-
-      {/* Results Display */}
-      {powerFactorResults && (
-        <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-          <h3 className="text-lg font-semibold mb-2">Results</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Input Section */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
           
-          <div className="mt-3 text-sm">
-            <h4 className="font-medium">1. Total Power Factor with Harmonic Distortion</h4>
-            <div className="pl-4 py-1 bg-white rounded my-1 overflow-x-auto">
-              <p className="font-mono">
-                Target Total PF = Displacement PF / √(1 + THD²) = {powerFactorInputs.targetPowerFactor} / √(1 + {parseFloat(powerFactorInputs.harmonicDistortion)/100}²) = {powerFactorResults.targetTotalPF}
-              </p>
+          <div className="mb-4">
+            <h4 className="font-medium text-blue-700 mb-2">Load Information</h4>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Load Power (kW)
+              </label>
+              <input
+                type="number"
+                name="loadPower"
+                value={powerFactorInputs.loadPower}
+                onChange={handlePowerFactorInputChange}
+                className="w-full p-2 border rounded-md text-sm"
+              />
             </div>
             
-            <h4 className="font-medium mt-2">2. Angles and Tangent Values</h4>
-            <div className="pl-4 py-1 bg-white rounded my-1 overflow-x-auto">
-              <p className="font-mono">Initial Angle = cos⁻¹({powerFactorResults.initialTotalPF}) = {powerFactorResults.initialAngleDegrees}°</p>
-              <p className="font-mono">Target Angle = cos⁻¹({powerFactorResults.targetTotalPF}) = {powerFactorResults.targetAngleDegrees}°</p>
-              <p className="font-mono">Initial Tangent = tan({powerFactorResults.initialAngleDegrees}°) = {powerFactorResults.initialTan}</p>
-              <p className="font-mono">Target Tangent = tan({powerFactorResults.targetAngleDegrees}°) = {powerFactorResults.targetTan}</p>
-            </div>
-            
-            <h4 className="font-medium mt-2">3. Required Reactive Power Calculation</h4>
-            <div className="pl-4 py-1 bg-white rounded my-1 overflow-x-auto">
-              <p className="font-mono">
-                kVAr Required = P × [tan(cos⁻¹(Initial Total PF)) - tan(cos⁻¹(Target Total PF))]
-              </p>
-              <p className="font-mono">
-                kVAr = {powerFactorInputs.loadPower} × [{powerFactorResults.initialTan} - {powerFactorResults.targetTan}] = {powerFactorResults.kVArRequired} kVAr
-              </p>
-            </div>
-            
-            <h4 className="font-medium mt-2">4. Apparent Power Reduction</h4>
-            <div className="pl-4 py-1 bg-white rounded my-1 overflow-x-auto">
-              <p className="font-mono">Initial kVA = {powerFactorInputs.loadPower} / {powerFactorResults.initialTotalPF} = {powerFactorResults.initialKVA} kVA</p>
-              <p className="font-mono">Target kVA = {powerFactorInputs.loadPower} / {powerFactorResults.targetTotalPF} = {powerFactorResults.targetKVA} kVA</p>
-              <p className="font-mono">kVA Reduction = {powerFactorResults.initialKVA} - {powerFactorResults.targetKVA} = {powerFactorResults.kVAReduction} kVA</p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Initial Displacement Power Factor
+              </label>
+              <input
+                type="number"
+                name="initialPowerFactor"
+                value={powerFactorInputs.initialPowerFactor}
+                onChange={handlePowerFactorInputChange}
+                className="w-full p-2 border rounded-md text-sm"
+                min="0.1"
+                max="1"
+                step="0.01"
+              />
+              <p className="text-xs text-gray-500 mt-1">Current power factor of the load (typically 0.7-0.8)</p>
             </div>
           </div>
           
-          <div className="mt-4 bg-green-100 p-3 rounded-lg">
-            <h4 className="font-semibold">Final Capacitor Bank Size:</h4>
-            <p className="text-lg">Minimum Required: <span className="font-bold">{powerFactorResults.kVArRequired} kVAr</span></p>
-            <p className="text-sm mt-1">Standard Bank Size: {powerFactorResults.standardCapacitorSize} kVAr (next standard size)</p>
+          <div className="border-t border-gray-300 my-4"></div>
+          
+          <div className="mb-4">
+            <h4 className="font-medium text-blue-700 mb-2">Correction Parameters</h4>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Target Power Factor
+              </label>
+              <input
+                type="number"
+                name="targetPowerFactor"
+                value={powerFactorInputs.targetPowerFactor}
+                onChange={handlePowerFactorInputChange}
+                className="w-full p-2 border rounded-md text-sm"
+                min="0.1"
+                max="1"
+                step="0.01"
+              />
+              <p className="text-xs text-gray-500 mt-1">Desired power factor after correction (typically 0.85-0.95)</p>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Harmonic Distortion (THD %)
+              </label>
+              <input
+                type="number"
+                name="harmonicDistortion"
+                value={powerFactorInputs.harmonicDistortion}
+                onChange={handlePowerFactorInputChange}
+                className="w-full p-2 border rounded-md text-sm"
+                min="0"
+                step="0.1"
+              />
+              <p className="text-xs text-gray-500 mt-1">Total Harmonic Distortion in the current waveform</p>
+            </div>
           </div>
           
-          <div className="mt-2 text-xs text-gray-600">
-            Note: Standard capacitor banks are typically available in fixed sizes (usually multiples of 25 kVAr). The actual size should be selected based on available equipment options.
+          {/* Calculate Button */}
+          <div className="mt-6">
+            <button
+              onClick={calculatePowerFactor}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Calculate Correction
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Explanatory Section */}
-      <div className="mt-8 border-t pt-4">
-        <h3 className="text-lg font-medium mb-2">About Power Factor Correction</h3>
-        <div className="text-sm text-gray-700">
-          <p>Power factor correction improves electrical efficiency by reducing reactive power demand. Low power factor (below 0.9) results in:</p>
-          <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Increased apparent power (kVA) for the same active power (kW)</li>
-            <li>Reduced capacity in electrical distribution systems</li>
-            <li>Increased voltage drop and system losses</li>
-          </ul>
-          <p className="mt-2">Capacitor banks provide reactive power locally, reducing the amount that must be supplied by the utility.</p>
+        {/* Results Section */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+          
+          {!powerFactorResults ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>Enter the parameters and click Calculate to see results</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-green-100 p-4 rounded-md mb-4">
+                <h4 className="font-medium text-green-800 mb-2">Capacitor Bank Sizing</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Minimum Required Capacity</p>
+                    <p className="text-xl font-bold text-green-700">{powerFactorResults.kVArRequired} kVAr</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Recommended Standard Size</p>
+                    <p className="text-lg font-medium">{powerFactorResults.standardCapacitorSize} kVAr</p>
+                    <p className="text-xs text-green-600">Based on standard capacitor bank sizes (multiples of 25 kVAr)</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">System Improvements</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Initial Power Factor</p>
+                    <p className="text-lg">{powerFactorResults.initialTotalPF}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Target Power Factor</p>
+                    <p className="text-lg">{powerFactorResults.targetTotalPF}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Initial Apparent Power</p>
+                    <p className="text-lg">{powerFactorResults.initialKVA} kVA</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">New Apparent Power</p>
+                    <p className="text-lg">{powerFactorResults.targetKVA} kVA</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm font-medium">Apparent Power Reduction</p>
+                    <p className="text-lg text-green-600 font-medium">{powerFactorResults.kVAReduction} kVA ({((parseFloat(powerFactorResults.kVAReduction) / parseFloat(powerFactorResults.initialKVA)) * 100).toFixed(1)}%)</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md">
+                <h4 className="font-medium text-blue-800 mb-2">Calculation Method</h4>
+                <div className="text-xs text-gray-700 space-y-2">
+                  <p className="font-medium">Step 1: Calculate angles from power factors</p>
+                  <p className="pl-3">Initial φ = cos⁻¹({powerFactorResults.initialTotalPF}) = {powerFactorResults.initialAngleDegrees}°</p>
+                  <p className="pl-3">Target φ = cos⁻¹({powerFactorResults.targetTotalPF}) = {powerFactorResults.targetAngleDegrees}°</p>
+                  
+                  <p className="font-medium">Step 2: Calculate tangent values</p>
+                  <p className="pl-3">tan(φ₁) = {powerFactorResults.initialTan}</p>
+                  <p className="pl-3">tan(φ₂) = {powerFactorResults.targetTan}</p>
+                  
+                  <p className="font-medium">Step 3: Calculate required reactive power</p>
+                  <p className="pl-3">kVAr = P × [tan(φ₁) - tan(φ₂)]</p>
+                  <p className="pl-3">kVAr = {powerFactorInputs.loadPower} × [{powerFactorResults.initialTan} - {powerFactorResults.targetTan}]</p>
+                  <p className="pl-3">kVAr = {powerFactorResults.kVArRequired}</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
+      </div>
+      
+      {/* Info section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-2">Important Notes</h3>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          <li>Power factor correction improves electrical efficiency by reducing reactive power demand.</li>
+          <li>Low power factor (below 0.9) results in increased apparent power (kVA) for the same active power (kW), reducing system capacity.</li>
+          <li>Capacitor banks provide reactive power locally, reducing the amount that must be supplied by the utility.</li>
+          <li>Benefits include: reduced electricity bills (if utility charges for kVA or kVAr), lower voltage drop, reduced system losses, and increased capacity.</li>
+          <li>Harmonic distortion can impact the effectiveness of power factor correction and should be considered in your calculations.</li>
+          <li>For systems with significant harmonics, consider using detuned capacitor banks to avoid resonance issues.</li>
+        </ul>
       </div>
     </div>
   );

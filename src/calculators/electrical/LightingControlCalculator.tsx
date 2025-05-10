@@ -1,19 +1,14 @@
 import React, { useState } from 'react';
+import { Icons } from '../../components/Icons';
 
 interface LightingControlCalculatorProps {
-  // No specific props needed unless we want to share state with parent
+  onShowTutorial?: () => void; // Optional function to show tutorial
 }
-
-// Table data from the image - Minimum number of lighting control points per area
-// The formula table from BEC Table 5.5 will be used instead of a lookup table:
-// For 0 < N ≤ 10:   15×(N-1) < A ≤ 15×N
-// For 10 < N ≤ 20:  30×(N-6) < A ≤ 30×(N-5)
-// For N > 20:       50×(N-12) < A ≤ 50×(N+11)
 
 // Maximum allowable LPD for office (from image)
 const MAX_ALLOWABLE_LPD = 7.8; // W/m²
 
-const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = () => {
+const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = ({ onShowTutorial }) => {
   // State for inputs
   const [officeArea, setOfficeArea] = useState<string>('250');
   const [actualLPD, setActualLPD] = useState<string>('7.0');
@@ -81,130 +76,193 @@ const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = () =
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Lighting Control Points Calculator</h2>
-      </div>
-      <p className="mb-4 text-gray-600">
-        Calculate the minimum number of lighting control points required for office spaces based on BEC Clause 5.5.2.
-      </p>
-
-      {/* Input Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block font-medium mb-1 text-sm">Office Area (m²)</label>
-          <input
-            type="number"
-            value={officeArea}
-            onChange={(e) => setOfficeArea(e.target.value)}
-            className="w-full p-2 border rounded-md text-sm"
-            min="1"
-          />
-        </div>
-        <div>
-          <label className="block font-medium mb-1 text-sm">Actual Lighting Power Density (W/m²)</label>
-          <input
-            type="number"
-            value={actualLPD}
-            onChange={(e) => setActualLPD(e.target.value)}
-            className="w-full p-2 border rounded-md text-sm"
-            min="0"
-            step="0.1"
-          />
-        </div>
+        
+        {onShowTutorial && (
+          <button 
+            onClick={onShowTutorial} 
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
+          </button>
+        )}
       </div>
 
-      {/* Calculate Button */}
-      <button
-        onClick={calculateControlPoints}
-        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-      >
-        Calculate Control Points
-      </button>
-
-      {/* Results Display */}
-      {results && (
-        <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-          <h3 className="text-lg font-semibold mb-2">Results</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 text-sm">
-            <div>
-              <span className="font-medium">Base Control Points:</span> {results.baseControlPoints}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Input Section */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+          
+          <div className="mb-4">
+            <h4 className="font-medium text-blue-700 mb-2">Office Details</h4>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Office Area (m²)
+              </label>
+              <input
+                type="number"
+                value={officeArea}
+                onChange={(e) => setOfficeArea(e.target.value)}
+                className="w-full p-2 border rounded-md text-sm"
+                min="1"
+              />
             </div>
-            {results.isReductionApplicable && (
-              <>
-                <div>
-                  <span className="font-medium">Maximum Allowable LPD:</span> {MAX_ALLOWABLE_LPD} W/m²
-                </div>
-                <div>
-                  <span className="font-medium">Reduction Ratio:</span> {(results.reductionRatio * 100).toFixed(1)}%
-                </div>
-              </>
-            )}
-            <div className="font-bold text-green-600">
-              <span className="font-medium text-black">Required Control Points:</span> {results.finalControlPoints}
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Actual Lighting Power Density (W/m²)
+              </label>
+              <input
+                type="number"
+                value={actualLPD}
+                onChange={(e) => setActualLPD(e.target.value)}
+                className="w-full p-2 border rounded-md text-sm"
+                min="0"
+                step="0.1"
+              />
+              <p className="text-xs text-gray-500 mt-1">Maximum allowable is {MAX_ALLOWABLE_LPD} W/m² for office spaces</p>
             </div>
           </div>
           
-          {!results.isReductionApplicable && parseFloat(officeArea) <= 200 && (
-            <div className="mt-2 text-xs text-gray-600">
-              Note: Reduction not applicable for office spaces under 200m².
-            </div>
-          )}
-          
-          {!results.isReductionApplicable && parseFloat(actualLPD) >= MAX_ALLOWABLE_LPD && (
-            <div className="mt-2 text-xs text-gray-600">
-              Note: Reduction not applicable when actual LPD is greater than or equal to maximum allowable LPD ({MAX_ALLOWABLE_LPD} W/m²).
-            </div>
-          )}
-          
-          {/* Show the formula used for calculating base points */}
-          <div className="mt-2 text-xs text-gray-600">
-            {parseFloat(officeArea) <= 150 ? 
-              `Base points formula: N = ceiling(A/15) = ceiling(${officeArea}/15) = ${results.baseControlPoints}` :
-             parseFloat(officeArea) <= 450 ? 
-              `Base points formula: N = ceiling(A/30 + 5) = ceiling(${officeArea}/30 + 5) = ${results.baseControlPoints}` :
-              `Base points formula: N = ceiling((A+550)/50) = ceiling((${officeArea}+550)/50) = ${results.baseControlPoints}`
-            }
+          {/* Calculate Button */}
+          <div className="mt-6">
+            <button
+              onClick={calculateControlPoints}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Calculate Control Points
+            </button>
           </div>
+        </div>
+
+        {/* Results Section */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
           
-          {results.isReductionApplicable && (
-            <div className="mt-2 text-xs text-gray-600">
-              Reduction calculation: {results.baseControlPoints} × (1 - {results.reductionRatio.toFixed(2)}) = {(results.baseControlPoints * (1 - results.reductionRatio)).toFixed(1)} → {results.finalControlPoints} (rounded up)
+          {!results ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>Enter the parameters and click Calculate to see results</p>
             </div>
+          ) : (
+            <>
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">Required Control Points</h4>
+                
+                <div className="grid grid-cols-1 gap-y-2 text-sm">
+                  <div>
+                    <p className="text-sm font-medium">Base Control Points</p>
+                    <p>{results.baseControlPoints}</p>
+                  </div>
+                  
+                  {results.isReductionApplicable && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium">Maximum Allowable LPD</p>
+                        <p>{MAX_ALLOWABLE_LPD} W/m²</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Reduction Ratio</p>
+                        <p>{(results.reductionRatio * 100).toFixed(1)}%</p>
+                      </div>
+                    </>
+                  )}
+                  
+                  <div className="mt-2 pt-2 border-t">
+                    <p className="text-sm font-medium">Required Control Points</p>
+                    <p className="text-green-600 font-bold text-lg">{results.finalControlPoints}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">Calculation Method</h4>
+                
+                <div className="text-xs text-gray-700">
+                  {parseFloat(officeArea) <= 150 ? 
+                    <p>Base points formula: N = ceiling(A/15) = ceiling({officeArea}/15) = {results.baseControlPoints}</p> :
+                   parseFloat(officeArea) <= 450 ? 
+                    <p>Base points formula: N = ceiling(A/30 + 5) = ceiling({officeArea}/30 + 5) = {results.baseControlPoints}</p> :
+                    <p>Base points formula: N = ceiling((A+550)/50) = ceiling(({officeArea}+550)/50) = {results.baseControlPoints}</p>
+                  }
+                  
+                  {results.isReductionApplicable && (
+                    <p className="mt-1">
+                      Reduction calculation: {results.baseControlPoints} × (1 - {results.reductionRatio.toFixed(2)}) = {(results.baseControlPoints * (1 - results.reductionRatio)).toFixed(1)} → {results.finalControlPoints} (rounded up)
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {!results.isReductionApplicable && (
+                <div className="bg-white p-4 rounded-md">
+                  <h4 className="font-medium text-blue-800 mb-2">Reduction Information</h4>
+                  
+                  {parseFloat(officeArea) <= 200 && (
+                    <p className="text-xs text-gray-700">
+                      Reduction is not applicable for office spaces under 200m². The base number of control points is used without reduction.
+                    </p>
+                  )}
+                  
+                  {parseFloat(actualLPD) >= MAX_ALLOWABLE_LPD && (
+                    <p className="text-xs text-gray-700">
+                      Reduction is not applicable when actual LPD is greater than or equal to maximum allowable LPD ({MAX_ALLOWABLE_LPD} W/m²). The base number of control points is used without reduction.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
-      )}
-
-      {/* Formula Reference */}
-      <div className="mt-8">
-        <h3 className="text-lg font-medium mb-2">Reference: Minimum Control Points Formula</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 border">Space Area A (m²)</th>
-                <th className="px-3 py-2 border">Minimum No. of Lighting Control Points (N : integer)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-200">
-                <td className="px-3 py-1 border">15×(N-1) &lt; A ≤ 15×N</td>
-                <td className="px-3 py-1 border text-center">0 &lt; N ≤ 10</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-3 py-1 border">30×(N-6) &lt; A ≤ 30×(N-5)</td>
-                <td className="px-3 py-1 border text-center">10 &lt; N ≤ 20</td>
-              </tr>
-              <tr className="border-b border-gray-200">
-                <td className="px-3 py-1 border">50×(N-12) &lt; A ≤ 50×(N+11)</td>
-                <td className="px-3 py-1 border text-center">N &gt; 20</td>
-              </tr>
-            </tbody>
-          </table>
+      </div>
+      
+      {/* Info section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-2">Reference Information</h3>
+        
+        <div className="mb-4">
+          <h4 className="font-medium mb-2">Minimum Control Points Formula (BEC Clause 5.5.2)</h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border border-gray-300">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-3 py-2 border">Space Area A (m²)</th>
+                  <th className="px-3 py-2 border">Minimum No. of Lighting Control Points (N : integer)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-200">
+                  <td className="px-3 py-1 border">15×(N-1) &lt; A ≤ 15×N</td>
+                  <td className="px-3 py-1 border text-center">0 &lt; N ≤ 10</td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="px-3 py-1 border">30×(N-6) &lt; A ≤ 30×(N-5)</td>
+                  <td className="px-3 py-1 border text-center">10 &lt; N ≤ 20</td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="px-3 py-1 border">50×(N-12) &lt; A ≤ 50×(N+11)</td>
+                  <td className="px-3 py-1 border text-center">N &gt; 20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            For a given area A, we solve these formulas to find the minimum required control points N.
+          </p>
         </div>
-        <p className="mt-2 text-xs text-gray-600">
-          For a given area A, we solve these formulas to find the minimum required control points N.
-        </p>
+        
+        <div>
+          <h4 className="font-medium mb-2">Control Point Reduction for Energy Efficiency</h4>
+          <ul className="list-disc pl-5 space-y-1 text-sm">
+            <li>Office spaces with area larger than 200m² may qualify for a reduction in the number of control points if the actual LPD is less than the maximum allowable LPD.</li>
+            <li>The reduction ratio is proportional to the LPD reduction: (MaxLPD - ActualLPD) / MaxLPD.</li>
+            <li>The final number of required control points is calculated as: BasePoints × (1 - ReductionRatio), rounded up to the nearest integer.</li>
+            <li>This incentivizes energy efficiency by allowing more flexible lighting control designs for spaces that use less power.</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

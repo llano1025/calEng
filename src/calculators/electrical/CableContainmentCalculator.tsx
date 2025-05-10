@@ -364,20 +364,20 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
   const isTableMethod = activeTab === 'conduitTable' || activeTab === 'trunkingTable';
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Cable Containment Calculator</h2>
         
         {onShowTutorial && (
-          <button onClick={onShowTutorial} className="flex items-center text-blue-600 hover:text-blue-800">
-            <span className="w-5 h-5 mr-1">ⓘ</span> Tutorial
+          <button 
+            onClick={onShowTutorial} 
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
           </button>
         )}
       </div>
-      
-      <p className="mb-4 text-gray-600">
-        Calculate cable containment requirements based on industry standards.
-      </p>
 
       {/* Tabs for different calculators */}
       <div className="border-b border-gray-200 mb-6">
@@ -425,693 +425,863 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
         </nav>
       </div>
 
-      {/* Conduit Table Method */}
-      {activeTab === 'conduitTable' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Conduit Diameter (mm)</label>
-              <select
-                value={conduitDiameter}
-                onChange={(e) => setConduitDiameter(e.target.value)}
-                className="w-full p-2 border rounded-md text-sm"
-              >
-                {conduitDiameterOptions.map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block font-medium mb-1 text-sm">Conduit Length</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  className={`p-2 rounded-md text-center transition-colors text-sm ${
-                    conduitLength === 'short'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                  }`}
-                  onClick={() => setConduitLength('short')}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Conduit Table Method */}
+        {activeTab === 'conduitTable' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conduit Diameter (mm)
+                </label>
+                <select
+                  value={conduitDiameter}
+                  onChange={(e) => setConduitDiameter(e.target.value)}
+                  className="w-full p-2 border rounded-md text-sm"
                 >
-                  ≤ 3m (Straight)
-                </button>
-                <button
-                  className={`p-2 rounded-md text-center transition-colors text-sm ${
-                    conduitLength === 'long'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                  }`}
-                  onClick={() => setConduitLength('long')}
-                >
-                  3m or With Bends
-                </button>
+                  {conduitDiameterOptions.map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-            
-            {/* Number of Bends (only if long) */}
-            {conduitLength === 'long' && (
-              <>
-                <div>
-                  <label className="block font-medium mb-1 text-sm">Number of Bends</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      className={`p-2 rounded-md text-center transition-colors text-sm ${
-                        numberOfBends === 0
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                      }`}
-                      onClick={() => setNumberOfBends(0)}
-                    >
-                      No Bends
-                    </button>
-                    <button
-                      className={`p-2 rounded-md text-center transition-colors text-sm ${
-                        numberOfBends === 1
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                      }`}
-                      onClick={() => setNumberOfBends(1)}
-                    >
-                      One Bend
-                    </button>
-                    <button
-                      className={`p-2 rounded-md text-center transition-colors text-sm ${
-                        numberOfBends === 2
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                      }`}
-                      onClick={() => setNumberOfBends(2)}
-                    >
-                      Two Bends
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block font-medium mb-1 text-sm">Conduit Length (m)</label>
-                  <select
-                    value={customConduitLength.toString()}
-                    onChange={(e) => setCustomConduitLength(parseFloat(e.target.value))}
-                    className="w-full p-2 border rounded-md text-sm"
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conduit Length
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className={`p-2 rounded-md text-center transition-colors text-sm ${
+                      conduitLength === 'short'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                    }`}
+                    onClick={() => setConduitLength('short')}
                   >
-                    {/* Dynamic options based on the number of bends */}
-                    {numberOfBends === 0 && [3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
-                      <option key={val} value={val}>{val}</option>
-                    ))}
+                    ≤ 3m (Straight)
+                  </button>
+                  <button
+                    className={`p-2 rounded-md text-center transition-colors text-sm ${
+                      conduitLength === 'long'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                    }`}
+                    onClick={() => setConduitLength('long')}
+                  >
+                    &gt;3m or With Bends
+                  </button>
+                </div>
+              </div>
+              
+              {/* Number of Bends (only if long) */}
+              {conduitLength === 'long' && (
+                <>
+                  <div className="border-t border-gray-300 my-4"></div>
+                  <h4 className="font-medium mb-3">Conduit Configuration</h4>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Number of Bends
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        className={`p-2 rounded-md text-center transition-colors text-sm ${
+                          numberOfBends === 0
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                        }`}
+                        onClick={() => setNumberOfBends(0)}
+                      >
+                        No Bends
+                      </button>
+                      <button
+                        className={`p-2 rounded-md text-center transition-colors text-sm ${
+                          numberOfBends === 1
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                        }`}
+                        onClick={() => setNumberOfBends(1)}
+                      >
+                        One Bend
+                      </button>
+                      <button
+                        className={`p-2 rounded-md text-center transition-colors text-sm ${
+                          numberOfBends === 2
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                        }`}
+                        onClick={() => setNumberOfBends(2)}
+                      >
+                        Two Bends
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Conduit Length (m)
+                    </label>
+                    <select
+                      value={customConduitLength.toString()}
+                      onChange={(e) => setCustomConduitLength(parseFloat(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                    >
+                      {/* Dynamic options based on the number of bends */}
+                      {numberOfBends === 0 && [3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
+                        <option key={val} value={val}>{val}</option>
+                      ))}
+                      
+                      {numberOfBends === 1 && [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
+                        <option key={val} value={val}>{val}</option>
+                      ))}
+                      
+                      {numberOfBends === 2 && [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
+                        <option key={val} value={val}>{val}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Cable Configuration</h4>
+              
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cables
+                  </label>
+                  <button
+                    onClick={addCable}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
+                  >
+                    <span className="mr-1">+</span> Add Cable
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto bg-white rounded-md">
+                  <table className="min-w-full border border-gray-200 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-3 py-2 text-left">Type</th>
+                        <th className="px-3 py-2 text-left">CSA (mm²)</th>
+                        <th className="px-3 py-2 text-left">Qty</th>
+                        {isCalculated && <th className="px-3 py-2 text-left">Factor</th>}
+                        <th className="px-3 py-2 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cables.map((cable) => (
+                        <tr key={cable.id} className="border-t border-gray-200">
+                          <td className="px-3 py-2">
+                            <select
+                              value={cable.conductorType}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'conductorType', e.target.value as ConductorType)
+                              }
+                              className="w-full p-1 border rounded-md text-sm"
+                            >
+                              <option value="solid">Solid</option>
+                              <option value="stranded">Stranded</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={cable.csa}
+                              onChange={(e) => updateCable(cable.id, 'csa', e.target.value)}
+                              className="w-full p-1 border rounded-md text-sm"
+                            >
+                              {csaOptions.map((size) => (
+                                <option key={size} value={size}>{size}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={cable.quantity}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'quantity', parseInt(e.target.value))
+                              }
+                              className="w-16 p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          {isCalculated && <td className="px-3 py-2">{cable.factor}</td>}
+                          <td className="px-3 py-2">
+                            <button
+                              onClick={() => removeCable(cable.id)}
+                              disabled={cables.length === 1}
+                              className={`p-1 rounded-md ${
+                                cables.length === 1
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-800'
+                              }`}
+                            >
+                              <span className="text-xs">Remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              {!isCalculated ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Enter the parameters and click Calculate to see results</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Total Cable Factor</p>
+                      <p className="text-lg">{totalCableFactor.toFixed(1)}</p>
+                    </div>
                     
-                    {numberOfBends === 1 && [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
-                      <option key={val} value={val}>{val}</option>
-                    ))}
+                    <div>
+                      <p className="text-sm font-medium">Conduit Factor</p>
+                      <p className="text-lg">{containmentFactor}</p>
+                    </div>
                     
-                    {numberOfBends === 2 && [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10].map(val => (
-                      <option key={val} value={val}>{val}</option>
-                    ))}
-                  </select>
+                    <div>
+                      <p className="text-sm font-medium">Compliance Status</p>
+                      <p className={`text-lg ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
+                        {isCompliant ? 'Compliant ✓' : 'Non-Compliant ✗'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Compliance Assessment</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'The conduit installation is compliant with the requirements. The conduit factor is sufficient for the cables installed.'
+                        : 'The conduit installation is non-compliant. The conduit factor must be equal to or greater than the total cable factor.'
+                      }
+                    </p>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Recommendation</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'Installation can proceed with the current configuration.'
+                        : 'Consider increasing the conduit diameter, reducing the number of cables, or dividing cables between multiple conduits.'
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Reference Information</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Calculations are performed based on BS 7671 cable factor tables.</li>
+                  <li>Conduit runs ≤ 3m can accommodate higher cable factors than longer runs.</li>
+                  <li>Each bend in a conduit reduces its capacity to hold cables.</li>
+                  <li>The conduit factor must be equal to or greater than the total cable factor.</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Conduit Space Factor */}
+        {activeTab === 'conduitSpace' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conduit Inner Diameter (mm)
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="100"
+                  placeholder="Enter diameter"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setConduitDiameter(val);
+                    }
+                  }}
+                  className="w-full p-2 border rounded-md text-sm"
+                />
+                <p className="text-xs text-gray-600 mt-1">Enter the exact conduit inner diameter in mm</p>
+              </div>
+              
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Cable Configuration</h4>
+              
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cables
+                  </label>
+                  <button
+                    onClick={addCable}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
+                  >
+                    <span className="mr-1">+</span> Add Cable
+                  </button>
                 </div>
-              </>
-            )}
-          </div>
-          
-          {/* Cables Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Cables</h3>
-              <button
-                onClick={addCable}
-                className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
-              >
-                <span className="mr-1">+</span> Add Cable
-              </button>
+
+                <div className="overflow-x-auto bg-white rounded-md">
+                  <table className="min-w-full border border-gray-200 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-left">Outer Dia. (mm)</th>
+                        <th className="px-3 py-2 text-left">Qty</th>
+                        {isCalculated && <th className="px-3 py-2 text-left">CSA (mm²)</th>}
+                        <th className="px-3 py-2 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cables.map((cable) => (
+                        <tr key={cable.id} className="border-t border-gray-200">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              placeholder="Cable description"
+                              className="w-full p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0.5"
+                              step="0.1"
+                              placeholder="Diameter"
+                              value={cable.outerDiameter || ''}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'outerDiameter', parseFloat(e.target.value))
+                              }
+                              className="w-full p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={cable.quantity}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'quantity', parseInt(e.target.value))
+                              }
+                              className="w-16 p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          {isCalculated && (
+                            <td className="px-3 py-2">
+                              {cable.outerDiameter ? 
+                                calculateCsaFromDiameter(cable.outerDiameter).toFixed(2) 
+                                : '0'}
+                            </td>
+                          )}
+                          <td className="px-3 py-2">
+                            <button
+                              onClick={() => removeCable(cable.id)}
+                              disabled={cables.length === 1}
+                              className={`p-1 rounded-md ${
+                                cables.length === 1
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-800'
+                              }`}
+                            >
+                              <span className="text-xs">Remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-md text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-3 py-2 text-left">Conductor Type</th>
-                    <th className="px-3 py-2 text-left">CSA (mm²)</th>
-                    <th className="px-3 py-2 text-left">Quantity</th>
-                    {isCalculated && <th className="px-3 py-2 text-left">Factor</th>}
-                    <th className="px-3 py-2 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cables.map((cable) => (
-                    <tr key={cable.id} className="border-t border-gray-200">
-                      <td className="px-3 py-2">
-                        <select
-                          value={cable.conductorType}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'conductorType', e.target.value as ConductorType)
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        >
-                          <option value="solid">Solid</option>
-                          <option value="stranded">Stranded</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={cable.csa}
-                          onChange={(e) => updateCable(cable.id, 'csa', e.target.value)}
-                          className="w-full p-2 border rounded-md text-sm"
-                        >
-                          {csaOptions.map((size) => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={cable.quantity}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'quantity', parseInt(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      {isCalculated && <td className="px-3 py-2">{cable.factor}</td>}
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => removeCable(cable.id)}
-                          disabled={cables.length === 1}
-                          className={`p-1 rounded-md ${
-                            cables.length === 1
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-800'
-                          }`}
-                        >
-                          <span className="text-xs">Remove</span>
-                        </button>
-                      </td>
-                    </tr>
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              {!isCalculated ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Enter the parameters and click Calculate to see results</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Space Factor</p>
+                      <p className="text-lg">{spaceFactorPercentage.toFixed(1)}%</p>
+                      <p className="text-xs text-gray-600">(Maximum allowed: 45%)</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm font-medium">Compliance Status</p>
+                      <p className={`text-lg ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
+                        {isCompliant ? 'Compliant ✓' : 'Non-Compliant ✗'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Compliance Assessment</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'The conduit installation is compliant with the 45% space factor rule. There is adequate space for cable pulling and prevention of overheating.'
+                        : 'The conduit installation is non-compliant. The space factor exceeds the maximum 45% rule, which may impede cable pulling and lead to overheating.'
+                      }
+                    </p>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Recommendation</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'Installation can proceed with the current configuration.'
+                        : 'Consider increasing the conduit diameter, reducing the number of cables, or dividing cables between multiple conduits.'
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Reference Information</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>The 45% space factor rule states that the total cross-sectional area of cables must not exceed 45% of the internal area of the conduit.</li>
+                  <li>This allows adequate space for pulling cables and prevents overheating due to close packing.</li>
+                  <li>Cable cross-sectional area is calculated using the formula: π × (diameter ÷ 2)²</li>
+                  <li>Conduit cross-sectional area is calculated using the same formula.</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Trunking Table Method */}
+        {activeTab === 'trunkingTable' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Trunking Size (mm)
+                </label>
+                <select
+                  value={trunkingSize}
+                  onChange={(e) => setTrunkingSize(e.target.value)}
+                  className="w-full p-2 border rounded-md text-sm"
+                >
+                  {trunkingSizeOptions.map((size) => (
+                    <option key={size} value={size}>{size}</option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </div>
+              
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Cable Configuration</h4>
+              
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cables
+                  </label>
+                  <button
+                    onClick={addCable}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
+                  >
+                    <span className="mr-1">+</span> Add Cable
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto bg-white rounded-md">
+                  <table className="min-w-full border border-gray-200 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-3 py-2 text-left">Type</th>
+                        <th className="px-3 py-2 text-left">CSA (mm²)</th>
+                        <th className="px-3 py-2 text-left">Qty</th>
+                        {isCalculated && <th className="px-3 py-2 text-left">Factor</th>}
+                        <th className="px-3 py-2 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cables.map((cable) => (
+                        <tr key={cable.id} className="border-t border-gray-200">
+                          <td className="px-3 py-2">
+                            <select
+                              value={cable.conductorType}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'conductorType', e.target.value as ConductorType)
+                              }
+                              className="w-full p-1 border rounded-md text-sm"
+                            >
+                              <option value="solid">Solid</option>
+                              <option value="stranded">Stranded</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={cable.csa}
+                              onChange={(e) => updateCable(cable.id, 'csa', e.target.value)}
+                              className="w-full p-1 border rounded-md text-sm"
+                            >
+                              {csaOptions.map((size) => (
+                                <option key={size} value={size}>{size}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={cable.quantity}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'quantity', parseInt(e.target.value))
+                              }
+                              className="w-16 p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          {isCalculated && <td className="px-3 py-2">{cable.factor}</td>}
+                          <td className="px-3 py-2">
+                            <button
+                              onClick={() => removeCable(cable.id)}
+                              disabled={cables.length === 1}
+                              className={`p-1 rounded-md ${
+                                cables.length === 1
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-800'
+                              }`}
+                            >
+                              <span className="text-xs">Remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate
-          </button>
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              {!isCalculated ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Enter the parameters and click Calculate to see results</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Total Cable Factor</p>
+                      <p className="text-lg">{totalCableFactor.toFixed(1)}</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm font-medium">Trunking Factor</p>
+                      <p className="text-lg">{containmentFactor}</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm font-medium">Compliance Status</p>
+                      <p className={`text-lg ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
+                        {isCompliant ? 'Compliant ✓' : 'Non-Compliant ✗'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Compliance Assessment</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'The trunking installation is compliant with the requirements. The trunking factor is sufficient for the cables installed.'
+                        : 'The trunking installation is non-compliant. The trunking factor must be equal to or greater than the total cable factor.'
+                      }
+                    </p>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Recommendation</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'Installation can proceed with the current configuration.'
+                        : 'Consider increasing the trunking size, reducing the number of cables, or dividing cables between multiple trunking routes.'
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Reference Information</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Calculations are performed based on BS 7671 cable factor tables for trunking.</li>
+                  <li>The trunking factor must be equal to or greater than the total cable factor.</li>
+                  <li>Trunking sizing is given as width × height in millimeters.</li>
+                  <li>The table method is more appropriate for standard cable types and trunking configurations.</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
 
-          {/* Results Display */}
-          {isCalculated && (
-            <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-              <h3 className="text-lg font-semibold mb-2">Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+        {/* Trunking Space Factor */}
+        {activeTab === 'trunkingSpace' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <span className="font-medium">Total Cable Factor:</span> {totalCableFactor.toFixed(1)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Trunking Width (mm)
+                  </label>
+                  <input
+                    type="number"
+                    min="25"
+                    max="300"
+                    placeholder="Width"
+                    id="trunkingWidth"
+                    className="w-full p-2 border rounded-md text-sm"
+                  />
                 </div>
                 <div>
-                  <span className="font-medium">Conduit Factor:</span> {containmentFactor}
-                </div>
-                <div className={isCompliant ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                  <span className="font-medium text-black">Status:</span> {isCompliant ? 'Compliant' : 'Non-Compliant'}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Trunking Height (mm)
+                  </label>
+                  <input
+                    type="number"
+                    min="25"
+                    max="300"
+                    placeholder="Height"
+                    id="trunkingHeight"
+                    className="w-full p-2 border rounded-md text-sm"
+                  />
                 </div>
               </div>
               
-              <div className="mt-2 text-xs text-gray-600">
-                {isCompliant 
-                  ? 'The conduit installation is compliant with the requirements.'
-                  : 'The conduit factor must be equal to or greater than the total cable factor.'
-                }
-              </div>
-            </div>
-          )}
-
-          {/* Reference Information */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Reference Information</h3>
-            <div className="text-xs text-gray-600">
-              <p>• Calculations are performed based on BS 7671 cable factor tables.</p>
-              <p>• Conduit runs ≤ 3m can accommodate higher cable factors than longer runs.</p>
-              <p>• Each bend in a conduit reduces its capacity to hold cables.</p>
-              <p>• The conduit factor must be equal to or greater than the total cable factor.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Conduit Space Factor */}
-      {activeTab === 'conduitSpace' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Conduit Inner Diameter (mm)</label>
-              <input
-                type="number"
-                min="10"
-                max="100"
-                placeholder="Enter diameter"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val) {
-                    setConduitDiameter(val);
-                  }
-                }}
-                className="w-full p-2 border rounded-md text-sm"
-              />
-              <p className="text-xs text-gray-600 mt-1">Enter the exact conduit inner diameter in mm</p>
-            </div>
-          </div>
-          
-          {/* Cables Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Cables</h3>
-              <button
-                onClick={addCable}
-                className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
-              >
-                <span className="mr-1">+</span> Add Cable
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-md text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-3 py-2 text-left">Cable Description</th>
-                    <th className="px-3 py-2 text-left">Outer Dia. (mm)</th>
-                    <th className="px-3 py-2 text-left">Quantity</th>
-                    {isCalculated && <th className="px-3 py-2 text-left">CSA (mm²)</th>}
-                    <th className="px-3 py-2 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cables.map((cable) => (
-                    <tr key={cable.id} className="border-t border-gray-200">
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          placeholder="Cable description"
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="0.5"
-                          step="0.1"
-                          placeholder="Diameter"
-                          value={cable.outerDiameter || ''}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'outerDiameter', parseFloat(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={cable.quantity}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'quantity', parseInt(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      {isCalculated && (
-                        <td className="px-3 py-2">
-                          {cable.outerDiameter ? 
-                            calculateCsaFromDiameter(cable.outerDiameter).toFixed(2) 
-                            : '0'}
-                        </td>
-                      )}
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => removeCable(cable.id)}
-                          disabled={cables.length === 1}
-                          className={`p-1 rounded-md ${
-                            cables.length === 1
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-800'
-                          }`}
-                        >
-                          <span className="text-xs">Remove</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate
-          </button>
-
-          {/* Results Display */}
-          {isCalculated && (
-            <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-              <h3 className="text-lg font-semibold mb-2">Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="font-medium">Space Factor:</span> {spaceFactorPercentage.toFixed(1)}%
-                  <div className="text-xs text-gray-600">(Maximum allowed: 45%)</div>
-                </div>
-                <div className={isCompliant ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                  <span className="font-medium text-black">Status:</span> {isCompliant ? 'Compliant' : 'Non-Compliant'}
-                </div>
-              </div>
+              <div className="border-t border-gray-300 my-4"></div>
               
-              <div className="mt-2 text-xs text-gray-600">
-                {isCompliant 
-                  ? 'The conduit installation is compliant with the 45% space factor rule.'
-                  : 'The space factor must not exceed 45% of the conduit cross-sectional area.'
-                }
-              </div>
-            </div>
-          )}
-
-          {/* Reference Information */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Reference Information</h3>
-            <div className="text-xs text-gray-600">
-              <p>• The 45% space factor rule states that the total cross-sectional area of cables must not exceed 45% of the internal area of the conduit.</p>
-              <p>• This allows adequate space for pulling cables and prevents overheating due to close packing.</p>
-              <p>• Cable cross-sectional area is calculated using the formula: π × (diameter ÷ 2)²</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Trunking Table Method */}
-      {activeTab === 'trunkingTable' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Trunking Size (mm)</label>
-              <select
-                value={trunkingSize}
-                onChange={(e) => setTrunkingSize(e.target.value)}
-                className="w-full p-2 border rounded-md text-sm"
-              >
-                {trunkingSizeOptions.map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          {/* Cables Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Cables</h3>
-              <button
-                onClick={addCable}
-                className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
-              >
-                <span className="mr-1">+</span> Add Cable
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-md text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-3 py-2 text-left">Conductor Type</th>
-                    <th className="px-3 py-2 text-left">CSA (mm²)</th>
-                    <th className="px-3 py-2 text-left">Quantity</th>
-                    {isCalculated && <th className="px-3 py-2 text-left">Factor</th>}
-                    <th className="px-3 py-2 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cables.map((cable) => (
-                    <tr key={cable.id} className="border-t border-gray-200">
-                      <td className="px-3 py-2">
-                        <select
-                          value={cable.conductorType}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'conductorType', e.target.value as ConductorType)
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        >
-                          <option value="solid">Solid</option>
-                          <option value="stranded">Stranded</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={cable.csa}
-                          onChange={(e) => updateCable(cable.id, 'csa', e.target.value)}
-                          className="w-full p-2 border rounded-md text-sm"
-                        >
-                          {csaOptions.map((size) => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={cable.quantity}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'quantity', parseInt(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      {isCalculated && <td className="px-3 py-2">{cable.factor}</td>}
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => removeCable(cable.id)}
-                          disabled={cables.length === 1}
-                          className={`p-1 rounded-md ${
-                            cables.length === 1
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-800'
-                          }`}
-                        >
-                          <span className="text-xs">Remove</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate
-          </button>
-
-          {/* Results Display */}
-          {isCalculated && (
-            <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-              <h3 className="text-lg font-semibold mb-2">Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="font-medium">Total Cable Factor:</span> {totalCableFactor.toFixed(1)}
-                </div>
-                <div>
-                  <span className="font-medium">Trunking Factor:</span> {containmentFactor}
-                </div>
-                <div className={isCompliant ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                  <span className="font-medium text-black">Status:</span> {isCompliant ? 'Compliant' : 'Non-Compliant'}
-                </div>
-              </div>
+              <h4 className="font-medium mb-3">Cable Configuration</h4>
               
-              <div className="mt-2 text-xs text-gray-600">
-                {isCompliant 
-                  ? 'The trunking installation is compliant with the requirements.'
-                  : 'The trunking factor must be equal to or greater than the total cable factor.'
-                }
-              </div>
-            </div>
-          )}
-
-          {/* Reference Information */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Reference Information</h3>
-            <div className="text-xs text-gray-600">
-              <p>• Calculations are performed based on BS 7671 cable factor tables for trunking.</p>
-              <p>• The trunking factor must be equal to or greater than the total cable factor.</p>
-              <p>• Trunking sizing is given as width × height in millimeters.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Trunking Space Factor */}
-      {activeTab === 'trunkingSpace' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Trunking Width (mm)</label>
-              <input
-                type="number"
-                min="25"
-                max="300"
-                placeholder="Width"
-                id="trunkingWidth"
-                className="w-full p-2 border rounded-md text-sm"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Trunking Height (mm)</label>
-              <input
-                type="number"
-                min="25"
-                max="300"
-                placeholder="Height"
-                id="trunkingHeight"
-                className="w-full p-2 border rounded-md text-sm"
-              />
-            </div>
-          </div>
-          
-          {/* Cables Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Cables</h3>
-              <button
-                onClick={addCable}
-                className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
-              >
-                <span className="mr-1">+</span> Add Cable
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-md text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-3 py-2 text-left">Cable Description</th>
-                    <th className="px-3 py-2 text-left">Outer Dia. (mm)</th>
-                    <th className="px-3 py-2 text-left">Quantity</th>
-                    {isCalculated && <th className="px-3 py-2 text-left">CSA (mm²)</th>}
-                    <th className="px-3 py-2 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cables.map((cable) => (
-                    <tr key={cable.id} className="border-t border-gray-200">
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          placeholder="Cable description"
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="0.5"
-                          step="0.1"
-                          placeholder="Diameter"
-                          value={cable.outerDiameter || ''}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'outerDiameter', parseFloat(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={cable.quantity}
-                          onChange={(e) => 
-                            updateCable(cable.id, 'quantity', parseInt(e.target.value))
-                          }
-                          className="w-full p-2 border rounded-md text-sm"
-                        />
-                      </td>
-                      {isCalculated && (
-                        <td className="px-3 py-2">
-                          {cable.outerDiameter ? 
-                            calculateCsaFromDiameter(cable.outerDiameter).toFixed(2) 
-                            : '0'}
-                        </td>
-                      )}
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => removeCable(cable.id)}
-                          disabled={cables.length === 1}
-                          className={`p-1 rounded-md ${
-                            cables.length === 1
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-800'
-                          }`}
-                        >
-                          <span className="text-xs">Remove</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate
-          </button>
-
-          {/* Results Display */}
-          {isCalculated && (
-            <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-              <h3 className="text-lg font-semibold mb-2">Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="font-medium">Space Factor:</span> {spaceFactorPercentage.toFixed(1)}%
-                  <div className="text-xs text-gray-600">(Maximum allowed: 45%)</div>
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cables
+                  </label>
+                  <button
+                    onClick={addCable}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
+                  >
+                    <span className="mr-1">+</span> Add Cable
+                  </button>
                 </div>
-                <div className={isCompliant ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                  <span className="font-medium text-black">Status:</span> {isCompliant ? 'Compliant' : 'Non-Compliant'}
+
+                <div className="overflow-x-auto bg-white rounded-md">
+                  <table className="min-w-full border border-gray-200 text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-left">Outer Dia. (mm)</th>
+                        <th className="px-3 py-2 text-left">Qty</th>
+                        {isCalculated && <th className="px-3 py-2 text-left">CSA (mm²)</th>}
+                        <th className="px-3 py-2 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cables.map((cable) => (
+                        <tr key={cable.id} className="border-t border-gray-200">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              placeholder="Cable description"
+                              className="w-full p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0.5"
+                              step="0.1"
+                              placeholder="Diameter"
+                              value={cable.outerDiameter || ''}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'outerDiameter', parseFloat(e.target.value))
+                              }
+                              className="w-full p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={cable.quantity}
+                              onChange={(e) => 
+                                updateCable(cable.id, 'quantity', parseInt(e.target.value))
+                              }
+                              className="w-16 p-1 border rounded-md text-sm"
+                            />
+                          </td>
+                          {isCalculated && (
+                            <td className="px-3 py-2">
+                              {cable.outerDiameter ? 
+                                calculateCsaFromDiameter(cable.outerDiameter).toFixed(2) 
+                                : '0'}
+                            </td>
+                          )}
+                          <td className="px-3 py-2">
+                            <button
+                              onClick={() => removeCable(cable.id)}
+                              disabled={cables.length === 1}
+                              className={`p-1 rounded-md ${
+                                cables.length === 1
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-800'
+                              }`}
+                            >
+                              <span className="text-xs">Remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
               
-              <div className="mt-2 text-xs text-gray-600">
-                {isCompliant 
-                  ? 'The trunking installation is compliant with the 45% space factor rule.'
-                  : 'The space factor must not exceed 45% of the trunking cross-sectional area.'
-                }
+              {!isCalculated ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Enter the parameters and click Calculate to see results</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Space Factor</p>
+                      <p className="text-lg">{spaceFactorPercentage.toFixed(1)}%</p>
+                      <p className="text-xs text-gray-600">(Maximum allowed: 45%)</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm font-medium">Compliance Status</p>
+                      <p className={`text-lg ${isCompliant ? 'text-green-600' : 'text-red-600'}`}>
+                        {isCompliant ? 'Compliant ✓' : 'Non-Compliant ✗'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Compliance Assessment</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'The trunking installation is compliant with the 45% space factor rule. There is adequate space for cable routing and prevention of overheating.'
+                        : 'The trunking installation is non-compliant. The space factor exceeds the maximum 45% rule, which may lead to installation difficulties and overheating.'
+                      }
+                    </p>
+                  </div>
+                  
+                  <div className="mt-6 bg-white p-3 rounded-md">
+                    <h4 className="font-medium mb-2">Recommendation</h4>
+                    <p className="text-sm text-gray-700">
+                      {isCompliant 
+                        ? 'Installation can proceed with the current configuration.'
+                        : 'Consider increasing the trunking size, reducing the number of cables, or dividing cables between multiple trunking routes.'
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Reference Information</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>The 45% space factor rule states that the total cross-sectional area of cables must not exceed 45% of the internal area of the trunking.</li>
+                  <li>This allows adequate space for adding cables in the future and prevents overheating due to close packing.</li>
+                  <li>Trunking area is calculated as width × height in square millimeters.</li>
+                  <li>Cable cross-sectional area is calculated using the formula: π × (diameter ÷ 2)²</li>
+                  <li>The space factor method is more appropriate when dealing with custom cable types or non-standard configurations.</li>
+                </ul>
               </div>
             </div>
-          )}
-
-          {/* Reference Information */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Reference Information</h3>
-            <div className="text-xs text-gray-600">
-              <p>• The 45% space factor rule states that the total cross-sectional area of cables must not exceed 45% of the internal area of the trunking.</p>
-              <p>• This allows adequate space for pulling cables and prevents overheating due to close packing.</p>
-              <p>• Trunking area is calculated as width × height in square millimeters.</p>
-              <p>• Cable cross-sectional area is calculated using the formula: π × (diameter ÷ 2)²</p>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
+      
+      {/* Info section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-2">Important Notes</h3>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          <li>Calculations are based on BS 7671 requirements for cable containment sizing.</li>
+          <li>The table method uses predefined factors from the standard for common cable types.</li>
+          <li>The space factor method (45% rule) is more flexible and can be used for any cable type provided you know the outer diameter.</li>
+          <li>For conduits exceeding 3m in length or with bends, reduced capacity factors apply to account for increased pulling tensions.</li>
+          <li>Always ensure proper cable support and appropriate bending radii during installation.</li>
+        </ul>
+      </div>
     </div>
   );
 };

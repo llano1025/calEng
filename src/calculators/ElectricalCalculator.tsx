@@ -12,6 +12,8 @@ import ProtectionCoordinationCalculator from './electrical/ProtectionCoordinatio
 import FuseOperationTimeCalculator from './electrical/FuseOperationTimeCalculator';
 import CableContainmentCalculator from './electrical/CableContainmentCalculator';
 import UPSCalculator from './electrical/UPSCalculator';
+import GensetLouverSizingCalculator from './electrical/GensetLouverSizingCalculator';
+import CombinedGeneratorCalculator from './electrical/GeneratorSizingCalculator';
 import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
@@ -58,6 +60,10 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
         return <CableContainmentCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'ups':
         return <UPSCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'gensetLouver':
+        return <GensetLouverSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'genset':
+        return <CombinedGeneratorCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -203,26 +209,6 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             </div>
           </button>
 
-          {/* Protection Coordination */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'protectionCoordination'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('protectionCoordination')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'protectionCoordination' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'protectionCoordination' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Main Incoming Circuit
-              </p>
-            </div>
-          </button>
-
           {/* Power Factor */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
@@ -258,7 +244,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Cable thermal check
+                <Icons.InfoInline /> Circuit Protection check
               </p>
             </div>
           </button>
@@ -302,6 +288,25 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               </p>
             </div>
           </button>
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
+              calculatorType === 'genset'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('genset')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'genset' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Generator Set</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'genset' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Generator sizing
+              </p>
+            </div>
+          </button>
+
         </div>
       </div>
 

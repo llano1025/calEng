@@ -37,7 +37,7 @@ function App() {
             <div className="container mx-auto max-w-5xl bg-white rounded-xl shadow-2xl p-6 sm:p-10">
                 {/* App Title */}
                 <h1 className="text-3xl sm:text-4xl font-bold text-center mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800">
-                    Engineering Calculator Suite
+                    Engineering Calculator
                 </h1>
 
                 {/* Conditional Rendering based on currentView state */}

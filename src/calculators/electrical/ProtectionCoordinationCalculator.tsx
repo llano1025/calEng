@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icons } from '../../components/Icons';
 
 interface ProtectionCoordinationCalculatorProps {
   onShowTutorial?: () => void;
@@ -129,7 +130,7 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
     const transImpedanceOhmsmOhm = transImpedanceOhms * 1000; // Convert to mΩ
     const cbImpedancemOhm = circuitBreakerImpedance; // Convert to mΩ
     
-    const totalImpedanceVal = srcImpedanceLV + transImpedanceOhms + circuitBreakerImpedance * 2; // in Ω
+    const totalImpedanceVal = srcImpedanceLV + transImpedanceOhms + circuitBreakerImpedance / 1000 * 2; // in Ω
     const totalImpedancemOhm = srcImpedanceLVmOhm + transImpedanceOhmsmOhm + cbImpedancemOhm * 2; // in mΩ
     setTotalImpedance(totalImpedanceVal);
     
@@ -238,7 +239,7 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Protection Coordination Calculator</h2>
         {onShowTutorial && (
@@ -247,18 +248,17 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
             className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
           >
             <span className="mr-1">Tutorial</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
+            <Icons.InfoInline />
           </button>
         )}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <h3 className="font-medium text-lg">System Parameters</h3>
+        {/* Input Section */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">System Parameters</h3>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fault Level (MVA)
             </label>
@@ -266,12 +266,11 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={faultLevel}
               onChange={(e) => setFaultLevel(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 350"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Incoming Voltage (kV)
             </label>
@@ -279,12 +278,11 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={voltage}
               onChange={(e) => setVoltage(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 11"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Incoming Transformer Rating (kVA)
             </label>
@@ -292,12 +290,11 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={incomingTransformerRating}
               onChange={(e) => setIncomingTransformerRating(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 2000"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Transformer Impedance (%)
             </label>
@@ -305,16 +302,15 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={transformerImpedance}
               onChange={(e) => setTransformerImpedance(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 6.25"
+              className="w-full p-2 border rounded-md"
             />
           </div>
-        </div>
-        
-        <div className="space-y-4">
-          <h3 className="font-medium text-lg">Circuit Breaker Parameters</h3>
           
-          <div>
+          <div className="border-t border-gray-300 my-4"></div>
+          
+          <h4 className="font-medium mb-3">Circuit Breaker Parameters</h4>
+          
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Main Circuit Breaker Rating (A)
             </label>
@@ -322,12 +318,11 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={mainBreakerRating}
               onChange={(e) => setMainBreakerRating(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 1600"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Feeder Circuit Breaker Rating (A)
             </label>
@@ -335,12 +330,11 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={feederBreakerRating}
               onChange={(e) => setFeederBreakerRating(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 2500"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Circuit Breaker Impedance (mΩ)
             </label>
@@ -348,124 +342,115 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               type="number"
               value={circuitBreakerImpedance}
               onChange={(e) => setCircuitBreakerImpedance(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 0.5"
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Time Multiplier and Accuracy Parameters */}
-      <div className="mt-6">
-        <h3 className="font-medium text-lg mb-4">Time Settings & Accuracy Parameters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Main Breaker TM Setting
-            </label>
-            <input
-              type="number"
-              step="0.001"
-              value={mainTM}
-              onChange={(e) => setMainTM(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 0.165"
+              className="w-full p-2 border rounded-md"
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Feeder Breaker TM Setting
-            </label>
-            <input
-              type="number"
-              step="0.001"
-              value={feederTM}
-              onChange={(e) => setFeederTM(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 0.1"
-            />
+          <div className="border-t border-gray-300 my-4"></div>
+          
+          <h4 className="font-medium mb-3">Time Settings & Accuracy Parameters</h4>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Main Breaker TM Setting
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                value={mainTM}
+                onChange={(e) => setMainTM(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Feeder Breaker TM Setting
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                value={feederTM}
+                onChange={(e) => setFeederTM(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Main Breaker Op Time (ms)
+              </label>
+              <input
+                type="number"
+                value={mainBreakerOpTime}
+                onChange={(e) => setMainBreakerOpTime(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Feeder Breaker Op Time (ms)
+              </label>
+              <input
+                type="number"
+                value={feederBreakerOpTime}
+                onChange={(e) => setFeederBreakerOpTime(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Main Relay Accuracy (%)
+              </label>
+              <input
+                type="number"
+                value={mainRelayAccuracy}
+                onChange={(e) => setMainRelayAccuracy(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Main CT Accuracy (%)
+              </label>
+              <input
+                type="number"
+                value={mainCTAccuracy}
+                onChange={(e) => setMainCTAccuracy(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Feeder Relay Accuracy (%)
+              </label>
+              <input
+                type="number"
+                value={feederRelayAccuracy}
+                onChange={(e) => setFeederRelayAccuracy(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Feeder CT Accuracy (%)
+              </label>
+              <input
+                type="number"
+                value={feederCTAccuracy}
+                onChange={(e) => setFeederCTAccuracy(Number(e.target.value))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Main Breaker Op Time (ms)
-            </label>
-            <input
-              type="number"
-              value={mainBreakerOpTime}
-              onChange={(e) => setMainBreakerOpTime(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="Custom operating time"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Feeder Breaker Op Time (ms)
-            </label>
-            <input
-              type="number"
-              value={feederBreakerOpTime}
-              onChange={(e) => setFeederBreakerOpTime(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="Custom operating time"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Main Relay Accuracy (%)
-            </label>
-            <input
-              type="number"
-              value={mainRelayAccuracy}
-              onChange={(e) => setMainRelayAccuracy(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 5"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Main CT Accuracy (%)
-            </label>
-            <input
-              type="number"
-              value={mainCTAccuracy}
-              onChange={(e) => setMainCTAccuracy(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 5"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Feeder Relay Accuracy (%)
-            </label>
-            <input
-              type="number"
-              value={feederRelayAccuracy}
-              onChange={(e) => setFeederRelayAccuracy(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 5"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Feeder CT Accuracy (%)
-            </label>
-            <input
-              type="number"
-              value={feederCTAccuracy}
-              onChange={(e) => setFeederCTAccuracy(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., 5"
-            />
-          </div>
-          
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               HV Fuse Op Time (ms) <span className="text-red-600">*</span>
             </label>
@@ -474,7 +459,6 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
               value={hvFuseOpTime}
               onChange={(e) => setHvFuseOpTime(Number(e.target.value))}
               className={`w-full p-2 border ${!isHvFuseOpTimeValid ? 'border-red-500' : 'border-gray-300'} rounded-md`}
-              placeholder="HV Fuse operating time (required)"
               required
             />
             {!isHvFuseOpTimeValid && (
@@ -482,154 +466,189 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
             )}
           </div>
           
-          <div className="pt-4 md:col-span-3">
-            <button
-              onClick={performCalculations}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-            >
-              Calculate
-            </button>
-          </div>
+          <button
+            onClick={performCalculations}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+          >
+            Calculate
+          </button>
+        </div>
+
+        {/* Results Section */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+          
+          {!faultCurrent ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>Enter the parameters and click Calculate to see results</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">Coordination Status</h4>
+                
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="p-2 rounded-md text-center font-medium" 
+                      style={{
+                        backgroundColor: isCoordinated ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: isCoordinated ? 'rgb(6, 95, 70)' : 'rgb(185, 28, 28)'
+                      }}
+                  >
+                    {isCoordinated 
+                      ? 'Main-Feeder Breaker Operating Time check passed' 
+                      : 'Main-Feeder Breaker Operating Time check failed'}
+                  </div>
+                  
+                  <div className="p-2 rounded-md text-center font-medium" 
+                      style={{
+                        backgroundColor: isFuseCoordinated ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: isFuseCoordinated ? 'rgb(6, 95, 70)' : 'rgb(185, 28, 28)'
+                      }}
+                  >
+                    {isFuseCoordinated 
+                      ? 'Fuse coordination achieved' 
+                      : 'Fuse coordination not achieved'}
+                  </div>
+                </div>
+                
+                <div className="mt-2 pt-2 border-t">
+                  <p className="text-sm font-medium">Minimum TM Setting for Main Breaker</p>
+                  <p className="text-green-600 font-bold text-lg">
+                    {mainBreakerOperatingTime && mainPSM ? (mainBreakerOperatingTime / (80 / (Math.pow(mainPSM, 2) - 1) * 1000)).toFixed(3) : "N/A"}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">System Impedance Details</h4>
+                
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="font-medium">Fault Current at HV Side</p>
+                    <p>{faultCurrent.toFixed(2)} kA</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Source Impedance</p>
+                    <p>{sourceImpedance?.toFixed(4)} Ω</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Source Impedance (LV)</p>
+                    <p>{sourceImpedanceLV?.toFixed(4)} Ω</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Transformer Impedance (LV)</p>
+                    <p>{transformerImpedanceOhms?.toFixed(4)} Ω</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Total Impedance</p>
+                    <p>{totalImpedance?.toFixed(4)} Ω</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Max Fault Current (LV)</p>
+                    <p>{(totalImpedance ? (LV_VOLTAGE * 1000) / (Math.sqrt(3) * totalImpedance) / 1000 : 0).toFixed(2)} kA</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">Breaker Operation Details</h4>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium">Main Breaker</p>
+                    <p>PSM: {mainPSM?.toFixed(2)}</p>
+                    <p>Operating Time: {mainBreakerOperatingTime?.toFixed(1)} ms</p>
+                    <p>Total Break Time: {totalMainBreakTime?.toFixed(1)} ms</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">Feeder Breaker</p>
+                    <p>PSM: {feederPSM?.toFixed(2)}</p>
+                    <p>Operating Time: {feederBreakerOperatingTime?.toFixed(1)} ms</p>
+                    <p>Total Break Time: {totalFeederBreakTime?.toFixed(1)} ms</p>
+                  </div>
+                </div>
+                
+                <div className="mt-3 pt-3 border-t grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium">Time Discrimination</p>
+                    <p>{(mainBreakerOperatingTime && feederBreakerOperatingTime) 
+                      ? (mainBreakerOperatingTime - feederBreakerOperatingTime).toFixed(1) 
+                      : "N/A"} ms</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium">HV Fuse Op Time</p>
+                    <p>{hvFuseOpTime} ms</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md mb-4">
+                <h4 className="font-medium text-blue-800 mb-2">Calculation Method</h4>
+                
+                <div className="text-xs text-gray-700 max-h-96 overflow-y-auto">
+                  {detailedCalculations.map((calc, index) => (
+                    <div key={index} className="border-b border-gray-200 pb-1 last:border-0 last:pb-0">
+                      {calc}
+                    </div>
+                  ))}
+                  
+                  <div className="mt-2 pt-2 border-t font-medium">
+                    Fuse Coordination: {isFuseCoordinated ? (
+                      <span className="text-green-600">Feeder Breaker ({totalFeederBreakTime?.toFixed(1)} ms) &lt; Main Breaker ({totalMainBreakTime?.toFixed(1)} ms) &lt; HV Fuse ({hvFuseOpTime} ms)</span>
+                    ) : (
+                      <span className="text-red-600">Coordination sequence not achieved</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {!isCoordinated && (
+                <div className="bg-white p-4 rounded-md">
+                  <h4 className="font-medium text-blue-800 mb-2">Coordination Issue</h4>
+                  
+                  <p className="text-xs text-gray-700">
+                    Main breaker operating time ({mainBreakerOperatingTime?.toFixed(1)} ms) is not greater than feeder breaker operating time ({feederBreakerOperatingTime?.toFixed(1)} ms). 
+                    Consider increasing the main breaker TM setting to at least {mainBreakerOperatingTime && mainPSM && feederBreakerOperatingTime ? 
+                      ((feederBreakerOperatingTime * 1.2) / (80 / (Math.pow(mainPSM, 2) - 1) * 1000)).toFixed(3) : "N/A"} 
+                    for proper coordination.
+                  </p>
+                </div>
+              )}
+              
+              {!isFuseCoordinated && isCoordinated && (
+                <div className="bg-white p-4 rounded-md">
+                  <h4 className="font-medium text-blue-800 mb-2">Fuse Coordination Issue</h4>
+                  
+                  <p className="text-xs text-gray-700">
+                    The coordination sequence between circuit breakers and HV fuse is not achieved. The proper sequence should be:
+                    Feeder Breaker ({totalFeederBreakTime?.toFixed(1)} ms) &lt; Main Breaker ({totalMainBreakTime?.toFixed(1)} ms) &lt; HV Fuse ({hvFuseOpTime} ms).
+                    Consider adjusting the HV fuse rating or circuit breaker settings.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
       
-      {faultCurrent !== null && (
-        <div className="mt-8">
-          <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
-          
-          {/* Summary Result Grid */}
-          <div className="bg-gray-50 p-4 rounded-md mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Fault Current at HV Side</p>
-                <p className="font-medium">{faultCurrent.toFixed(2)} kA</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Source Impedance</p>
-                <p className="font-medium">{sourceImpedance?.toFixed(4)} Ω</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Source Impedance (LV Side)</p>
-                <p className="font-medium">{sourceImpedanceLV?.toFixed(4)} Ω</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Transformer Impedance (LV Side)</p>
-                <p className="font-medium">{transformerImpedanceOhms?.toFixed(4)} Ω</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Total Impedance (Load Side)</p>
-                <p className="font-medium">{totalImpedance?.toFixed(4)} Ω</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Max Fault Current (LV)</p>
-                <p className="font-medium">{(totalImpedance ? (LV_VOLTAGE * 1000) / (Math.sqrt(3) * totalImpedance) / 1000 : 0).toFixed(2)} kA</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Rated Current (HV Side)</p>
-                <p className="font-medium">{(incomingTransformerRating / (Math.sqrt(3) * voltage * 1000) * 1000).toFixed(1)} A</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Main Breaker PSM</p>
-                <p className="font-medium">{mainPSM?.toFixed(2)}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Feeder Breaker PSM</p>
-                <p className="font-medium">{feederPSM?.toFixed(2)}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Main Breaker TM Setting</p>
-                <p className="font-medium">{(mainBreakerOperatingTime && mainPSM ? mainBreakerOperatingTime / (80 / (Math.pow(mainPSM, 2) - 1) * 1000) : mainTM).toFixed(3)}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Feeder Breaker TM Setting</p>
-                <p className="font-medium">{(feederBreakerOperatingTime && feederPSM ? feederBreakerOperatingTime / (80 / (Math.pow(feederPSM, 2) - 1) * 1000) : feederTM).toFixed(3)}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Main Breaker Operating Time</p>
-                <p className="font-medium">{mainBreakerOperatingTime?.toFixed(1)} ms</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Feeder Breaker Operating Time</p>
-                <p className="font-medium">{feederBreakerOperatingTime?.toFixed(1)} ms</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Main Breaker Total Break Time</p>
-                <p className="font-medium">{totalMainBreakTime?.toFixed(1)} ms</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Feeder Breaker Total Break Time</p>
-                <p className="font-medium">{totalFeederBreakTime?.toFixed(1)} ms</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Time Discrimination</p>
-                <p className="font-medium">
-                  {(mainBreakerOperatingTime && feederBreakerOperatingTime) 
-                    ? (mainBreakerOperatingTime - feederBreakerOperatingTime).toFixed(1) 
-                    : "N/A"} ms
-                </p>
-              </div>
-              
-
-              
-              <div>
-                <p className="text-sm text-gray-500">HV Fuse Op Time</p>
-                <p className="font-medium">{hvFuseOpTime} ms</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-2 rounded-md text-center font-medium" 
-                   style={{
-                     backgroundColor: isCoordinated ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                     color: isCoordinated ? 'rgb(6, 95, 70)' : 'rgb(185, 28, 28)'
-                   }}
-              >
-                {isCoordinated 
-                  ? 'Main-Feeder Breaker Operating Time check passed' 
-                  : 'Main-Feeder Breaker Operating Time check failed'}
-              </div>
-              
-              <div className="p-2 rounded-md text-center font-medium" 
-                   style={{
-                     backgroundColor: isFuseCoordinated ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                     color: isFuseCoordinated ? 'rgb(6, 95, 70)' : 'rgb(185, 28, 28)'
-                   }}
-              >
-                {isFuseCoordinated 
-                  ? 'Fuse coordination achieved' 
-                  : 'Fuse coordination not achieved'}
-              </div>
-            </div>
-          </div>
-          
-          {/* Detailed Calculation Steps */}
-          <div className="bg-gray-50 p-4 rounded-md">
-            <h4 className="font-medium text-md mb-3">Detailed Calculation Steps</h4>
-            <div className="text-sm space-y-1.5 font-mono">
-              {detailedCalculations.map((calc, index) => (
-                <div key={index} className="border-b border-gray-200 pb-1 last:border-0 last:pb-0">
-                  {calc}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Info section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-2">Important Notes</h3>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          <li>The calculation is based on an EI (Extremely Inverse) curve for the relay characteristics.</li>
+          <li>Proper coordination requires the main breaker to operate slower than the feeder breaker for discrimination.</li>
+          <li>Breaker operating time is affected by relay accuracy and CT accuracy factors.</li>
+          <li>For proper coordination, the HV fuse operating time should be greater than the main breaker total break time.</li>
+          <li>Typical time discrimination between breakers should be at least 200ms (recommended).</li>
+        </ul>
+      </div>
     </div>
   );
 };

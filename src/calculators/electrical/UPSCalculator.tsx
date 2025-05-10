@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
 
 interface UPSCalculatorProps {
@@ -255,20 +255,20 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Uninterruptible Power Supply Calculator</h2>
         
         {onShowTutorial && (
-          <button onClick={onShowTutorial} className="flex items-center text-blue-600 hover:text-blue-800">
-            <Icons.InfoInline/> Tutorial
+          <button 
+            onClick={onShowTutorial} 
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
           </button>
         )}
       </div>
-      
-      <p className="mb-4 text-gray-600">
-        Calculate UPS battery requirements, battery breaker sizing, ventilation needs, and charging current.
-      </p>
 
       {/* Tabs for different calculators */}
       <div className="border-b border-gray-200 mb-6">
@@ -316,565 +316,681 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
         </nav>
       </div>
 
-      {/* Battery Power Required */}
-      {activeTab === 'batteryPower' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Load Power (kVA)</label>
-              <input
-                type="number"
-                id="loadPower"
-                name="loadPower"
-                value={formData.loadPower}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 10"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Power Factor</label>
-              <input
-                type="number"
-                id="powerFactor"
-                name="powerFactor"
-                min="0"
-                max="1"
-                step="0.01"
-                value={formData.powerFactor}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 0.85"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">UPS Efficiency</label>
-              <input
-                type="number"
-                id="efficiency"
-                name="efficiency"
-                min="0"
-                max="1"
-                step="0.01"
-                value={formData.efficiency}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 0.95"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Battery Voltage (V)</label>
-              <input
-                type="number"
-                id="batteryVoltage"
-                name="batteryVoltage"
-                value={formData.batteryVoltage}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 12"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Number of Battery Strings</label>
-              <input
-                type="number"
-                id="batteryString"
-                name="batteryString"
-                value={formData.batteryString}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 1"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Batteries Per String</label>
-              <input
-                type="number"
-                id="batteryPerString"
-                name="batteryPerString"
-                value={formData.batteryPerString}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 34"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Aging Factor</label>
-              <input
-                type="number"
-                id="agingFactor"
-                name="agingFactor"
-                step="0.01"
-                value={formData.agingFactor}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 1.15"
-              />
-            </div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Battery Power Required */}
+        {activeTab === 'batteryPower' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Load Power (kVA)
+                </label>
+                <input
+                  type="number"
+                  id="loadPower"
+                  name="loadPower"
+                  value={formData.loadPower}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 10"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Power Factor
+                </label>
+                <input
+                  type="number"
+                  id="powerFactor"
+                  name="powerFactor"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formData.powerFactor}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 0.85"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  UPS Efficiency
+                </label>
+                <input
+                  type="number"
+                  id="efficiency"
+                  name="efficiency"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formData.efficiency}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 0.95"
+                />
+              </div>
 
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate Battery Power
-          </button>
-          
-          {/* Results Display */}
-          <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-            <h3 className="text-lg font-semibold mb-2">Results</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 text-sm">
-              <div>
-                <span className="font-medium">Required Power:</span> {(results.batteryPower.requiredPower / 1000).toFixed(2)} kW
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Battery Configuration</h4>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Battery Voltage (V)
+                </label>
+                <input
+                  type="number"
+                  id="batteryVoltage"
+                  name="batteryVoltage"
+                  value={formData.batteryVoltage}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 12"
+                />
               </div>
-              <div>
-                <span className="font-medium">Total Cell Number:</span> {results.batteryPower.cellNumber.toFixed(0)}
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Number of Battery Strings
+                </label>
+                <input
+                  type="number"
+                  id="batteryString"
+                  name="batteryString"
+                  value={formData.batteryString}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 1"
+                />
               </div>
-              <div className="font-bold text-green-600">
-                <span className="font-medium text-black">Battery Energy:</span> {results.batteryPower.batteryEnergy.toFixed(2)} W
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Batteries Per String
+                </label>
+                <input
+                  type="number"
+                  id="batteryPerString"
+                  name="batteryPerString"
+                  value={formData.batteryPerString}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 34"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Aging Factor
+                </label>
+                <input
+                  type="number"
+                  id="agingFactor"
+                  name="agingFactor"
+                  step="0.01"
+                  value={formData.agingFactor}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 1.15"
+                />
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate Battery Power
+                </button>
               </div>
             </div>
 
-            <div className="mt-2 text-xs text-gray-600">
-              Formula: Battery Energy = (Load Power × 1000 × PF / Efficiency) / (Strings × Batteries × Voltage / 2) × Aging Factor
-            </div>
-          </div>
-        </div>
-      )}
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Required Power</p>
+                  <p className="text-lg">
+                    {(results.batteryPower.requiredPower / 1000).toFixed(2)} kW
+                  </p>
+                </div>
 
-      {/* Battery Breaker */}
-      {activeTab === 'batteryBreaker' && (
-        <div>
-          {/* Display key inputs that affect breaker sizing */}
-          {/* <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <Icons.InfoCircle />
+                <div>
+                  <p className="text-sm font-medium">Total Cell Number</p>
+                  <p className="text-lg">
+                    {results.batteryPower.cellNumber.toFixed(0)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium">Battery Energy</p>
+                  <p className="text-lg text-green-600">
+                    {results.batteryPower.batteryEnergy.toFixed(2)} W
+                  </p>
+                </div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  Battery breaker sizing is calculated using load power, efficiency, and cell configuration.
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">How This is Calculated</h4>
+                <p className="text-sm text-gray-600">
+                  Battery Energy = (Load Power × 1000 × PF / Efficiency) / (Strings × Batteries × Voltage / 2) × Aging Factor
                 </p>
               </div>
-            </div>
-          </div> */}
-
-          {/* Key Parameters Display */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Load Power (kVA)</label>
-              <input
-                type="number"
-                id="loadPower"
-                name="loadPower"
-                value={formData.loadPower}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 10"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Power Factor</label>
-              <input
-                type="number"
-                id="powerFactor"
-                name="powerFactor"
-                min="0"
-                max="1"
-                step="0.01"
-                value={formData.powerFactor}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 0.85"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">UPS Efficiency</label>
-              <input
-                type="number"
-                id="efficiency"
-                name="efficiency"
-                min="0"
-                max="1"
-                step="0.01"
-                value={formData.efficiency}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 0.95"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Battery Voltage (V)</label>
-              <input
-                type="number"
-                id="batteryVoltage"
-                name="batteryVoltage"
-                value={formData.batteryVoltage}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 12"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Batteries Per String</label>
-              <input
-                type="number"
-                id="batteryPerString"
-                name="batteryPerString"
-                value={formData.batteryPerString}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 34"
-              />
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate Breaker Size
-          </button>
-
-          {/* Results Display */}
-          <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-            <h3 className="text-lg font-semibold mb-2">Results</h3>
-            <div className="text-sm">
-              <div className="font-bold text-green-600">
-                <span className="font-medium text-black">Battery Breaker Rating:</span> {results.batteryBreaker.breakerRating.toFixed(2)} A
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Notes</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>The aging factor accounts for battery capacity degradation over time.</li>
+                  <li>Higher efficiency values result in lower battery energy requirements.</li>
+                  <li>Battery string configurations significantly impact the total system capacity.</li>
+                </ul>
               </div>
             </div>
+          </>
+        )}
 
-            <div className="mt-2 text-xs text-gray-600">
-              Formula: Breaker Rating = (Load Power × Power Factor / Efficiency × 1000) / 1.75 / (Batteries Per String × Battery Voltage / 2)
-            </div>
-          </div>
-
-          {/* Formula Reference */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Battery Breaker Sizing Guide</h3>
-            <div className="text-sm text-gray-700 space-y-2">
-              <p>The battery circuit breaker should be properly sized to protect both the batteries and the UPS system.</p>
-              <p>The calculation takes into account:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Load power requirements</li>
-                <li>Power factor</li>
-                <li>System efficiency</li>
-                <li>Battery configuration (strings and cells)</li>
-              </ul>
-              <p>For VRLA batteries, use DC-rated circuit breakers with appropriate voltage rating.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Ventilation */}
-      {activeTab === 'ventilation' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Battery Type</label>
-              <select
-                id="batteryType"
-                name="batteryType"
-                value={formData.batteryType}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-              >
-                <option value="lead_acid_vented">Lead-acid Vented</option>
-                <option value="lead_acid_vrla">Lead-acid VRLA</option>
-                <option value="nicd">NiCd Batteries</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Charging Mode</label>
-              <select
-                id="chargingMode"
-                name="chargingMode"
-                value={formData.chargingMode}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-              >
-                <option value="float">Float Charge</option>
-                <option value="boost">Boost Charge</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Number of Cells</label>
-              <input
-                type="number"
-                id="numCells"
-                name="numCells"
-                value={formData.numCells}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 120"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Battery Capacity (Ah)</label>
-              <input
-                type="number"
-                id="batteryCapacity"
-                name="batteryCapacity"
-                value={formData.batteryCapacity}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 100"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Number of Battery Strings</label>
-              <input
-                type="number"
-                id="batteryString"
-                name="batteryString"
-                value={formData.batteryString}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 1"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Room Floor Area (m²)</label>
-              <input
-                type="number"
-                id="roomFloorArea"
-                name="roomFloorArea"
-                value={formData.roomFloorArea}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 20"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Lower Explosion Limit (%)</label>
-              <input
-                type="number"
-                id="lowerExplosionLimit"
-                name="lowerExplosionLimit"
-                step="0.1"
-                min="0"
-                max="100"
-                value={formData.lowerExplosionLimit}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 4"
-              />
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate Ventilation Requirements
-          </button>
-
-          {/* Results Display */}
-          <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-            <h3 className="text-lg font-semibold mb-2">Results</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 text-sm">
-              <div>
-                <span className="font-medium">Total Battery Capacity:</span> {results.ventilation.totalBatteryCapacity.toFixed(0)} Ah
-              </div>
-              <div>
-                <span className="font-medium">Gas Producing Current:</span> {results.ventilation.gasProducingCurrent.toFixed(2)} mA/Ah
-              </div>
-              <div>
-                <span className="font-medium">Dilution Factor (v):</span> {results.ventilation.vFactor.toFixed(2)}
-              </div>
-              <div>
-                <span className="font-medium">Calculated Air Flow Rate:</span> {results.ventilation.airFlowRate.toFixed(2)} m³/h
+        {/* Battery Breaker */}
+        {activeTab === 'batteryBreaker' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Load Power (kVA)
+                </label>
+                <input
+                  type="number"
+                  id="loadPower"
+                  name="loadPower"
+                  value={formData.loadPower}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 10"
+                />
               </div>
               
-              {results.ventilation.applyMinimumRate && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Power Factor
+                </label>
+                <input
+                  type="number"
+                  id="powerFactor"
+                  name="powerFactor"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formData.powerFactor}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 0.85"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  UPS Efficiency
+                </label>
+                <input
+                  type="number"
+                  id="efficiency"
+                  name="efficiency"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formData.efficiency}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 0.95"
+                />
+              </div>
+
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Battery Configuration</h4>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Battery Voltage (V)
+                </label>
+                <input
+                  type="number"
+                  id="batteryVoltage"
+                  name="batteryVoltage"
+                  value={formData.batteryVoltage}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 12"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Batteries Per String
+                </label>
+                <input
+                  type="number"
+                  id="batteryPerString"
+                  name="batteryPerString"
+                  value={formData.batteryPerString}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 34"
+                />
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate Breaker Size
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              <div>
+                <p className="text-sm font-medium">Battery Breaker Rating</p>
+                <p className="text-lg text-green-600">
+                  {results.batteryBreaker.breakerRating.toFixed(2)} A
+                </p>
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">How This is Calculated</h4>
+                <p className="text-sm text-gray-600">
+                  Breaker Rating = (Load Power × Power Factor / Efficiency × 1000) / 1.75 / (Batteries Per String × Battery Voltage / 2)
+                </p>
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Battery Breaker Sizing Guide</h4>
+                <div className="text-sm text-gray-700 space-y-2">
+                  <p>The battery circuit breaker should be properly sized to protect both the batteries and the UPS system.</p>
+                  <p>The calculation takes into account:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Load power requirements</li>
+                    <li>Power factor</li>
+                    <li>System efficiency</li>
+                    <li>Battery configuration (strings and cells)</li>
+                  </ul>
+                  <p>For VRLA batteries, use DC-rated circuit breakers with appropriate voltage rating.</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Ventilation */}
+        {activeTab === 'ventilation' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Battery Type
+                </label>
+                <select
+                  id="batteryType"
+                  name="batteryType"
+                  value={formData.batteryType}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                >
+                  <option value="lead_acid_vented">Lead-acid Vented</option>
+                  <option value="lead_acid_vrla">Lead-acid VRLA</option>
+                  <option value="nicd">NiCd Batteries</option>
+                </select>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Charging Mode
+                </label>
+                <select
+                  id="chargingMode"
+                  name="chargingMode"
+                  value={formData.chargingMode}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                >
+                  <option value="float">Float Charge</option>
+                  <option value="boost">Boost Charge</option>
+                </select>
+              </div>
+
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Battery Configuration</h4>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Number of Cells
+                </label>
+                <input
+                  type="number"
+                  id="numCells"
+                  name="numCells"
+                  value={formData.numCells}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 120"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Battery Capacity (Ah)
+                </label>
+                <input
+                  type="number"
+                  id="batteryCapacity"
+                  name="batteryCapacity"
+                  value={formData.batteryCapacity}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 100"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Number of Battery Strings
+                </label>
+                <input
+                  type="number"
+                  id="batteryString"
+                  name="batteryString"
+                  value={formData.batteryString}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 1"
+                />
+              </div>
+
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              <h4 className="font-medium mb-3">Room Parameters</h4>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Room Floor Area (m²)
+                </label>
+                <input
+                  type="number"
+                  id="roomFloorArea"
+                  name="roomFloorArea"
+                  value={formData.roomFloorArea}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 20"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lower Explosion Limit (%)
+                </label>
+                <input
+                  type="number"
+                  id="lowerExplosionLimit"
+                  name="lowerExplosionLimit"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={formData.lowerExplosionLimit}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 4"
+                />
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate Ventilation Requirements
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <span className="font-medium">Minimum Air Flow Rate:</span> {results.ventilation.minimumAirFlowRate.toFixed(2)} m³/h
+                  <p className="text-sm font-medium">Total Battery Capacity</p>
+                  <p className="text-lg">
+                    {results.ventilation.totalBatteryCapacity.toFixed(0)} Ah
+                  </p>
                 </div>
-              )}
-              
-              <div className="font-bold text-green-600 col-span-2">
-                <span className="font-medium text-black">Recommended Air Flow Rate:</span> {results.ventilation.recommendedAirFlowRate.toFixed(2)} m³/h
-                {results.ventilation.applyMinimumRate && results.ventilation.recommendedAirFlowRate === results.ventilation.minimumAirFlowRate ? 
-                  " (based on floor area)" : " (based on calculation)"}
+                
+                <div>
+                  <p className="text-sm font-medium">Gas Producing Current</p>
+                  <p className="text-lg">
+                    {results.ventilation.gasProducingCurrent.toFixed(2)} mA/Ah
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium">Dilution Factor (v)</p>
+                  <p className="text-lg">
+                    {results.ventilation.vFactor.toFixed(2)}
+                  </p>
+                </div>
               </div>
               
-              {!results.ventilation.applyMinimumRate && (
-                <div className="italic text-xs text-gray-600 col-span-2 mt-2">
-                  Note: Minimum floor area rate (5.1 L/s/m²) does not apply as total battery capacity is less than 400 Ah.
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Air Flow Rate Details</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Calculated Air Flow Rate</p>
+                    <p>{results.ventilation.airFlowRate.toFixed(2)} m³/h</p>
+                  </div>
+                  
+                  {results.ventilation.applyMinimumRate && (
+                    <div>
+                      <p className="text-sm text-gray-600">Minimum Air Flow Rate</p>
+                      <p>{results.ventilation.minimumAirFlowRate.toFixed(2)} m³/h</p>
+                    </div>
+                  )}
+                  
+                  <div className="font-bold text-green-600">
+                    <p className="text-sm text-gray-600">Recommended Air Flow Rate</p>
+                    <p>{results.ventilation.recommendedAirFlowRate.toFixed(2)} m³/h
+                      {results.ventilation.applyMinimumRate && results.ventilation.recommendedAirFlowRate === results.ventilation.minimumAirFlowRate ? 
+                        " (based on floor area)" : " (based on calculation)"}
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Ventilation Formula</h4>
+                <p className="text-sm text-gray-600">
+                  Q = v × q × s × n × Igas × Crt × 10⁻³ (m³/h)
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Where: v = dilution factor, q = hydrogen generation rate, s = safety factor, n = number of cells, 
+                  Igas = gas producing current, Crt = battery capacity
+                </p>
+                
+                {!results.ventilation.applyMinimumRate && (
+                  <p className="italic text-xs text-gray-600 mt-2">
+                    Note: Minimum floor area rate (5.1 L/s/m²) does not apply as total battery capacity is less than 400 Ah.
+                  </p>
+                )}
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Notes</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Based on EN 50272-2 standard for battery ventilation requirements.</li>
+                  <li>Higher charging currents increase hydrogen gas production.</li>
+                  <li>VRLA batteries generally produce less hydrogen than vented types.</li>
+                  <li>Minimum ventilation rate of 5.1 L/s/m² applies to installations ≥ 400 Ah.</li>
+                </ul>
+              </div>
             </div>
+          </>
+        )}
 
-            <div className="mt-2 text-xs text-gray-600">
-              Formula: Q = v × q × s × n × Igas × Crt × 10⁻³ (m³/h)
-            </div>
-          </div>
+        {/* Charging Current */}
+        {activeTab === 'chargingCurrent' && (
+          <>
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Battery Capacity (Ah)
+                </label>
+                <input
+                  type="number"
+                  id="batteryCapacity"
+                  name="batteryCapacity"
+                  value={formData.batteryCapacity}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 100"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Charging Efficiency
+                </label>
+                <input
+                  type="number"
+                  id="chargingEfficiency"
+                  name="chargingEfficiency"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formData.chargingEfficiency}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 0.85"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Desired Charging Time (hours)
+                </label>
+                <input
+                  type="number"
+                  id="chargingTime"
+                  name="chargingTime"
+                  value={formData.chargingTime}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded-md text-sm"
+                  placeholder="e.g., 10"
+                />
+              </div>
 
-          {/* Formula Reference */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Ventilation Calculation Reference (EN 50272-2)</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-3 py-2 border">Symbol</th>
-                    <th className="px-3 py-2 border">Description</th>
-                    <th className="px-3 py-2 border">Value/Unit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">v</td>
-                    <td className="px-3 py-1 border">Dilution factor</td>
-                    <td className="px-3 py-1 border">(100% - LEL%) ÷ LEL%</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">q</td>
-                    <td className="px-3 py-1 border">Hydrogen generation rate</td>
-                    <td className="px-3 py-1 border">0.42 × 1.095 × 10⁻³ m³/Ah</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">s</td>
-                    <td className="px-3 py-1 border">Safety factor</td>
-                    <td className="px-3 py-1 border">5</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">n</td>
-                    <td className="px-3 py-1 border">Number of cells</td>
-                    <td className="px-3 py-1 border">cells</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">Igas</td>
-                    <td className="px-3 py-1 border">Gas producing current</td>
-                    <td className="px-3 py-1 border">mA/Ah</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">Crt</td>
-                    <td className="px-3 py-1 border">Battery capacity</td>
-                    <td className="px-3 py-1 border">Ah</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-2 text-xs text-gray-600">
-              The minimum 5.1 L/s/m² ventilation rate applies only if total battery capacity ≥ 400 Ah.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Charging Current */}
-      {activeTab === 'chargingCurrent' && (
-        <div>
-          {/* Input Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block font-medium mb-1 text-sm">Battery Capacity (Ah)</label>
-              <input
-                type="number"
-                id="batteryCapacity"
-                name="batteryCapacity"
-                value={formData.batteryCapacity}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 100"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Charging Efficiency</label>
-              <input
-                type="number"
-                id="chargingEfficiency"
-                name="chargingEfficiency"
-                min="0"
-                max="1"
-                step="0.01"
-                value={formData.chargingEfficiency}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 0.85"
-              />
-            </div>
-            <div>
-              <label className="block font-medium mb-1 text-sm">Desired Charging Time (hours)</label>
-              <input
-                type="number"
-                id="chargingTime"
-                name="chargingTime"
-                value={formData.chargingTime}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md text-sm"
-                placeholder="e.g., 10"
-              />
-            </div>
-          </div>
-
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4"
-          >
-            Calculate Charging Current
-          </button>
-
-          {/* Results Display */}
-          <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-            <h3 className="text-lg font-semibold mb-2">Results</h3>
-            <div className="text-sm">
-              <div className="font-bold text-green-600">
-                <span className="font-medium text-black">Maximum Charging Current:</span> {results.chargingCurrent.maxChargingCurrent.toFixed(2)} A
+              <div className="mt-4">
+                <button
+                  onClick={handleCalculate}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Calculate Charging Current
+                </button>
               </div>
             </div>
 
-            <div className="mt-2 text-xs text-gray-600">
-              Formula: Maximum Charging Current = (Battery Capacity ÷ Charging Time) ÷ Charging Efficiency
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              <div>
+                <p className="text-sm font-medium">Maximum Charging Current</p>
+                <p className="text-lg text-green-600">
+                  {results.chargingCurrent.maxChargingCurrent.toFixed(2)} A
+                </p>
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">How This is Calculated</h4>
+                <p className="text-sm text-gray-600">
+                  Maximum Charging Current = (Battery Capacity ÷ Charging Time) ÷ Charging Efficiency
+                </p>
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Battery Charging Current Guidelines</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border border-gray-300">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-3 py-2 border">Charging Type</th>
+                        <th className="px-3 py-2 border">Typical Rate</th>
+                        <th className="px-3 py-2 border">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-200">
+                        <td className="px-3 py-1 border">Float charging</td>
+                        <td className="px-3 py-1 border">0.001C to 0.002C</td>
+                        <td className="px-3 py-1 border">Maintenance charge (0.1-0.2% of capacity)</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="px-3 py-1 border">Boost/bulk charging</td>
+                        <td className="px-3 py-1 border">0.05C to 0.2C</td>
+                        <td className="px-3 py-1 border">Normal recharge (5-20% of capacity)</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="px-3 py-1 border">Fast charging</td>
+                        <td className="px-3 py-1 border">up to 0.3C</td>
+                        <td className="px-3 py-1 border">Rapid recharge (not recommended for regular use)</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="mt-6 bg-white p-3 rounded-md">
+                <h4 className="font-medium mb-2">Notes</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Higher charging currents increase hydrogen gas production and battery temperature.</li>
+                  <li>Follow manufacturer recommendations for optimal charging current.</li>
+                  <li>Charging too quickly may reduce battery lifespan.</li>
+                  <li>Charging too slowly may not fully charge batteries before next discharge cycle.</li>
+                </ul>
+              </div>
             </div>
-          </div>
-
-          {/* Charging Guidelines */}
-          {/* <div className="mt-8">
-            <h3 className="text-lg font-medium mb-2">Battery Charging Current Guidelines</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-3 py-2 border">Charging Type</th>
-                    <th className="px-3 py-2 border">Typical Rate</th>
-                    <th className="px-3 py-2 border">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">Float charging</td>
-                    <td className="px-3 py-1 border">0.001C to 0.002C</td>
-                    <td className="px-3 py-1 border">Maintenance charge (0.1-0.2% of capacity)</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">Boost/bulk charging</td>
-                    <td className="px-3 py-1 border">0.05C to 0.2C</td>
-                    <td className="px-3 py-1 border">Normal recharge (5-20% of capacity)</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-1 border">Fast charging</td>
-                    <td className="px-3 py-1 border">up to 0.3C</td>
-                    <td className="px-3 py-1 border">Rapid recharge (not recommended for regular use)</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-2 text-xs text-gray-600">
-              Higher charging currents increase hydrogen gas production and battery temperature. Follow manufacturer recommendations.
-            </p>
-          </div> */}
-        </div>
-      )}
+          </>
+        )}
+      </div>
+      
+      {/* Info section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-2">Important Notes</h3>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          <li>Calculations are based on industry standards for battery sizing and UPS system design.</li>
+          <li>Battery ventilation requirements follow EN 50272-2 standard for stationary batteries.</li>
+          <li>Battery breaker sizing must be verified against manufacturer specifications for the selected DC circuit breaker.</li>
+          <li>Aging factor accounts for battery capacity loss over time and is typically 1.15-1.25 for VRLA batteries.</li>
+        </ul>
+      </div>
     </div>
   );
 };
