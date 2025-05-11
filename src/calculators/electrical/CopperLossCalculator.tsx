@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icons } from '../../components/Icons';
 
 // Interface for the component props
 interface CopperLossCalculatorProps {
@@ -70,181 +71,185 @@ interface CalculationDetail {
   unit: string;
 }
 
-// Cable resistance data from Table 7.8
-// Contains exactly the 6 columns from the table:
-// 1. Multicore PVC (70°C)
-// 2. Multicore XLPE (90°C) 
-// 3. Single-core PVC enclosed (70°C)
-// 4. Single-core PVC direct/touching (70°C)
-// 5. Single-core XLPE enclosed (90°C)
-// 6. Single-core XLPE direct/touching (90°C)
-const cableResistanceData: {
-  [size: number]: {
-    multicore: {
-      pvc: number;
-      xlpe: number;
-    };
-    singlecore: {
-      pvc: { enclosed: number; touching: number };
-      xlpe: { enclosed: number; touching: number };
-    };
-  };
-} = {
-  1.5: { 
-    multicore: { pvc: 14.4, xlpe: 15.6 },
-    singlecore: { 
-      pvc: { enclosed: 14.4, touching: 14.4 }, 
-      xlpe: { enclosed: 15.6, touching: 15.6 } 
-    }
-  },
-  2.5: { 
-    multicore: { pvc: 9.0, xlpe: 9.0 },
-    singlecore: { 
-      pvc: { enclosed: 9.0, touching: 9.0 }, 
-      xlpe: { enclosed: 9.0, touching: 9.0 } 
-    }
-  },
-  4: { 
-    multicore: { pvc: 5.5, xlpe: 5.8 },
-    singlecore: { 
-      pvc: { enclosed: 5.5, touching: 5.5 }, 
-      xlpe: { enclosed: 5.8, touching: 5.8 } 
-    }
-  },
-  6: { 
-    multicore: { pvc: 3.70, xlpe: 3.93 },
-    singlecore: { 
-      pvc: { enclosed: 3.70, touching: 3.70 }, 
-      xlpe: { enclosed: 3.93, touching: 3.93 } 
-    }
-  },
-  10: { 
-    multicore: { pvc: 2.2, xlpe: 2.3 },
-    singlecore: { 
-      pvc: { enclosed: 2.2, touching: 2.2 }, 
-      xlpe: { enclosed: 2.3, touching: 2.3 } 
-    }
-  },
-  16: { 
-    multicore: { pvc: 1.4, xlpe: 1.4 },
-    singlecore: { 
-      pvc: { enclosed: 1.4, touching: 1.4 }, 
-      xlpe: { enclosed: 1.4, touching: 1.4 } 
-    }
-  },
-  25: { 
-    multicore: { pvc: 0.866, xlpe: 0.924 },
-    singlecore: { 
-      pvc: { enclosed: 0.866, touching: 0.866 }, 
-      xlpe: { enclosed: 0.924, touching: 0.924 } 
-    }
-  },
-  35: { 
-    multicore: { pvc: 0.635, xlpe: 0.664 },
-    singlecore: { 
-      pvc: { enclosed: 0.635, touching: 0.635 }, 
-      xlpe: { enclosed: 0.664, touching: 0.664 } 
-    }
-  },
-  50: { 
-    multicore: { pvc: 0.462, xlpe: 0.497 },
-    singlecore: { 
-      pvc: { enclosed: 0.468, touching: 0.462 }, 
-      xlpe: { enclosed: 0.508, touching: 0.497 } 
-    }
-  },
-  70: { 
-    multicore: { pvc: 0.318, xlpe: 0.341 },
-    singlecore: { 
-      pvc: { enclosed: 0.318, touching: 0.318 }, 
-      xlpe: { enclosed: 0.346, touching: 0.341 } 
-    }
-  },
-  95: { 
-    multicore: { pvc: 0.237, xlpe: 0.248 },
-    singlecore: { 
-      pvc: { enclosed: 0.242, touching: 0.237 }, 
-      xlpe: { enclosed: 0.254, touching: 0.248 } 
-    }
-  },
-  120: { 
-    multicore: { pvc: 0.191, xlpe: 0.196 },
-    singlecore: { 
-      pvc: { enclosed: 0.191, touching: 0.185 }, 
-      xlpe: { enclosed: 0.202, touching: 0.196 } 
-    }
-  },
-  150: { 
-    multicore: { pvc: 0.150, xlpe: 0.162 },
-    singlecore: { 
-      pvc: { enclosed: 0.156, touching: 0.150 }, 
-      xlpe: { enclosed: 0.167, touching: 0.162 } 
-    }
-  },
-  185: { 
-    multicore: { pvc: 0.121, xlpe: 0.127 },
-    singlecore: { 
-      pvc: { enclosed: 0.127, touching: 0.121 }, 
-      xlpe: { enclosed: 0.133, touching: 0.127 } 
-    }
-  },
-  240: { 
-    multicore: { pvc: 0.095, xlpe: 0.101 },
-    singlecore: { 
-      pvc: { enclosed: 0.098, touching: 0.092 }, 
-      xlpe: { enclosed: 0.107, touching: 0.098 } 
-    }
-  },
-  300: { 
-    multicore: { pvc: 0.078, xlpe: 0.081 },
-    singlecore: { 
-      pvc: { enclosed: 0.081, touching: 0.075 }, 
-      xlpe: { enclosed: 0.087, touching: 0.081 } 
-    }
-  },
-  400: { 
-    multicore: { pvc: 0.058, xlpe: 0.066 },
-    singlecore: { 
-      pvc: { enclosed: 0.069, touching: 0.061 }, 
-      xlpe: { enclosed: 0.072, touching: 0.064 } 
-    }
-  },
-  500: { 
-    multicore: { pvc: 0.050, xlpe: 0.052 },
-    singlecore: { 
-      pvc: { enclosed: 0.058, touching: 0.050 }, 
-      xlpe: { enclosed: 0.058, touching: 0.052 } 
-    }
-  },
-  630: { 
-    multicore: { pvc: 0.042, xlpe: 0.043 },
-    singlecore: { 
-      pvc: { enclosed: 0.046, touching: 0.042 }, 
-      xlpe: { enclosed: 0.051, touching: 0.043 } 
-    }
-  },
-  800: { 
-    multicore: { pvc: 0.035, xlpe: 0.035 },
-    singlecore: { 
-      pvc: { enclosed: 0.035, touching: 0.035 }, 
-      xlpe: { enclosed: 0.036, touching: 0.036 } 
-    }
-  },
-  1000: { 
-    multicore: { pvc: 0.030, xlpe: 0.032 },
-    singlecore: { 
-      pvc: { enclosed: 0.030, touching: 0.030 }, 
-      xlpe: { enclosed: 0.032, touching: 0.032 } 
-    }
-  }
-};
-
 const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutorial }) => {
+  // State to track which calculator is active
+  const [activeCalculator, setActiveCalculator] = useState<'loss' | 'resistance'>('loss');
+
+  // Cable resistance data from Table 7.8
+  // Contains exactly the 6 columns from the table:
+  // 1. Multicore PVC (70°C)
+  // 2. Multicore XLPE (90°C) 
+  // 3. Single-core PVC enclosed (70°C)
+  // 4. Single-core PVC direct/touching (70°C)
+  // 5. Single-core XLPE enclosed (90°C)
+  // 6. Single-core XLPE direct/touching (90°C)
+  const cableResistanceData: {
+    [size: number]: {
+      multicore: {
+        pvc: number;
+        xlpe: number;
+      };
+      singlecore: {
+        pvc: { enclosed: number; touching: number };
+        xlpe: { enclosed: number; touching: number };
+      };
+    };
+  } = {
+    1.5: { 
+      multicore: { pvc: 14.4, xlpe: 15.6 },
+      singlecore: { 
+        pvc: { enclosed: 14.4, touching: 14.4 }, 
+        xlpe: { enclosed: 15.6, touching: 15.6 } 
+      }
+    },
+    2.5: { 
+      multicore: { pvc: 9.0, xlpe: 9.0 },
+      singlecore: { 
+        pvc: { enclosed: 9.0, touching: 9.0 }, 
+        xlpe: { enclosed: 9.0, touching: 9.0 } 
+      }
+    },
+    4: { 
+      multicore: { pvc: 5.5, xlpe: 5.8 },
+      singlecore: { 
+        pvc: { enclosed: 5.5, touching: 5.5 }, 
+        xlpe: { enclosed: 5.8, touching: 5.8 } 
+      }
+    },
+    6: { 
+      multicore: { pvc: 3.70, xlpe: 3.93 },
+      singlecore: { 
+        pvc: { enclosed: 3.70, touching: 3.70 }, 
+        xlpe: { enclosed: 3.93, touching: 3.93 } 
+      }
+    },
+    10: { 
+      multicore: { pvc: 2.2, xlpe: 2.3 },
+      singlecore: { 
+        pvc: { enclosed: 2.2, touching: 2.2 }, 
+        xlpe: { enclosed: 2.3, touching: 2.3 } 
+      }
+    },
+    16: { 
+      multicore: { pvc: 1.4, xlpe: 1.4 },
+      singlecore: { 
+        pvc: { enclosed: 1.4, touching: 1.4 }, 
+        xlpe: { enclosed: 1.4, touching: 1.4 } 
+      }
+    },
+    25: { 
+      multicore: { pvc: 0.866, xlpe: 0.924 },
+      singlecore: { 
+        pvc: { enclosed: 0.866, touching: 0.866 }, 
+        xlpe: { enclosed: 0.924, touching: 0.924 } 
+      }
+    },
+    35: { 
+      multicore: { pvc: 0.635, xlpe: 0.664 },
+      singlecore: { 
+        pvc: { enclosed: 0.635, touching: 0.635 }, 
+        xlpe: { enclosed: 0.664, touching: 0.664 } 
+      }
+    },
+    50: { 
+      multicore: { pvc: 0.462, xlpe: 0.497 },
+      singlecore: { 
+        pvc: { enclosed: 0.468, touching: 0.462 }, 
+        xlpe: { enclosed: 0.508, touching: 0.497 } 
+      }
+    },
+    70: { 
+      multicore: { pvc: 0.318, xlpe: 0.341 },
+      singlecore: { 
+        pvc: { enclosed: 0.318, touching: 0.318 }, 
+        xlpe: { enclosed: 0.346, touching: 0.341 } 
+      }
+    },
+    95: { 
+      multicore: { pvc: 0.237, xlpe: 0.248 },
+      singlecore: { 
+        pvc: { enclosed: 0.242, touching: 0.237 }, 
+        xlpe: { enclosed: 0.254, touching: 0.248 } 
+      }
+    },
+    120: { 
+      multicore: { pvc: 0.191, xlpe: 0.196 },
+      singlecore: { 
+        pvc: { enclosed: 0.191, touching: 0.185 }, 
+        xlpe: { enclosed: 0.202, touching: 0.196 } 
+      }
+    },
+    150: { 
+      multicore: { pvc: 0.150, xlpe: 0.162 },
+      singlecore: { 
+        pvc: { enclosed: 0.156, touching: 0.150 }, 
+        xlpe: { enclosed: 0.167, touching: 0.162 } 
+      }
+    },
+    185: { 
+      multicore: { pvc: 0.121, xlpe: 0.127 },
+      singlecore: { 
+        pvc: { enclosed: 0.127, touching: 0.121 }, 
+        xlpe: { enclosed: 0.133, touching: 0.127 } 
+      }
+    },
+    240: { 
+      multicore: { pvc: 0.095, xlpe: 0.101 },
+      singlecore: { 
+        pvc: { enclosed: 0.098, touching: 0.092 }, 
+        xlpe: { enclosed: 0.107, touching: 0.098 } 
+      }
+    },
+    300: { 
+      multicore: { pvc: 0.078, xlpe: 0.081 },
+      singlecore: { 
+        pvc: { enclosed: 0.081, touching: 0.075 }, 
+        xlpe: { enclosed: 0.087, touching: 0.081 } 
+      }
+    },
+    400: { 
+      multicore: { pvc: 0.058, xlpe: 0.066 },
+      singlecore: { 
+        pvc: { enclosed: 0.069, touching: 0.061 }, 
+        xlpe: { enclosed: 0.072, touching: 0.064 } 
+      }
+    },
+    500: { 
+      multicore: { pvc: 0.050, xlpe: 0.052 },
+      singlecore: { 
+        pvc: { enclosed: 0.058, touching: 0.050 }, 
+        xlpe: { enclosed: 0.058, touching: 0.052 } 
+      }
+    },
+    630: { 
+      multicore: { pvc: 0.042, xlpe: 0.043 },
+      singlecore: { 
+        pvc: { enclosed: 0.046, touching: 0.042 }, 
+        xlpe: { enclosed: 0.051, touching: 0.043 } 
+      }
+    },
+    800: { 
+      multicore: { pvc: 0.035, xlpe: 0.035 },
+      singlecore: { 
+        pvc: { enclosed: 0.035, touching: 0.035 }, 
+        xlpe: { enclosed: 0.036, touching: 0.036 } 
+      }
+    },
+    1000: { 
+      multicore: { pvc: 0.030, xlpe: 0.032 },
+      singlecore: { 
+        pvc: { enclosed: 0.030, touching: 0.030 }, 
+        xlpe: { enclosed: 0.032, touching: 0.032 } 
+      }
+    }
+  };
+
+  //=============================================================================
+  // Copper Loss Calculator States & Functions
+  //=============================================================================
+  
   // State for selected circuit type
   const [circuitType, setCircuitType] = useState<CircuitType>('submain-nonres-short');
-  
-  // Remove separate state variables for main and feeder circuit inputs
-  // All calculations will use common portion now
   
   // State for sub-main circuit inputs
   const [commonPortion, setCommonPortion] = useState<CommonPortion>({
@@ -361,7 +366,6 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
   };
   
   // Function to calculate diversity factor based on Image 1
-  // MODIFIED: Only include lateral portions in diversity calculation and handle empty branch case
   const calculateDiversityFactor = (): number => {
     // Calculate total design current for all LATERAL branch portions only
     const totalBranchDesignCurrent = branchPortions
@@ -436,7 +440,6 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
   };
   
   // Function to update a branch portion
-  // MODIFIED: Special handling for riser portions
   const updateBranchPortion = (id: number, field: keyof BranchPortion, value: any) => {
     setBranchPortions(
       branchPortions.map(portion => {
@@ -558,7 +561,6 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
   };
   
   // Function to update common portion
-  // MODIFIED: Update riser resistances when common portion resistance changes
   const updateCommonPortion = (field: keyof CommonPortion, value: any) => {
     setCommonPortion(prevPortion => {
       const updatedPortion = { ...prevPortion, [field]: value };
@@ -841,651 +843,1055 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
   
   // Reset results when circuit type changes
   useEffect(() => {
-    setCopperLoss(null);
-    setCopperLossPercentage(null);
-    setIsCompliant(null);
-    setActivePower(null);
-    setCalculationDetails([]);
-  }, [circuitType]);
+    if (activeCalculator === 'loss') {
+      setCopperLoss(null);
+      setCopperLossPercentage(null);
+      setIsCompliant(null);
+      setActivePower(null);
+      setCalculationDetails([]);
+    }
+  }, [circuitType, activeCalculator]);
   
   // Update riser resistances when common portion resistance changes
   useEffect(() => {
-    updateRiserResistances();
-  }, [commonPortion.resistance]);
+    if (activeCalculator === 'loss') {
+      updateRiserResistances();
+    }
+  }, [commonPortion.resistance, activeCalculator]);
   
+  //=============================================================================
+  // Max Copper Resistance Calculator States & Functions
+  //=============================================================================
+  
+  // State for Max Copper Resistance Calculator
+  const [mrLineVoltage, setMrLineVoltage] = useState<number>(380);
+  const [mrPowerFactor, setMrPowerFactor] = useState<number>(0.9);
+  const [mrDesignCurrent, setMrDesignCurrent] = useState<number>(0);
+  const [mrCableLength, setMrCableLength] = useState<number>(0);
+  const [mrMaxLossPercentage, setMrMaxLossPercentage] = useState<number>(1);
+  
+  // Harmonic distortion inputs
+  const [mrThd, setMrThd] = useState<number>(0);
+  const [mrNeutralCurrentRatio, setMrNeutralCurrentRatio] = useState<number>(1);
+  const [mrIncludeNeutral, setMrIncludeNeutral] = useState<boolean>(false);
+  
+  // Calculation outputs
+  const [mrFundamentalCurrent, setMrFundamentalCurrent] = useState<number | null>(null);
+  const [mrMaxResistance, setMrMaxResistance] = useState<number | null>(null);
+  const [mrCopperLoss, setMrCopperLoss] = useState<number | null>(null);
+  const [mrCopperLossPercentage, setMrCopperLossPercentage] = useState<number | null>(null);
+  const [mrNeutralCurrent, setMrNeutralCurrent] = useState<number | null>(null);
+
+  // Calculate max resistance for circuit with harmonics
+  const calculateMaxResistance = () => {
+    if (mrDesignCurrent <= 0 || mrCableLength <= 0 || mrMaxLossPercentage <= 0) {
+      alert('Please enter valid values for current, cable length, and loss percentage');
+      return;
+    }
+
+    // Calculate fundamental current: I₁ = Ib / √(1+THD²)
+    const i1 = mrDesignCurrent / Math.sqrt(1 + Math.pow(mrThd/100, 2));
+    setMrFundamentalCurrent(i1);
+    
+    // Calculate neutral current if included
+    let nCurrent = 0;
+    if (mrIncludeNeutral) {
+      // Use the neutral/phase current ratio from user input
+      nCurrent = i1 * mrNeutralCurrentRatio;
+      setMrNeutralCurrent(nCurrent);
+    } else {
+      setMrNeutralCurrent(0);
+    }
+
+    // For harmonic circuits:
+    // max r = (%loss × √3 × U × I₁ × cosθ × 1000) / ((3 × Ib² + IN²) × L)
+    let denominator = 3 * Math.pow(mrDesignCurrent, 2);
+    if (mrIncludeNeutral) {
+      denominator += Math.pow(nCurrent, 2);
+    }
+    
+    const maxR = (mrMaxLossPercentage / 100 * Math.sqrt(3) * mrLineVoltage * i1 * mrPowerFactor * 1000) / (denominator * mrCableLength);
+    setMrMaxResistance(maxR);
+
+    // Calculate copper loss in Watts: Pcopper = (3 × Ib² + IN²) × r × L / 1000
+    const estimatedLoss = denominator * (maxR / 1000) * mrCableLength;
+    setMrCopperLoss(estimatedLoss);
+
+    // Calculate copper loss percentage
+    const activePower = Math.sqrt(3) * mrLineVoltage * i1 * mrPowerFactor;
+    const lossPercentage = (estimatedLoss / activePower) * 100;
+    setMrCopperLossPercentage(lossPercentage);
+  };
+
+  // Reset fields when changing calculator
+  useEffect(() => {
+    // Reset results when switching calculators
+    if (activeCalculator === 'loss') {
+      setMrMaxResistance(null);
+      setMrFundamentalCurrent(null);
+      setMrCopperLoss(null);
+      setMrCopperLossPercentage(null);
+      setMrNeutralCurrent(null);
+    } else {
+      setCopperLoss(null);
+      setCopperLossPercentage(null);
+      setIsCompliant(null);
+      setActivePower(null);
+      setCalculationDetails([]);
+    }
+  }, [activeCalculator]);
+
+  // Main render method
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Copper Loss Calculator</h2>
+        
         {onShowTutorial && (
           <button
             onClick={onShowTutorial}
             className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
           >
             <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
           </button>
         )}
       </div>
-      
-      {/* Circuit Type Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">Circuit Type:</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-          <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'main'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('main')}
-          >
-            Main Circuit (≤0.5%)
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'feeder'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('feeder')}
-          >
-            Feeder Circuit (≤2.5%)
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'submain-nonres-short'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('submain-nonres-short')}
-          >
-            Sub-main (Non-residential, ≤100m) (≤1.5%)
-          </button>
-                      <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'submain-nonres-long'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('submain-nonres-long')}
-          >
-            Sub-main (Non-residential, &gt;100m) (≤2.5%)
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'submain-res'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('submain-res')}
-          >
-            Sub-main (Residential) (≤2.5%)
-          </button>
-          <button
-            className={`px-4 py-2 rounded text-sm ${
-              circuitType === 'final'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-            onClick={() => setCircuitType('final')}
-          >
-            Final Circuit &gt;32A (≤1.0%)
-          </button>
-        </div>
-        <p className="text-sm text-gray-600 mt-2">
-          Based on Table 7.4(b)(ii): Summary of Maximum Allowable Circuit Copper Loss
-        </p>
+
+      {/* Tab Selector */}
+      <div className="flex border-b mb-6">
+        <button
+          className={`py-2 px-4 mr-2 ${
+            activeCalculator === 'loss' 
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveCalculator('loss')}
+        >
+          Copper Loss
+        </button>
+        <button
+          className={`py-2 px-4 ${
+            activeCalculator === 'resistance' 
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveCalculator('resistance')}
+        >
+          Max Copper Resistance
+        </button>
       </div>
-      
-      {/* Inputs based on selected circuit type - now all types use the same form */}
-      <div>
-        {/* Common Portion Inputs */}
-        <div className="mb-6 bg-gray-50 p-4 rounded">
-          <h3 className="font-medium mb-3">Common Portion:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Floor Range:</label>
-                <input
-                  type="text"
-                  value={commonPortion.floorRange}
-                  onChange={(e) => updateCommonPortion('floorRange', e.target.value)}
-                  className="w-full p-2 border rounded"
-                  placeholder="e.g. G/F to 12/F"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Fundamental Current (A):</label>
-                <input
-                  type="number"
-                  value={commonPortion.fundamentalCurrent || ''}
-                  onChange={(e) => updateCommonPortion('fundamentalCurrent', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="I1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">THD (%):</label>
-                <input
-                  type="number"
-                  value={commonPortion.thd || ''}
-                  onChange={(e) => updateCommonPortion('thd', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="Total Harmonic Distortion"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Design Current (A):</label>
-                <input
-                  type="number"
-                  value={commonPortion.designCurrent || ''}
-                  className="w-full p-2 border rounded bg-gray-100"
-                  readOnly
-                  placeholder="Im = I1 × √(1+THD²)"
-                />
-                <p className="text-xs text-gray-500 mt-1">Calculated from I1 and THD</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Cable Configuration:</label>
-                <select
-                  value={commonPortion.cableConfig}
-                  onChange={(e) => updateCommonPortion('cableConfig', e.target.value as CableConfig)}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="multicore">Multicore</option>
-                  <option value="singlecore">Single-core</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Cable Type:</label>
-                <select
-                  value={commonPortion.cableType}
-                  onChange={(e) => updateCommonPortion('cableType', e.target.value as CableType)}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="pvc">PVC</option>
-                  <option value="xlpe">XLPE</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Cable Size (mm²):</label>
-                <select
-                  value={commonPortion.cableSize}
-                  onChange={(e) => updateCommonPortion('cableSize', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                >
-                  {Object.keys(cableResistanceData).map(size => (
-                    <option key={size} value={size}>{size} mm²</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Installation Method:</label>
-                <select
-                  value={commonPortion.installationMethod}
-                  onChange={(e) => updateCommonPortion('installationMethod', e.target.value as InstallationMethod)}
-                  className="w-full p-2 border rounded"
-                  disabled={commonPortion.cableConfig === 'multicore'}
-                >
-                  <option value="enclosed">Enclosed</option>
-                  <option value="touching">Touching</option>
-                  <option value="spaced">Spaced</option>
-                </select>
-                {commonPortion.cableConfig === 'multicore' && (
-                  <p className="text-xs text-gray-500 mt-1">Not applicable for multicore cables</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Resistance (mΩ/metre):</label>
-                <input
-                  type="number"
-                  value={commonPortion.resistance || ''}
-                  className="w-full p-2 border rounded bg-gray-100"
-                  readOnly
-                />
-                <p className="text-xs text-gray-500 mt-1">Auto-calculated from cable properties</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Length (metre):</label>
-                <input
-                  type="number"
-                  value={commonPortion.length || ''}
-                  onChange={(e) => updateCommonPortion('length', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="Lm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Neutral Current (A):</label>
-                <input
-                  type="number"
-                  value={commonPortion.neutralCurrent || ''}
-                  onChange={(e) => updateCommonPortion('neutralCurrent', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="IN"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Power Factor:</label>
-                <input
-                  type="number"
-                  value={commonPortion.powerFactor || ''}
-                  onChange={(e) => updateCommonPortion('powerFactor', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="cos φ"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tabulated Current (A): <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={commonPortion.tabulatedCurrent || ''}
-                  onChange={(e) => updateCommonPortion('tabulatedCurrent', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="Current carrying capacity"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">From cable manufacturer data (required)</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Ambient Temp (°C):</label>
-                <input
-                  type="number"
-                  value={commonPortion.ambientTemperature || ''}
-                  onChange={(e) => updateCommonPortion('ambientTemperature', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="Ambient temperature"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Max Operating Temp (°C):</label>
-                <input
-                  type="number"
-                  value={commonPortion.operatingTemperature || ''}
-                  onChange={(e) => updateCommonPortion('operatingTemperature', Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                  placeholder="Operating temperature"
-                />
-              </div>
+
+      {/* Copper Loss Calculator Content */}
+      {activeCalculator === 'loss' && (
+        <>
+          {/* Circuit Type Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">Circuit Type:</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'main'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('main')}
+              >
+                Main Circuit (≤0.5%)
+              </button>
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'feeder'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('feeder')}
+              >
+                Feeder Circuit (≤2.5%)
+              </button>
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'submain-nonres-short'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('submain-nonres-short')}
+              >
+                Sub-main (Non-residential, ≤100m) (≤1.5%)
+              </button>
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'submain-nonres-long'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('submain-nonres-long')}
+              >
+                Sub-main (Non-residential, &gt;100m) (≤2.5%)
+              </button>
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'submain-res'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('submain-res')}
+              >
+                Sub-main (Residential) (≤2.5%)
+              </button>
+              <button
+                className={`px-4 py-2 rounded text-sm ${
+                  circuitType === 'final'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => setCircuitType('final')}
+              >
+                Final Circuit &gt;32A (≤1.0%)
+              </button>
             </div>
+            <p className="text-sm text-gray-600 mt-2">
+              Based on Table 7.4(b)(ii): Summary of Maximum Allowable Circuit Copper Loss
+            </p>
           </div>
           
-          {/* Diversity Calculator Information */}
-          {branchPortions.length > 0 && (
-            <div className="mb-6 bg-yellow-50 p-4 rounded border border-yellow-200">
-              <h3 className="font-medium mb-2">Diversity Factor Information:</h3>
-              <p className="text-sm text-gray-700 mb-2">
-                The diversity factor (df) for the <strong>lateral branches only</strong> will be auto-calculated based on the lateral currents and quantities.
-                It will be applied to each lateral branch's design current for copper loss calculation. <strong>Riser portions are not included in diversity calculations.</strong>
-              </p>
-              {calculatedDiversityFactor !== null && (
-                <p className="font-medium">
-                  Calculated Diversity Factor: {calculatedDiversityFactor.toFixed(3)}
-                </p>
-              )}
-            </div>
-          )}
-          
-          {/* Branch Portions */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-medium">Branch Portions:</h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => addBranchPortion('riser')}
-                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                >
-                  Add Riser Portion
-                </button>
-                <button
-                  onClick={() => addBranchPortion('lateral')}
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                >
-                  Add Lateral Tee-off
-                </button>
+          {/* Inputs based on selected circuit type - now all types use the same form */}
+          <div>
+            {/* Common Portion Inputs */}
+            <div className="mb-6 bg-gray-50 p-4 rounded">
+              <h3 className="font-medium mb-3">Common Portion:</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Floor Range:</label>
+                  <input
+                    type="text"
+                    value={commonPortion.floorRange}
+                    onChange={(e) => updateCommonPortion('floorRange', e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="e.g. G/F to 12/F"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Fundamental Current (A):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.fundamentalCurrent || ''}
+                    onChange={(e) => updateCommonPortion('fundamentalCurrent', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="I1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">THD (%):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.thd || ''}
+                    onChange={(e) => updateCommonPortion('thd', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="Total Harmonic Distortion"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Design Current (A):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.designCurrent || ''}
+                    className="w-full p-2 border rounded bg-gray-100"
+                    readOnly
+                    placeholder="Im = I1 × √(1+THD²)"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Calculated from I1 and THD</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cable Configuration:</label>
+                  <select
+                    value={commonPortion.cableConfig}
+                    onChange={(e) => updateCommonPortion('cableConfig', e.target.value as CableConfig)}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="multicore">Multicore</option>
+                    <option value="singlecore">Single-core</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cable Type:</label>
+                  <select
+                    value={commonPortion.cableType}
+                    onChange={(e) => updateCommonPortion('cableType', e.target.value as CableType)}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="pvc">PVC</option>
+                    <option value="xlpe">XLPE</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cable Size (mm²):</label>
+                  <select
+                    value={commonPortion.cableSize}
+                    onChange={(e) => updateCommonPortion('cableSize', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                  >
+                    {Object.keys(cableResistanceData).map(size => (
+                      <option key={size} value={size}>{size} mm²</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Installation Method:</label>
+                  <select
+                    value={commonPortion.installationMethod}
+                    onChange={(e) => updateCommonPortion('installationMethod', e.target.value as InstallationMethod)}
+                    className="w-full p-2 border rounded"
+                    disabled={commonPortion.cableConfig === 'multicore'}
+                  >
+                    <option value="enclosed">Enclosed</option>
+                    <option value="touching">Touching</option>
+                    <option value="spaced">Spaced</option>
+                  </select>
+                  {commonPortion.cableConfig === 'multicore' && (
+                    <p className="text-xs text-gray-500 mt-1">Not applicable for multicore cables</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Resistance (mΩ/metre):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.resistance || ''}
+                    className="w-full p-2 border rounded bg-gray-100"
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Auto-calculated from cable properties</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Length (metre):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.length || ''}
+                    onChange={(e) => updateCommonPortion('length', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="Lm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Neutral Current (A):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.neutralCurrent || ''}
+                    onChange={(e) => updateCommonPortion('neutralCurrent', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="IN"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Power Factor:</label>
+                  <input
+                    type="number"
+                    value={commonPortion.powerFactor || ''}
+                    onChange={(e) => updateCommonPortion('powerFactor', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="cos φ"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Tabulated Current (A): <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={commonPortion.tabulatedCurrent || ''}
+                    onChange={(e) => updateCommonPortion('tabulatedCurrent', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="Current carrying capacity"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">From cable manufacturer data (required)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ambient Temp (°C):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.ambientTemperature || ''}
+                    onChange={(e) => updateCommonPortion('ambientTemperature', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="Ambient temperature"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Max Operating Temp (°C):</label>
+                  <input
+                    type="number"
+                    value={commonPortion.operatingTemperature || ''}
+                    onChange={(e) => updateCommonPortion('operatingTemperature', Number(e.target.value))}
+                    className="w-full p-2 border rounded"
+                    placeholder="Operating temperature"
+                  />
+                </div>
               </div>
             </div>
             
-            {branchPortions.map((portion) => (
-              <div 
-                key={portion.id} 
-                className={`${
-                  portion.type === 'riser' ? 'bg-green-50 border-l-4 border-green-500' : 'bg-blue-50 border-l-4 border-blue-500'
-                } p-4 rounded mb-4`}
-              >
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium">
-                    {portion.type === 'riser' ? 'Riser Portion' : 'Lateral Tee-off'} {portion.id}
-                  </h4>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => duplicateBranchPortion(portion.id)}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      Duplicate
-                    </button>
-                    {branchPortions.length > 1 && (
-                      <button
-                        onClick={() => removeBranchPortion(portion.id)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
+            {/* Diversity Calculator Information */}
+            {branchPortions.length > 0 && (
+              <div className="mb-6 bg-yellow-50 p-4 rounded border border-yellow-200">
+                <h3 className="font-medium mb-2">Diversity Factor Information:</h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  The diversity factor (df) for the <strong>lateral branches only</strong> will be auto-calculated based on the lateral currents and quantities.
+                  It will be applied to each lateral branch's design current for copper loss calculation. <strong>Riser portions are not included in diversity calculations.</strong>
+                </p>
+                {calculatedDiversityFactor !== null && (
+                  <p className="font-medium">
+                    Calculated Diversity Factor: {calculatedDiversityFactor.toFixed(3)}
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Branch Portions */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium">Branch Portions:</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => addBranchPortion('riser')}
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                  >
+                    Add Riser Portion
+                  </button>
+                  <button
+                    onClick={() => addBranchPortion('lateral')}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Add Lateral Tee-off
+                  </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Type:</label>
-                    <select
-                      value={portion.type}
-                      onChange={(e) => updateBranchPortion(portion.id, 'type', e.target.value as BranchType)}
-                      className="w-full p-2 border rounded"
-                    >
-                      <option value="riser">Riser Portion</option>
-                      <option value="lateral">Lateral Tee-off</option>
-                    </select>
+              </div>
+              
+              {branchPortions.map((portion) => (
+                <div 
+                  key={portion.id} 
+                  className={`${
+                    portion.type === 'riser' ? 'bg-green-50 border-l-4 border-green-500' : 'bg-blue-50 border-l-4 border-blue-500'
+                  } p-4 rounded mb-4`}
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-medium">
+                      {portion.type === 'riser' ? 'Riser Portion' : 'Lateral Tee-off'} {portion.id}
+                    </h4>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => duplicateBranchPortion(portion.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        Duplicate
+                      </button>
+                      {branchPortions.length > 1 && (
+                        <button
+                          onClick={() => removeBranchPortion(portion.id)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Floor Number:</label>
-                    <input
-                      type="text"
-                      value={portion.floorNumber}
-                      onChange={(e) => updateBranchPortion(portion.id, 'floorNumber', e.target.value)}
-                      className="w-full p-2 border rounded"
-                      placeholder="e.g. 12/F"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Quantity:</label>
-                    <input
-                      type="number"
-                      value={portion.quantity || 1}
-                      onChange={(e) => updateBranchPortion(portion.id, 'quantity', Math.max(1, Number(e.target.value)))}
-                      className="w-full p-2 border rounded"
-                      min="1"
-                      placeholder="Number of identical branches"
-                    />
-                  </div>
-                  {portion.type === 'riser' ? (
-                    // For risers, we directly input design current
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Design Current (A):</label>
-                      <input
-                        type="number"
-                        value={portion.designCurrent || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'designCurrent', Number(e.target.value))}
+                      <label className="block text-sm font-medium mb-1">Type:</label>
+                      <select
+                        value={portion.type}
+                        onChange={(e) => updateBranchPortion(portion.id, 'type', e.target.value as BranchType)}
                         className="w-full p-2 border rounded"
-                        placeholder="Direct design current input"
+                      >
+                        <option value="riser">Riser Portion</option>
+                        <option value="lateral">Lateral Tee-off</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Floor Number:</label>
+                      <input
+                        type="text"
+                        value={portion.floorNumber}
+                        onChange={(e) => updateBranchPortion(portion.id, 'floorNumber', e.target.value)}
+                        className="w-full p-2 border rounded"
+                        placeholder="e.g. 12/F"
                       />
                     </div>
-                  ) : (
-                    // For laterals, we calculate design current from fundamental current and THD
                     <div>
-                      <label className="block text-sm font-medium mb-1">Fundamental Current (A):</label>
+                      <label className="block text-sm font-medium mb-1">Quantity:</label>
                       <input
                         type="number"
-                        value={portion.fundamentalCurrent || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'fundamentalCurrent', Number(e.target.value))}
+                        value={portion.quantity || 1}
+                        onChange={(e) => updateBranchPortion(portion.id, 'quantity', Math.max(1, Number(e.target.value)))}
                         className="w-full p-2 border rounded"
-                        placeholder="I1"
+                        min="1"
+                        placeholder="Number of identical branches"
                       />
                     </div>
-                  )}
-                  {portion.type === 'lateral' && (
+                    {portion.type === 'riser' ? (
+                      // For risers, we directly input design current
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Design Current (A):</label>
+                        <input
+                          type="number"
+                          value={portion.designCurrent || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'designCurrent', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="Direct design current input"
+                        />
+                      </div>
+                    ) : (
+                      // For laterals, we calculate design current from fundamental current and THD
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Fundamental Current (A):</label>
+                        <input
+                          type="number"
+                          value={portion.fundamentalCurrent || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'fundamentalCurrent', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="I1"
+                        />
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">THD (%):</label>
+                        <input
+                          type="number"
+                          value={portion.thd || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'thd', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="Total Harmonic Distortion"
+                        />
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Design Current (A):</label>
+                        <input
+                          type="number"
+                          value={portion.designCurrent || ''}
+                          className="w-full p-2 border rounded bg-gray-100"
+                          readOnly
+                          placeholder="Ib = I1 × √(1+THD²)"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Calculated from I1 and THD</p>
+                      </div>
+                    )}
                     <div>
-                      <label className="block text-sm font-medium mb-1">THD (%):</label>
+                      <label className="block text-sm font-medium mb-1">Neutral Current (A):</label>
                       <input
                         type="number"
-                        value={portion.thd || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'thd', Number(e.target.value))}
+                        value={portion.neutralCurrent || ''}
+                        onChange={(e) => updateBranchPortion(portion.id, 'neutralCurrent', Number(e.target.value))}
                         className="w-full p-2 border rounded"
-                        placeholder="Total Harmonic Distortion"
+                        placeholder="Branch neutral current"
                       />
                     </div>
-                  )}
-                  {portion.type === 'lateral' && (
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Cable Configuration:</label>
+                        <select
+                          value={portion.cableConfig}
+                          onChange={(e) => updateBranchPortion(portion.id, 'cableConfig', e.target.value as CableConfig)}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="multicore">Multicore</option>
+                          <option value="singlecore">Single-core</option>
+                        </select>
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Cable Type:</label>
+                        <select
+                          value={portion.cableType}
+                          onChange={(e) => updateBranchPortion(portion.id, 'cableType', e.target.value as CableType)}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="pvc">PVC</option>
+                          <option value="xlpe">XLPE</option>
+                        </select>
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Cable Size (mm²):</label>
+                        <select
+                          value={portion.cableSize}
+                          onChange={(e) => updateBranchPortion(portion.id, 'cableSize', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                        >
+                          {Object.keys(cableResistanceData).map(size => (
+                            <option key={size} value={size}>{size} mm²</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && portion.cableConfig === 'singlecore' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Installation Method:</label>
+                        <select
+                          value={portion.installationMethod}
+                          onChange={(e) => updateBranchPortion(portion.id, 'installationMethod', e.target.value as InstallationMethod)}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="enclosed">Enclosed</option>
+                          <option value="touching">Touching</option>
+                          <option value="spaced">Spaced</option>
+                        </select>
+                      </div>
+                    )}
                     <div>
-                      <label className="block text-sm font-medium mb-1">Design Current (A):</label>
+                      <label className="block text-sm font-medium mb-1">Resistance (mΩ/metre):</label>
                       <input
                         type="number"
-                        value={portion.designCurrent || ''}
+                        value={portion.resistance || ''}
                         className="w-full p-2 border rounded bg-gray-100"
                         readOnly
-                        placeholder="Ib = I1 × √(1+THD²)"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Calculated from I1 and THD</p>
+                      {portion.type === 'riser' ? (
+                        <p className="text-xs text-gray-500 mt-1">Using resistance from common portion</p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-1">Auto-calculated from cable properties</p>
+                      )}
                     </div>
-                  )}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Neutral Current (A):</label>
-                    <input
-                      type="number"
-                      value={portion.neutralCurrent || ''}
-                      onChange={(e) => updateBranchPortion(portion.id, 'neutralCurrent', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                      placeholder="Branch neutral current"
-                    />
-                  </div>
-                  {portion.type === 'lateral' && (
                     <div>
-                      <label className="block text-sm font-medium mb-1">Cable Configuration:</label>
-                      <select
-                        value={portion.cableConfig}
-                        onChange={(e) => updateBranchPortion(portion.id, 'cableConfig', e.target.value as CableConfig)}
+                      <label className="block text-sm font-medium mb-1">Length (metre):</label>
+                      <input
+                        type="number"
+                        value={portion.length || ''}
+                        onChange={(e) => updateBranchPortion(portion.id, 'length', Number(e.target.value))}
                         className="w-full p-2 border rounded"
-                      >
-                        <option value="multicore">Multicore</option>
-                        <option value="singlecore">Single-core</option>
-                      </select>
+                        placeholder={`L${portion.id}`}
+                      />
                     </div>
-                  )}
-                  {portion.type === 'lateral' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Cable Type:</label>
-                      <select
-                        value={portion.cableType}
-                        onChange={(e) => updateBranchPortion(portion.id, 'cableType', e.target.value as CableType)}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="pvc">PVC</option>
-                        <option value="xlpe">XLPE</option>
-                      </select>
-                    </div>
-                  )}
-                  {portion.type === 'lateral' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Cable Size (mm²):</label>
-                      <select
-                        value={portion.cableSize}
-                        onChange={(e) => updateBranchPortion(portion.id, 'cableSize', Number(e.target.value))}
-                        className="w-full p-2 border rounded"
-                      >
-                        {Object.keys(cableResistanceData).map(size => (
-                          <option key={size} value={size}>{size} mm²</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {portion.type === 'lateral' && portion.cableConfig === 'singlecore' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Installation Method:</label>
-                      <select
-                        value={portion.installationMethod}
-                        onChange={(e) => updateBranchPortion(portion.id, 'installationMethod', e.target.value as InstallationMethod)}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="enclosed">Enclosed</option>
-                        <option value="touching">Touching</option>
-                        <option value="spaced">Spaced</option>
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Resistance (mΩ/metre):</label>
-                    <input
-                      type="number"
-                      value={portion.resistance || ''}
-                      className="w-full p-2 border rounded bg-gray-100"
-                      readOnly
-                    />
-                    {portion.type === 'riser' ? (
-                      <p className="text-xs text-gray-500 mt-1">Using resistance from common portion</p>
-                    ) : (
-                      <p className="text-xs text-gray-500 mt-1">Auto-calculated from cable properties</p>
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Tabulated Current (A): <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={portion.tabulatedCurrent || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'tabulatedCurrent', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="Current carrying capacity"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">From cable manufacturer data (required)</p>
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Ambient Temp (°C):</label>
+                        <input
+                          type="number"
+                          value={portion.ambientTemperature || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'ambientTemperature', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="Ambient temperature"
+                        />
+                      </div>
+                    )}
+                    {portion.type === 'lateral' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Max Operating Temp (°C):</label>
+                        <input
+                          type="number"
+                          value={portion.operatingTemperature || ''}
+                          onChange={(e) => updateBranchPortion(portion.id, 'operatingTemperature', Number(e.target.value))}
+                          className="w-full p-2 border rounded"
+                          placeholder="Operating temperature"
+                        />
+                      </div>
                     )}
                   </div>
+                  {portion.type === 'riser' && (
+                    <div className="mt-2 px-2 py-1 bg-green-100 text-sm rounded">
+                      <strong>Note:</strong> Riser portions use direct design current input and resistance from common portion.
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        
+        {/* Calculate Button */}
+        <div className="mb-6">
+          <button
+            onClick={calculateCopperLoss}
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+          >
+            Calculate Copper Loss
+          </button>
+        </div>
+        
+        {/* Results */}
+        {copperLoss !== null && (
+          <div className="bg-blue-50 p-4 rounded border border-blue-200">
+            <h3 className="font-medium mb-2">Results:</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div>
+                <p className="text-sm font-medium">Copper Loss:</p>
+                <p className="text-lg">{copperLoss.toFixed(2)} W</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Copper Loss Percentage:</p>
+                <p className="text-lg">{copperLossPercentage?.toFixed(2)}%</p>
+              </div>
+              {activePower !== null && (
+                <div>
+                  <p className="text-sm font-medium">Active Power:</p>
+                  <p className="text-lg">{activePower.toFixed(2)} W</p>
+                </div>
+              )}
+              {calculatedDiversityFactor !== null && (
+                <div>
+                  <p className="text-sm font-medium">Diversity Factor:</p>
+                  <p className="text-lg">{calculatedDiversityFactor.toFixed(3)}</p>
+                </div>
+              )}
+            </div>
+            
+            {isCompliant !== null && (
+              <div className={`mb-4 p-2 rounded ${isCompliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                <p className="font-medium flex items-center">
+                  {isCompliant 
+                    ? <><span className="text-green-600 mr-1">✓</span> Compliant: The copper loss is within allowable limits.</>
+                    : <><span className="text-red-600 mr-1">✗</span> Non-Compliant: The copper loss exceeds allowable limits.</>}
+                </p>
+                  <p className="text-sm">
+                    For {
+                      circuitType === 'main' ? 'Main Circuit' :
+                      circuitType === 'feeder' ? 'Feeder Circuit' :
+                      circuitType === 'submain-nonres-short' ? 'Sub-main Circuit (Non-residential ≤100m)' :
+                      circuitType === 'submain-nonres-long' ? 'Sub-main Circuit (Non-residential &gt;100m)' :
+                      circuitType === 'submain-res' ? 'Sub-main Circuit (Residential)' :
+                      'Final Circuit &gt;32A'
+                    }, the maximum allowable copper loss is {getMaxAllowablePercentage(circuitType)}% of total active power.
+                  </p>
+              </div>
+            )}
+            
+            {/* Detailed Calculation Steps */}
+            {calculationDetails.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium mb-2">Detailed Calculation Steps:</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-300">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 border">Description</th>
+                        <th className="px-4 py-2 border">Formula</th>
+                        <th className="px-4 py-2 border">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calculationDetails.map((detail, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2 border">{detail.description}</td>
+                          <td className="px-4 py-2 border font-mono text-sm">{detail.formula}</td>
+                          <td className="px-4 py-2 border text-right">
+                            {detail.result.toFixed(2)} {detail.unit}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        </>
+      )}
+
+      {/* Maximum Copper Resistance Calculator Content */}
+      {activeCalculator === 'resistance' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Input Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Input Parameters</h3>
+              
+              {/* Circuit Parameters */}
+              <div className="mb-4">
+                <h4 className="font-medium text-blue-700 mb-2">Circuit Parameters</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Length (metre):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Line Voltage (V)
+                    </label>
                     <input
                       type="number"
-                      value={portion.length || ''}
-                      onChange={(e) => updateBranchPortion(portion.id, 'length', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                      placeholder={`L${portion.id}`}
+                      value={mrLineVoltage || ''}
+                      onChange={(e) => setMrLineVoltage(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="380"
                     />
                   </div>
-                  {portion.type === 'lateral' && (
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Power Factor (cosθ)
+                    </label>
+                    <input
+                      type="number"
+                      value={mrPowerFactor || ''}
+                      onChange={(e) => setMrPowerFactor(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="0.9"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Design Current (A)
+                    </label>
+                    <input
+                      type="number"
+                      value={mrDesignCurrent || ''}
+                      onChange={(e) => setMrDesignCurrent(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="Enter design current"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cable Length (m)
+                    </label>
+                    <input
+                      type="number"
+                      value={mrCableLength || ''}
+                      onChange={(e) => setMrCableLength(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="Enter cable length"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Max. Loss Percentage (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={mrMaxLossPercentage || ''}
+                      onChange={(e) => setMrMaxLossPercentage(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="Enter max allowable loss %"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-300 my-4"></div>
+              
+              {/* Harmonic Parameters */}
+              <div className="mb-4">
+                <h4 className="font-medium text-blue-700 mb-2">Harmonic Parameters</h4>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Total Harmonic Distortion (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={mrThd || ''}
+                      onChange={(e) => setMrThd(Number(e.target.value))}
+                      className="w-full p-2 border rounded-md text-sm"
+                      placeholder="Enter THD"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center py-2">
+                    <input
+                      type="checkbox"
+                      id="includeNeutral"
+                      checked={mrIncludeNeutral}
+                      onChange={(e) => setMrIncludeNeutral(e.target.checked)}
+                      className="mr-2 h-4 w-4"
+                    />
+                    <label htmlFor="includeNeutral" className="text-sm font-medium text-gray-700">
+                      Include Neutral Conductor
+                    </label>
+                  </div>
+                  
+                  {mrIncludeNeutral && (
                     <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Tabulated Current (A): <span className="text-red-600">*</span>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Neutral/Phase Current Ratio
                       </label>
                       <input
                         type="number"
-                        value={portion.tabulatedCurrent || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'tabulatedCurrent', Number(e.target.value))}
-                        className="w-full p-2 border rounded"
-                        placeholder="Current carrying capacity"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">From cable manufacturer data (required)</p>
-                    </div>
-                  )}
-                  {portion.type === 'lateral' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Ambient Temp (°C):</label>
-                      <input
-                        type="number"
-                        value={portion.ambientTemperature || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'ambientTemperature', Number(e.target.value))}
-                        className="w-full p-2 border rounded"
-                        placeholder="Ambient temperature"
-                      />
-                    </div>
-                  )}
-                  {portion.type === 'lateral' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Max Operating Temp (°C):</label>
-                      <input
-                        type="number"
-                        value={portion.operatingTemperature || ''}
-                        onChange={(e) => updateBranchPortion(portion.id, 'operatingTemperature', Number(e.target.value))}
-                        className="w-full p-2 border rounded"
-                        placeholder="Operating temperature"
+                        value={mrNeutralCurrentRatio || ''}
+                        onChange={(e) => setMrNeutralCurrentRatio(Number(e.target.value))}
+                        className="w-full p-2 border rounded-md text-sm"
+                        placeholder="IN/IL ratio"
+                        min="0"
+                        step="0.1"
                       />
                     </div>
                   )}
                 </div>
-                {portion.type === 'riser' && (
-                  <div className="mt-2 px-2 py-1 bg-green-100 text-sm rounded">
-                    <strong>Note:</strong> Riser portions use direct design current input and resistance from common portion.
+              </div>
+              
+              {/* Calculate Button */}
+              <div className="mt-6">
+                <button
+                  onClick={calculateMaxResistance}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors w-full"
+                >
+                  Calculate Maximum Resistance
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
+              
+              {mrMaxResistance === null ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Enter the parameters and click Calculate to see results</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-white p-3 rounded-md">
+                      <p className="text-sm font-medium">Maximum Resistance</p>
+                      <p className="text-lg font-bold text-green-600">{mrMaxResistance.toFixed(4)} mΩ/m</p>
+                    </div>
+                    
+                    {mrFundamentalCurrent !== null && (
+                      <div className="bg-white p-3 rounded-md">
+                        <p className="text-sm font-medium">Fundamental Current (I₁)</p>
+                        <p className="text-lg">{mrFundamentalCurrent.toFixed(2)} A</p>
+                      </div>
+                    )}
+                    
+                    <div className="bg-white p-3 rounded-md">
+                      <p className="text-sm font-medium">Design Current (Ib)</p>
+                      <p className="text-lg">{mrDesignCurrent.toFixed(2)} A</p>
+                    </div>
+                    
+                    {mrIncludeNeutral && mrNeutralCurrent !== null && (
+                      <div className="bg-white p-3 rounded-md">
+                        <p className="text-sm font-medium">Neutral Current (IN)</p>
+                        <p className="text-lg">{mrNeutralCurrent.toFixed(2)} A</p>
+                      </div>
+                    )}
+                    
+                    {mrCopperLoss !== null && (
+                      <div className="bg-white p-3 rounded-md">
+                        <p className="text-sm font-medium">Estimated Copper Loss</p>
+                        <p className="text-lg">{mrCopperLoss.toFixed(2)} W</p>
+                      </div>
+                    )}
+                    
+                    {mrCopperLossPercentage !== null && (
+                      <div className="bg-white p-3 rounded-md">
+                        <p className="text-sm font-medium">Copper Loss Percentage</p>
+                        <p className="text-lg">{mrCopperLossPercentage.toFixed(2)}%</p>
+                        <p className="text-xs text-gray-500 mt-1">Target: {mrMaxLossPercentage}%</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      
-      {/* Calculate Button */}
-      <div className="mb-6">
-        <button
-          onClick={calculateCopperLoss}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          Calculate Copper Loss
-        </button>
-      </div>
-      
-      {/* Results */}
-      {copperLoss !== null && (
-        <div className="bg-blue-50 p-4 rounded border border-blue-200">
-          <h3 className="font-medium mb-2">Results:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <div>
-              <p className="text-sm font-medium">Copper Loss:</p>
-              <p className="text-lg">{copperLoss.toFixed(2)} W</p>
+                  
+                  <div className="bg-white p-4 rounded-md mb-4">
+                    <h4 className="font-medium text-blue-800 mb-2">Detailed Calculation</h4>
+                    
+                    <div className="text-sm text-gray-700">
+                      <p className="mb-2 font-medium">Formula Used:</p>
+                      <div className="bg-gray-50 p-2 rounded-md font-mono text-xs mb-3">
+                        Max r (mΩ/m) = (%loss × √3 × U × I₁ × cosθ × 1000) / ((3 × Ib² + IN²) × L)
+                      </div>
+                      
+                      <p className="mb-2 font-medium">Values:</p>
+                      <ul className="list-disc pl-5 mb-3 space-y-1 text-xs">
+                        <li>Loss percentage (%loss): {mrMaxLossPercentage}%</li>
+                        <li>Line voltage (U): {mrLineVoltage} V</li>
+                        <li>Fundamental current (I₁): {mrFundamentalCurrent !== null ? mrFundamentalCurrent.toFixed(2) : 0} A</li>
+                        <li>Power factor (cosθ): {mrPowerFactor}</li>
+                        <li>Design current (Ib): {mrDesignCurrent} A</li>
+                        {mrIncludeNeutral && <li>Neutral current (IN): {mrNeutralCurrent?.toFixed(2)} A</li>}
+                        <li>Cable length (L): {mrCableLength} m</li>
+                      </ul>
+                      
+                      <p className="mb-2 font-medium">Calculation Steps:</p>
+                      <ol className="list-decimal pl-5 space-y-1 text-xs">
+                        <li>
+                          Calculate fundamental current: I₁ = Ib ÷ √(1+THD²)<br />
+                          I₁ = {mrDesignCurrent} ÷ √(1+({mrThd}/100)²) = {mrFundamentalCurrent !== null ? mrFundamentalCurrent.toFixed(4) : 0} A
+                        </li>
+                        <li>
+                          {mrIncludeNeutral ? (
+                            <>
+                              Calculate denominator: (3 × Ib² + IN²) × L<br />
+                              = (3 × {mrDesignCurrent}² + {mrNeutralCurrent?.toFixed(2)}²) × {mrCableLength}<br />
+                              = {(3 * Math.pow(mrDesignCurrent, 2) + Math.pow((mrNeutralCurrent ?? 0), 2)).toFixed(2)} × {mrCableLength}<br />
+                              = {(3 * Math.pow(mrDesignCurrent, 2) + Math.pow((mrNeutralCurrent ?? 0), 2)) * mrCableLength}
+                            </>
+                          ) : (
+                            <>
+                              Calculate denominator: 3 × Ib² × L<br />
+                              = 3 × {mrDesignCurrent}² × {mrCableLength}<br />
+                              = {(3 * Math.pow(mrDesignCurrent, 2)).toFixed(2)} × {mrCableLength}<br />
+                              = {(3 * Math.pow(mrDesignCurrent, 2) * mrCableLength).toFixed(2)}
+                            </>
+                          )}
+                        </li>
+                        <li>
+                          Calculate numerator: %loss × √3 × U × I₁ × cosθ × 1000<br />
+                          = {mrMaxLossPercentage/100} × √3 × {mrLineVoltage} × {mrFundamentalCurrent?.toFixed(2)} × {mrPowerFactor} × 1000<br />
+                          = {(mrMaxLossPercentage/100 * Math.sqrt(3) * mrLineVoltage * (mrFundamentalCurrent ?? 0) * mrPowerFactor * 1000).toFixed(2)}
+                        </li>
+                        <li>
+                          Calculate max resistance: numerator ÷ denominator<br />
+                          = {(mrMaxLossPercentage/100 * Math.sqrt(3) * mrLineVoltage * (mrFundamentalCurrent ?? 0) * mrPowerFactor * 1000).toFixed(2)} ÷ {mrIncludeNeutral ? 
+                            ((3 * Math.pow(mrDesignCurrent, 2) + Math.pow((mrNeutralCurrent ?? 0), 2)) * mrCableLength).toFixed(2) : 
+                            (3 * Math.pow(mrDesignCurrent, 2) * mrCableLength).toFixed(2)}<br />
+                          = {mrMaxResistance.toFixed(4)} mΩ/m
+                        </li>
+                      </ol>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded-md">
+                    <h4 className="font-medium text-blue-800 mb-2">Next Steps</h4>
+                    <p className="text-sm text-gray-700">
+                      Select appropriate conductor size from TG Table 7.8 based on the calculated maximum resistance value. 
+                      Ensure the selected cable has a resistance per meter less than or equal to {mrMaxResistance.toFixed(4)} mΩ/m.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
-            <div>
-              <p className="text-sm font-medium">Copper Loss Percentage:</p>
-              <p className="text-lg">{copperLossPercentage?.toFixed(2)}%</p>
-            </div>
-            {activePower !== null && (
-              <div>
-                <p className="text-sm font-medium">Active Power:</p>
-                <p className="text-lg">{activePower.toFixed(2)} W</p>
-              </div>
-            )}
-            {calculatedDiversityFactor !== null && (
-              <div>
-                <p className="text-sm font-medium">Diversity Factor:</p>
-                <p className="text-lg">{calculatedDiversityFactor.toFixed(3)}</p>
-              </div>
-            )}
           </div>
           
-          {isCompliant !== null && (
-            <div className={`mb-4 p-2 rounded ${isCompliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              <p className="font-medium flex items-center">
-                {isCompliant 
-                  ? <><span className="text-green-600 mr-1">✓</span> Compliant: The copper loss is within allowable limits.</>
-                  : <><span className="text-red-600 mr-1">✗</span> Non-Compliant: The copper loss exceeds allowable limits.</>}
-              </p>
-                <p className="text-sm">
-                  For {
-                    circuitType === 'main' ? 'Main Circuit' :
-                    circuitType === 'feeder' ? 'Feeder Circuit' :
-                    circuitType === 'submain-nonres-short' ? 'Sub-main Circuit (Non-residential ≤100m)' :
-                    circuitType === 'submain-nonres-long' ? 'Sub-main Circuit (Non-residential &gt;100m)' :
-                    circuitType === 'submain-res' ? 'Sub-main Circuit (Residential)' :
-                    'Final Circuit &gt;32A'
-                  }, the maximum allowable copper loss is {getMaxAllowablePercentage(circuitType)}% of total active power.
-                </p>
-            </div>
-          )}
-          
-          {/* Detailed Calculation Steps */}
-          {calculationDetails.length > 0 && (
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">Detailed Calculation Steps:</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 border">Description</th>
-                      <th className="px-4 py-2 border">Formula</th>
-                      <th className="px-4 py-2 border">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {calculationDetails.map((detail, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-2 border">{detail.description}</td>
-                        <td className="px-4 py-2 border font-mono text-sm">{detail.formula}</td>
-                        <td className="px-4 py-2 border text-right">
-                          {detail.result.toFixed(2)} {detail.unit}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
+          {/* Info section */}
+          <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+            <h3 className="font-medium text-lg mb-2">Important Notes</h3>
+            <ul className="list-disc pl-5 space-y-1 text-sm">
+              <li>This calculator determines the maximum allowable conductor resistance based on your specified maximum copper loss percentage.</li>
+              <li>The formula accounts for harmonic distortion (THD) which affects the fundamental current component of the total load current.</li>
+              <li>For circuits with significant harmonic content, the actual power loss will be higher than in purely resistive circuits.</li>
+              <li>Including the neutral conductor is important for three-phase four-wire systems with unbalanced loads or significant triplen harmonics.</li>
+              <li>The neutral current ratio typically ranges from 1.0 (balanced loads) to 1.73 (heavy single-phase non-linear loads).</li>
+              <li>Once you've determined the maximum resistance, select a conductor size from standard tables that has a resistance per meter less than this value.</li>
+            </ul>
+          </div>
+        </>
       )}
     </div>
   );

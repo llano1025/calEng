@@ -378,51 +378,50 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
           </button>
         )}
       </div>
+        
+      {/* Tab Selector */}
+      <div className="flex border-b mb-6">
+        <button
+          className={`py-2 px-4 mr-2 ${
+            activeTab === 'conduitTable'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveTab('conduitTable')}
+        >
+          Conduit (Table Method)
+        </button>
+        <button
+          className={`py-2 px-4 ${
+            activeTab === 'conduitSpace'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveTab('conduitSpace')}
+        >
+          Conduit (Space Factor)
+        </button>
+        <button
+          className={`py-2 px-4 ${
+            activeTab === 'trunkingTable'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveTab('trunkingTable')}
+        >
+          Trunking (Table Method)
+        </button>
+        <button
+          className={`py-2 px-4 ${
+            activeTab === 'trunkingSpace'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+          onClick={() => setActiveTab('trunkingSpace')}
+        >
+          Trunking (Space Factor)
+        </button>
 
-      {/* Tabs for different calculators */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-4 overflow-x-auto">
-          <button
-            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-              activeTab === 'conduitTable'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('conduitTable')}
-          >
-            Conduit (Table Method)
-          </button>
-          <button
-            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-              activeTab === 'conduitSpace'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('conduitSpace')}
-          >
-            Conduit (Space Factor)
-          </button>
-          <button
-            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-              activeTab === 'trunkingTable'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('trunkingTable')}
-          >
-            Trunking (Table Method)
-          </button>
-          <button
-            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-              activeTab === 'trunkingSpace'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveTab('trunkingSpace')}
-          >
-            Trunking (Space Factor)
-          </button>
-        </nav>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

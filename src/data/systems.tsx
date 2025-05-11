@@ -88,9 +88,9 @@ export const engineeringSystemsData: EngineeringSystemsData = {
         }
       }
     },
-     'thermodynamics': {
+    'thermodynamics': {
       name: 'Thermodynamics',
-       icon: <Icons.TemperatureHigh /> as React.ReactElement,
+      icon: <Icons.TemperatureHigh /> as React.ReactElement,
       formulas: {
         'heat_transfer': {
           name: 'Conduction Heat Transfer', description: 'Steady-state heat transfer through a plane wall',
@@ -103,6 +103,12 @@ export const engineeringSystemsData: EngineeringSystemsData = {
           calculate: (inputs) => { const P = parseFloat(inputs.pressure); const V = parseFloat(inputs.volume); const n = parseFloat(inputs.moles); const T = parseFloat(inputs.temperature); const R = 8.314; const calc = inputs.calculation; if (calc === 'pressure') { if (isNaN(n) || isNaN(T) || isNaN(V) || V === 0) return { value: NaN, unit: 'Pa' }; return { value: (n * R * T) / V, unit: 'Pa' }; } else if (calc === 'volume') { if (isNaN(n) || isNaN(T) || isNaN(P) || P === 0) return { value: NaN, unit: 'm³' }; return { value: (n * R * T) / P, unit: 'm³' }; } else if (calc === 'temperature') { if (isNaN(P) || isNaN(V) || isNaN(n) || n === 0) return { value: NaN, unit: 'K' }; return { value: (P * V) / (n * R), unit: 'K' }; } else if (calc === 'moles') { if (isNaN(P) || isNaN(V) || isNaN(T) || T === 0) return { value: NaN, unit: 'mol' }; return { value: (P * V) / (R * T), unit: 'mol' }; } return { value: NaN, unit: '' }; }
         }
       }
+    },
+    'mvac': {
+      name: 'Mechanical Ventilation & Air Conditioning',
+      icon: <Icons.TemperatureHigh /> as React.ReactElement,
+      // No formulas needed here; the MVACalculator component handles its own logic
+      formulas: {}
     },
     'broadcast': {
       name: 'Broadcast Reception',

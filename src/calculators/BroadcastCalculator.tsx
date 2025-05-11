@@ -1,4 +1,4 @@
-// Update imports to include the new calculators
+// Updated imports without lucide-react
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../components/Icons';
 
@@ -6,6 +6,69 @@ import { Icons } from '../components/Icons';
 interface BroadcastCalculatorProps {
   onBack: () => void; // Function to navigate back
 }
+
+// Custom icon components to replace Lucide icons
+const CustomIcons = {
+  ZoomIn: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <line x1="11" y1="8" x2="11" y2="14"></line>
+      <line x1="8" y1="11" x2="14" y2="11"></line>
+    </svg>
+  ),
+  ZoomOut: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <line x1="8" y1="11" x2="14" y2="11"></line>
+    </svg>
+  ),
+  Reset: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="1 4 1 10 7 10"></polyline>
+      <polyline points="23 20 23 14 17 14"></polyline>
+      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+    </svg>
+  ),
+  Trash: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      <line x1="10" y1="11" x2="10" y2="17"></line>
+      <line x1="14" y1="11" x2="14" y2="17"></line>
+    </svg>
+  ),
+  ChevronUp: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  ),
+  ChevronDown: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  ),
+  Amplifier: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M2 12h6m8 0h6M12 2v8m0 4v8M9 5.5L12 2l3 3.5M5 19l-3-3 3-3"></path>
+      <circle cx="12" cy="12" r="4"></circle>
+    </svg>
+  ),
+  Cable: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M4 9h16M4 15h16"></path>
+    </svg>
+  ),
+  Splitter: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <rect x="2" y="4" width="20" height="6" rx="2"></rect>
+      <rect x="2" y="14" width="9" height="6" rx="2"></rect>
+      <rect x="13" y="14" width="9" height="6" rx="2"></rect>
+      <path d="M12 10v4"></path>
+    </svg>
+  )
+};
 
 // The Broadcast Reception Calculator component
 const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => {
@@ -41,6 +104,9 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
   // State for calculation results
   const [signalStrengthResults, setSignalStrengthResults] = useState<any>(null); // Use a more specific type if possible
   const [opticalLossResults, setOpticalLossResults] = useState<any>(null); // Use a more specific type if possible
+
+  // NEW STATE: to track selected component for editing
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
 
   // Define fiber types and their attenuation rates
   const fiberTypes = [
@@ -138,6 +204,9 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
   const deleteComponent = (id: string) => {
     const newComponents = components.filter(comp => comp.id !== id);
     setComponents(newComponents);
+    if (selectedComponent === id) {
+      setSelectedComponent(null);
+    }
   };
   
   const moveComponentUp = (id: string) => {
@@ -178,34 +247,59 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
     setComponents(newComponents);
   };
 
+  // Helper to get component icon based on type
+  const getComponentIcon = (type: string) => {
+    switch(type) {
+      case 'amplifier': return <CustomIcons.Amplifier />;
+      case 'cable': return <CustomIcons.Cable />;
+      case 'splitter': return <CustomIcons.Splitter />;
+      default: return null;
+    }
+  };
+
+  // Helper to get component label
+  const getComponentLabel = (comp: DiagramComponent) => {
+    switch(comp.type) {
+      case 'antenna': return 'Antenna';
+      case 'amplifier': return `Amplifier (${comp.gain || 0}dB)`;
+      case 'cable': return `Cable (${comp.length || 0}m)`;
+      case 'splitter': 
+        const splitterIndex = components
+          .filter(c => c.type === 'splitter')
+          .findIndex(c => c.id === comp.id) + 1;
+        return `Splitter ${splitterIndex}`;
+      default: return comp.type;
+    }
+  };
+
   // Effect for global mouse listeners for panning
   useEffect(() => {
     const handleCanvasMouseMove = (e: MouseEvent) => {
-        if (!isPanning) return;
-        const dx = e.clientX - panStart.x;
-        const dy = e.clientY - panStart.y;
-        setCanvasOffset(prevOffset => ({
-            x: prevOffset.x + dx,
-            y: prevOffset.y + dy
-        }));
-        setPanStart({ x: e.clientX, y: e.clientY }); // Update start for next move delta
+      if (!isPanning) return;
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      setCanvasOffset(prevOffset => ({
+        x: prevOffset.x + dx,
+        y: prevOffset.y + dy
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY }); // Update start for next move delta
     };
     
     const handleCanvasMouseUp = () => {
-        if (isPanning) {
-            setIsPanning(false);
-        }
+      if (isPanning) {
+        setIsPanning(false);
+      }
     };
 
     if (isPanning) {
-        document.addEventListener('mousemove', handleCanvasMouseMove);
-        document.addEventListener('mouseup', handleCanvasMouseUp);
+      document.addEventListener('mousemove', handleCanvasMouseMove);
+      document.addEventListener('mouseup', handleCanvasMouseUp);
     }
 
     // Cleanup function
     return () => {
-        document.removeEventListener('mousemove', handleCanvasMouseMove);
-        document.removeEventListener('mouseup', handleCanvasMouseUp);
+      document.removeEventListener('mousemove', handleCanvasMouseMove);
+      document.removeEventListener('mouseup', handleCanvasMouseUp);
     };
   }, [isPanning, panStart]); // Re-run effect if isPanning changes
 
@@ -256,6 +350,17 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
       for (const component of sortedComponents) {
         const compX = component.x;
         const compY = component.y;
+
+        // Highlight selected component
+        if (component.id === selectedComponent) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
+          ctx.beginPath();
+          ctx.arc(compX, compY, 30, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
         switch (component.type) {
           case 'antenna':
             ctx.beginPath();
@@ -348,7 +453,7 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
       }
       ctx.restore(); // Restore default state
     }
-  }, [calculatorType, components, signalStrengthResults, signalStrengthInputs, canvasScale, canvasOffset]); // Dependencies for redraw
+  }, [calculatorType, components, signalStrengthResults, signalStrengthInputs, canvasScale, canvasOffset, selectedComponent]); // Dependencies for redraw
 
   // --- Calculation Functions ---
   const calculateSignalStrength = () => {
@@ -483,7 +588,7 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">TV Signal Strength Calculator Tutorial</h2>
           <button onClick={() => setShowTutorial(false)} className="text-gray-500 hover:text-gray-700">
-            Close
+            <Icons.Close />
           </button>
         </div>
         {/* ... rest of tutorial content ... */}
@@ -505,73 +610,268 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
             <p className="mb-4 text-gray-600">
               Configure the signal path using the component table and diagram. Enter source/final path details below.
             </p>
+            
             {/* Component Diagram */}
-            <div className="mb-6 relative">
-              <h3 className="text-lg font-medium mb-2">Component Diagram</h3>
-              <div className="relative border border-gray-300 rounded-lg bg-gray-50 overflow-hidden h-[400px]"> {/* Fixed height */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-medium text-gray-700">Component Diagram</h3>
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={zoomIn} 
+                    className="p-1.5 rounded hover:bg-gray-100 text-gray-700" 
+                    title="Zoom In"
+                  >
+                    <CustomIcons.ZoomIn />
+                  </button>
+                  <button 
+                    onClick={zoomOut} 
+                    className="p-1.5 rounded hover:bg-gray-100 text-gray-700" 
+                    title="Zoom Out"
+                  >
+                    <CustomIcons.ZoomOut />
+                  </button>
+                  <button 
+                    onClick={resetView} 
+                    className="p-1.5 rounded hover:bg-gray-100 text-gray-700" 
+                    title="Reset View"
+                  >
+                    <CustomIcons.Reset />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="relative border border-gray-200 rounded-lg bg-gray-50 h-64 overflow-hidden">
                 <canvas
                   ref={canvasRef}
-                  className="absolute top-0 left-0 w-full h-full" // Fill container
+                  className="absolute top-0 left-0 w-full h-full"
                   style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
                   onMouseDown={handleCanvasMouseDown}
-                ></canvas>
-                {/* Canvas controls */}
-                <div className="absolute top-2 right-2 flex space-x-1 bg-white bg-opacity-80 rounded border p-1 z-10">
-                   <button onClick={zoomIn} className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200" title="Zoom In">+</button>
-                   <button onClick={zoomOut} className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200" title="Zoom Out">−</button>
-                   <button onClick={resetView} className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200" title="Reset View">↺</button>
+                />
+                <div className="absolute bottom-2 left-2 bg-white/80 rounded text-xs px-2 py-1 text-gray-500">
+                  Drag to pan • Click component to select
                 </div>
-                <div className="absolute bottom-2 right-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm z-10">{Math.round(canvasScale * 100)}%</div>
-                <div className="absolute bottom-2 left-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm text-gray-500 z-10">Drag to pan</div>
+                <div className="absolute top-2 right-2 bg-white/80 rounded text-xs px-2 py-1">
+                  {Math.round(canvasScale * 100)}%
+                </div>
               </div>
             </div>
-            {/* Component Configuration Table */}
+            
+            {/* Component Configuration Section - REDESIGNED */}
             <div className="mb-6">
-              <h3 className="text-lg font-medium mb-2">Component Configuration</h3>
-              <div className="flex mb-2 space-x-2">
-                <button onClick={() => addComponent('amplifier')} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm">+ Amplifier</button>
-                <button onClick={() => addComponent('cable')} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm">+ Cable</button>
-                <button onClick={() => addComponent('splitter')} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm">+ Splitter</button>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-medium text-gray-700">Signal Path Components</h3>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => addComponent('amplifier')} 
+                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-sm"
+                    title="Add an amplifier to boost signal strength"
+                  >
+                    <CustomIcons.Amplifier /> Amplifier
+                  </button>
+                  <button 
+                    onClick={() => addComponent('cable')} 
+                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-sm"
+                    title="Add a cable section with signal loss"
+                  >
+                    <CustomIcons.Cable /> Cable
+                  </button>
+                  <button 
+                    onClick={() => addComponent('splitter')} 
+                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-sm"
+                    title="Add a signal splitter to distribute to multiple outlets"
+                  >
+                    <CustomIcons.Splitter /> Splitter
+                  </button>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full w-full bg-white border border-gray-300 rounded-lg text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="py-2 px-3 text-left font-semibold">Order</th>
-                      <th className="py-2 px-3 text-left font-semibold">Type</th>
-                      <th className="py-2 px-3 text-left font-semibold">Properties</th>
-                      <th className="py-2 px-3 text-left font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {components.sort((a, b) => a.order - b.order).map((component, index) => (
-                      <tr key={component.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="py-2 px-3">{component.order}</td>
-                        <td className="py-2 px-3 capitalize">{component.type}</td>
-                        <td className="py-2 px-3">
-                          {/* Property Inputs */}
-                          {component.type === 'amplifier' && (<div className="flex items-center space-x-1"><label className="text-xs">Gain:</label><input type="number" value={component.gain ?? ''} onChange={(e) => updateComponent(component.id, 'gain', e.target.value)} className="w-16 p-1 border rounded text-xs" disabled={!component.canEdit} /><span>dB</span></div>)}
-                          {component.type === 'cable' && (<div className="space-y-1"><div className="flex items-center space-x-1"><label className="text-xs">Len:</label><input type="number" value={component.length ?? ''} onChange={(e) => updateComponent(component.id, 'length', e.target.value)} className="w-16 p-1 border rounded text-xs" disabled={!component.canEdit} /><span>m</span></div><div className="flex items-center space-x-1"><label className="text-xs">Loss:</label><input type="number" value={component.lossPerMeter ?? ''} onChange={(e) => updateComponent(component.id, 'lossPerMeter', e.target.value)} className="w-16 p-1 border rounded text-xs" step="0.01" disabled={!component.canEdit} /><span>dB/m</span></div></div>)}
-                          {component.type === 'splitter' && (<div className="flex items-center space-x-1"><label className="text-xs">Loss:</label><input type="number" value={component.loss ?? ''} onChange={(e) => updateComponent(component.id, 'loss', e.target.value)} className="w-16 p-1 border rounded text-xs" disabled={!component.canEdit} /><span>dB</span></div>)}
-                        </td>
-                        <td className="py-1 px-3">
-                          {/* Action Buttons */}
-                          {component.canEdit && (
-                            <div className="flex space-x-1">
-                              <button onClick={() => moveComponentUp(component.id)} className="p-1 text-blue-600 hover:bg-blue-100 rounded disabled:opacity-50 disabled:hover:bg-transparent" title="Move Up" disabled={index <= 1}>↑</button>
-                              <button onClick={() => moveComponentDown(component.id)} className="p-1 text-blue-600 hover:bg-blue-100 rounded disabled:opacity-50 disabled:hover:bg-transparent" title="Move Down" disabled={index >= components.length - 1}>↓</button>
-                              <button onClick={() => deleteComponent(component.id)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete">✕</button>
+              
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                {/* Component List */}
+                <div className="grid grid-cols-1 divide-y divide-gray-200">
+                  {components.sort((a, b) => a.order - b.order).map((comp, index) => (
+                    <div 
+                      key={comp.id}
+                      className={`p-3 transition-colors ${selectedComponent === comp.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                      onClick={() => setSelectedComponent(comp.id === selectedComponent ? null : comp.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Order indicator */}
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-medium">
+                          {comp.order}
+                        </div>
+                        
+                        {/* Component type and info */}
+                        <div className="flex-grow flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            {getComponentIcon(comp.type)}
+                            <span className="font-medium text-sm">{getComponentLabel(comp)}</span>
+                          </div>
+                          
+                          {/* Component properties summary */}
+                          <div className="flex gap-2 ml-2 text-xs text-gray-500">
+                            {comp.type === 'amplifier' && (
+                              <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">
+                                +{comp.gain}dB
+                              </span>
+                            )}
+                            {comp.type === 'cable' && (
+                              <>
+                                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                                  {comp.length}m
+                                </span>
+                                <span className="px-1.5 py-0.5 bg-red-50 text-red-700 rounded-full">
+                                  -{(Number(comp.lossPerMeter) * Number(comp.length)).toFixed(1)}dB
+                                </span>
+                              </>
+                            )}
+                            {comp.type === 'splitter' && (
+                              <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-full">
+                                -{comp.loss}dB
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Component actions */}
+                        {comp.canEdit && (
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); moveComponentUp(comp.id); }}
+                              className="p-1 text-gray-600 hover:bg-gray-200 rounded" 
+                              disabled={index <= 1}
+                              title="Move up in signal path"
+                            >
+                              <CustomIcons.ChevronUp />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); moveComponentDown(comp.id); }}
+                              className="p-1 text-gray-600 hover:bg-gray-200 rounded" 
+                              disabled={index >= components.length - 1}
+                              title="Move down in signal path"
+                            >
+                              <CustomIcons.ChevronDown />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); deleteComponent(comp.id); }}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              title="Remove component"
+                            >
+                              <CustomIcons.Trash />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Expanded edit panel when selected */}
+                      {selectedComponent === comp.id && comp.canEdit && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {comp.type === 'amplifier' && (
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Gain (dB)</label>
+                              <div className="flex">
+                                <input
+                                  type="number"
+                                  value={comp.gain || 0}
+                                  onChange={(e) => updateComponent(comp.id, 'gain', e.target.value)}
+                                  className="w-full p-1.5 border border-gray-300 rounded-l text-sm"
+                                  step="1"
+                                />
+                                <div className="px-2 py-1.5 bg-gray-100 border border-l-0 border-gray-300 rounded-r text-sm text-gray-600">
+                                  dB
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                <Icons.InfoInline />
+                                Amplifiers boost signal strength, but too much can cause distortion
+                              </p>
                             </div>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          
+                          {comp.type === 'cable' && (
+                            <>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Length (m)</label>
+                                <div className="flex">
+                                  <input
+                                    type="number"
+                                    value={comp.length || 0}
+                                    onChange={(e) => updateComponent(comp.id, 'length', e.target.value)}
+                                    className="w-full p-1.5 border border-gray-300 rounded-l text-sm"
+                                    step="1"
+                                  />
+                                  <div className="px-2 py-1.5 bg-gray-100 border border-l-0 border-gray-300 rounded-r text-sm text-gray-600">
+                                    m
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Loss per meter (dB/m)</label>
+                                <div className="flex">
+                                  <input
+                                    type="number"
+                                    value={comp.lossPerMeter || 0}
+                                    onChange={(e) => updateComponent(comp.id, 'lossPerMeter', e.target.value)}
+                                    className="w-full p-1.5 border border-gray-300 rounded-l text-sm"
+                                    step="0.01"
+                                  />
+                                  <div className="px-2 py-1.5 bg-gray-100 border border-l-0 border-gray-300 rounded-r text-sm text-gray-600">
+                                    dB/m
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <Icons.InfoInline />
+                                  Typical values: RG6 = 0.05 dB/m, RG59 = 0.08 dB/m
+                                </p>
+                              </div>
+                            </>
+                          )}
+                          
+                          {comp.type === 'splitter' && (
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Loss (dB)</label>
+                              <div className="flex">
+                                <input
+                                  type="number"
+                                  value={comp.loss || 0}
+                                  onChange={(e) => updateComponent(comp.id, 'loss', e.target.value)}
+                                  className="w-full p-1.5 border border-gray-300 rounded-l text-sm"
+                                  step="0.5"
+                                />
+                                <div className="px-2 py-1.5 bg-gray-100 border border-l-0 border-gray-300 rounded-r text-sm text-gray-600">
+                                  dB
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                <Icons.InfoInline />
+                                2-way: ~3.5dB, 3-way: ~5.5dB, 4-way: ~7dB, 8-way: ~10.5dB
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Quick tips/help */}
+              <div className="mt-3 bg-blue-50 rounded-lg p-3 text-sm text-blue-800 border border-blue-200">
+                <h4 className="font-medium mb-1 flex items-center">
+                  <Icons.InfoInline />
+                  How to use the component configuration
+                </h4>
+                <ul className="text-xs space-y-1 pl-5 list-disc">
+                  <li>Click "Amplifier", "Cable", or "Splitter" buttons to add components to your signal path</li>
+                  <li>Components are always added to the end of the path</li>
+                  <li>Use the Up/Down arrows to rearrange components in the signal path</li>
+                  <li>Click on a component to select it and edit its properties</li>
+                  <li>Watch the diagram update in real-time as you make changes</li>
+                </ul>
               </div>
             </div>
-             {/* Input Fields for fixed parts */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+
+            {/* Input Fields for fixed parts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
                 <div className="border-t pt-4">
                     <h3 className="text-lg font-medium mb-2">Signal Source</h3>
                     <div>
@@ -599,10 +899,12 @@ const BroadcastReceptionCalculator: React.FC<BroadcastCalculatorProps> = ({ onBa
                     </div>
                 </div>
             </div>
+            
             {/* Calculate Button */}
             <button onClick={calculateSignalStrength} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors mb-4">
               Calculate Signal Strength
             </button>
+            
             {/* Results Display */}
             {signalStrengthResults && (
               <div className="mt-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">

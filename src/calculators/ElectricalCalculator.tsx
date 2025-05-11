@@ -129,27 +129,27 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             </div>
           </button>
 
-          {/* Max Copper Resistance */}
+          {/* Cable Containment */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'maxResistance'
+              calculatorType === 'cableContainment'
                 ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
                 : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
-            onClick={() => setCalculatorType('maxResistance')}
+            onClick={() => setCalculatorType('cableContainment')}
           >
             <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'maxResistance' ? 'text-white' : 'text-indigo-500'}`} />
+              <Icons.Calculator className={`${calculatorType === 'cableContainment' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Max Copper Resistance</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'maxResistance' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Maximum allowable resistance
+              <h3 className="font-semibold text-sm sm:text-base">Cable Containment</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'cableContainment' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Conduit & trunking capacity
               </p>
             </div>
           </button>
 
-          {/* Load Balancing */}
+          {/* Power Quality */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'loadBalancing'
@@ -162,9 +162,9 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               <Icons.Calculator className={`${calculatorType === 'loadBalancing' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Load Balancing</h3>
+              <h3 className="font-semibold text-sm sm:text-base">Power Quality</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'loadBalancing' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Phase unbalance checker
+                <Icons.InfoInline /> Power quality calculator
               </p>
             </div>
           </button>
@@ -182,29 +182,9 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               <Icons.Calculator className={`${calculatorType === 'lightingControl' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Lighting Calculator</h3>
+              <h3 className="font-semibold text-sm sm:text-base">Lighting</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'lightingControl' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Lighting calculations
-              </p>
-            </div>
-          </button>
-
-          {/* Power Factor */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'powerFactor'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('powerFactor')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'powerFactor' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Power Factor</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'powerFactor' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Capacitor sizing
               </p>
             </div>
           </button>
@@ -225,26 +205,6 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Circuit Protection check
-              </p>
-            </div>
-          </button>
-
-          {/* Cable Containment */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'cableContainment'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('cableContainment')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'cableContainment' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Cable Containment</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'cableContainment' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Conduit & trunking capacity
               </p>
             </div>
           </button>

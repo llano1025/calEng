@@ -25,23 +25,23 @@ const CircuitProtectionCalculator: React.FC<CircuitProtectionCalculatorProps> = 
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
-      <button
-          className={`py-2 px-4 font-medium text-sm ${
-            activeTab === 'coordination' 
-              ? 'border-b-2 border-blue-500 text-blue-600' 
-              : 'text-gray-500 hover:text-gray-700'
+      {/* Tab Selector */}
+      <div className="flex border-b mb-6">
+        <button
+          className={`py-2 px-4 mr-2 ${
+            activeTab === 'coordination'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
           }`}
           onClick={() => setActiveTab('coordination')}
         >
           Fault Current
         </button>
         <button
-          className={`py-2 px-4 font-medium text-sm ${
-            activeTab === 'standard' 
-              ? 'border-b-2 border-blue-500 text-blue-600' 
-              : 'text-gray-500 hover:text-gray-700'
+          className={`py-2 px-4 ${
+            activeTab === 'standard'
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
+              : 'text-gray-600 hover:text-blue-600'
           }`}
           onClick={() => setActiveTab('standard')}
         >
