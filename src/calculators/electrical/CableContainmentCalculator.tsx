@@ -117,7 +117,7 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
   };
 
   // Conduit factors for runs > 3m or with bends
-  const conduitFactorLong = {
+  const conduitFactorLong: Record<string, Record<number, Record<string, number>>> = {
     // [diameter, bends] => factor
     '16': {
       0: { '3': 167, '3.5': 179, '4': 177, '4.5': 174, '5': 171, '6': 167, '7': 162, '8': 158, '9': 154, '10': 150 },

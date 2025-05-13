@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
 import DuctStaticPressureCalculator from './mvac/DuctStaticPressureCalculator';
 import ChilledWaterPipeSizingCalculator from './mvac/ChilledWaterPipeSizingCalculator';
+import SteamPipeSizingCalculator from './mvac/SteamPipeSizingCalculator';
 // import CoolingLoadCalculator from './mvac/CoolingLoadCalculator';
 // import FanPowerCalculator from './mvac/FanPowerCalculator';
 // import AirDiffusionCalculator from './mvac/AirDiffusionCalculator';
@@ -35,6 +36,8 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
         return <DuctStaticPressureCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'chillerPipe':
         return <ChilledWaterPipeSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'steamPipe':
+        return <SteamPipeSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'coolingLoad':
         return <CoolingLoadCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'fanPower':
@@ -109,6 +112,27 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Chilled Water Pipe</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'chillerPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Pipework sizing
+              </p>
+            </div>
+          </button>
+
+          
+          {/* Steam Pipe */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'steamPipe'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('steamPipe')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'steamPipe' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Steam Pipe</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'steamPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Pipework sizing
               </p>
             </div>

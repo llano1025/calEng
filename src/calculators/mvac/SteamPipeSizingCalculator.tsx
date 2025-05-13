@@ -22,7 +22,7 @@ interface PipeSegment {
 interface PipeFitting {
   id: string;
   type: string;          // e.g., 'elbow', 'valve', 'tee'
-  equivalentLength: number; // meters
+  equivalentLength: number; // meters for custom, diameters for standard
   quantity: number;
   isCustom: boolean;     // Flag for custom fitting
 }
@@ -38,6 +38,8 @@ interface SteamState {
   isSuperheated: boolean; // true if superheated
 }
 
+type SteamConditionType = 'Superheated' | 'Saturated' | 'Wet Steam' | '';
+
 // Define calculation result
 interface CalculationResult {
   sectionId: string;
@@ -49,11 +51,19 @@ interface CalculationResult {
   frictionFactor: number;
   specificVolume: number;       // m³/kg
   densityKgM3: number;          // kg/m³
-  steamType: string;
-  fittingDetails: any[];
+  steamType: SteamConditionType;
+  fittingDetails: {
+    type: string;
+    quantity: number;
+    equivalentLength: number; // Total equivalent length in meters for this fitting type & quantity
+    pressureDrop: number;
+    isCustom: boolean;
+  }[];
   flowRateActual: number;       // Actual steam flow kg/h
   velocityLimit: number;        // m/s
   isVelocityCompliant: boolean;
+  normalizedDropPer100m?: number;
+  isPressureDropCompliant?: boolean;
   error?: string;               // Error message if calculation fails
 }
 
@@ -90,7 +100,12 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
   const [totalPressureDrop, setTotalPressureDrop] = useState<number>(0);
   const [isSystemCompliant, setIsSystemCompliant] = useState<boolean>(true);
   const [maxOverallVelocity, setMaxOverallVelocity] = useState<number>(0);
-  const [steamProperties, setSteamProperties] = useState<any>({
+  const [steamProperties, setSteamProperties] = useState<{
+    specificVolume: number;
+    density: number;
+    saturationTemp: number;
+    steamType: SteamConditionType;
+  }>({
     specificVolume: 0,
     density: 0,
     saturationTemp: 0,
@@ -122,7 +137,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
     { id: 'check_valve', name: 'Check Valve', eqDiameters: 100 },
     { id: 'entry', name: 'Pipe Entry', eqDiameters: 20 },
     { id: 'exit', name: 'Pipe Exit', eqDiameters: 10 },
-    { id: 'custom', name: 'Custom Fitting', eqDiameters: 20 }
+    // 'custom' fitting is handled separately
   ];
   
   // Calculate steam properties based on pressure and temperature
@@ -134,22 +149,29 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
     const saturationTemp = 100 * Math.pow((absolutePressure/1.013), 0.25);
     
     let specificVolume = 0;
-    let steamType = '';
+    let steamType: SteamConditionType = '';
     let density = 0;
     
+    let effectiveIsSuperheated = isSuperheated;
+    if (isSuperheated && steamTemperature <= saturationTemp) {
+      effectiveIsSuperheated = false; // Treat as saturated if temp is not above saturation
+    }
+
     // Check if steam is superheated or saturated
-    if (isSuperheated && steamTemperature > saturationTemp) {
+    if (effectiveIsSuperheated) {
       // Simplified calculation for superheated steam
-      specificVolume = 0.461 * (steamTemperature + 273.15) / (absolutePressure * 100);
+      specificVolume = 0.461 * (steamTemperature + 273.15) / (absolutePressure * 100); // R_steam = 0.461 kJ/kg.K
       steamType = 'Superheated';
     } else {
       // Saturated steam calculation with quality
       // Using approximate formula for saturated steam
-      specificVolume = 0.0015 + (1.696 / absolutePressure) * steamQuality;
-      setIsSuperheated(false);
-      steamType = steamQuality >= 0.98 ? 'Saturated' : 'Wet Steam';
-      // Force temperature to saturation
-      setSteamTemperature(saturationTemp);
+      const currentQuality = (isSuperheated && steamTemperature <= saturationTemp && steamQuality === 1) ? 1.0 : steamQuality; 
+      specificVolume = 0.0015 + (1.696 / absolutePressure) * currentQuality; // This is a rough approximation
+      steamType = currentQuality >= 0.98 ? 'Saturated' : 'Wet Steam';
+      // If user selected superheated but temp was too low, or selected saturated, force temp to saturation
+      if (!effectiveIsSuperheated || (isSuperheated && steamTemperature <= saturationTemp)) {
+        setSteamTemperature(saturationTemp);
+      }
     }
     
     density = 1 / specificVolume;
@@ -179,20 +201,26 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
       if (massFlowRate <= 0) {
         results.push({
           sectionId: segment.id,
-          recommendedDiameter: 0,
-          velocity: 0,
-          pressureDrop: 0,
-          flowArea: 0,
-          reynoldsNumber: 0,
-          frictionFactor: 0,
-          specificVolume: steamProperties.specificVolume,
-          densityKgM3: steamProperties.density,
-          steamType: steamProperties.steamType,
-          fittingDetails: [],
-          flowRateActual: segment.flowRate,
+          recommendedDiameter: 0, velocity: 0, pressureDrop: 0, flowArea: 0, reynoldsNumber: 0,
+          frictionFactor: 0, specificVolume: steamProperties.specificVolume,
+          densityKgM3: steamProperties.density, steamType: steamProperties.steamType,
+          fittingDetails: [], flowRateActual: segment.flowRate,
           velocityLimit: segment.type === 'supply' ? SUPPLY_VELOCITY_LIMIT : RETURN_VELOCITY_LIMIT,
-          isVelocityCompliant: false,
-          error: "Flow rate must be greater than zero."
+          isVelocityCompliant: false, error: "Flow rate must be greater than zero."
+        });
+        systemIsCompliant = false;
+        return;
+      }
+
+      if (segment.length <= 0) {
+        results.push({
+          sectionId: segment.id,
+          recommendedDiameter: 0, velocity: 0, pressureDrop: 0, flowArea: 0, reynoldsNumber: 0,
+          frictionFactor: 0, specificVolume: steamProperties.specificVolume,
+          densityKgM3: steamProperties.density, steamType: steamProperties.steamType,
+          fittingDetails: [], flowRateActual: segment.flowRate,
+          velocityLimit: segment.type === 'supply' ? SUPPLY_VELOCITY_LIMIT : RETURN_VELOCITY_LIMIT,
+          isVelocityCompliant: false, error: "Segment length must be greater than zero."
         });
         systemIsCompliant = false;
         return;
@@ -233,55 +261,60 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
       
       // Calculate Reynolds number
       // Dynamic viscosity of steam (approximate value in Pa·s)
-      const dynamicViscosity = 1.5e-5; // For steam at moderate pressure
+      const dynamicViscosity = 1.5e-5; // For steam at moderate pressure. More accurate models would vary this with temp/pressure.
       const density = steamProperties.density;
       const kinematicViscosity = dynamicViscosity / density;
       const reynoldsNumber = (velocity * actualDiameterM) / kinematicViscosity;
       
-      // Calculate friction factor using Colebrook-White equation approximation
+      // Calculate friction factor using Colebrook-White equation approximation (Swamee-Jain)
       const relativeRoughness = (segment.roughness / 1000) / actualDiameterM;
       let frictionFactor;
       
-      if (reynoldsNumber < 2000) {
+      if (reynoldsNumber < 2000) { // Laminar flow
         frictionFactor = 64 / reynoldsNumber;
-      } else {
-        const term1 = Math.pow(relativeRoughness / 3.7, 1.11);
-        const term2 = 6.9 / reynoldsNumber;
-        frictionFactor = Math.pow(-1.8 * Math.log10(term1 + term2), -2);
+      } else { // Turbulent flow
+        // Swamee-Jain equation (explicit approximation of Colebrook-White)
+        frictionFactor = 0.25 / Math.pow(Math.log10((relativeRoughness / 3.7) + (5.74 / Math.pow(reynoldsNumber, 0.9))), 2);
       }
       
       // Calculate pressure drop for straight pipe (bar)
-      // Using Darcy-Weisbach equation
-      const straightPipePressureDrop = (frictionFactor * segment.length * density * Math.pow(velocity, 2)) / (2 * actualDiameterM * 100000);
+      // Using Darcy-Weisbach equation: dP = f * (L/D) * (rho * v^2 / 2)
+      const straightPipePressureDrop = (frictionFactor * segment.length * density * Math.pow(velocity, 2)) / (2 * actualDiameterM * 100000); // Convert Pa to bar
       
       // Calculate pressure drop for fittings
-      let fittingsPressureDrop = 0;
-      const fittingDetails: any[] = [];
+      let totalFittingsPressureDrop = 0;
+      const fittingDetailsResults: CalculationResult['fittingDetails'] = [];
       
       segment.fittings.forEach(fitting => {
-        // Convert equivalent length from diameters to meters
-        const eqLengthM = fitting.equivalentLength * fitting.quantity;
+        let individualFittingTotalEqLengthM: number; 
+
+        if (fitting.isCustom) {
+          // For custom fittings, equivalentLength is already in meters
+          individualFittingTotalEqLengthM = fitting.equivalentLength * fitting.quantity;
+        } else {
+          // For standard fittings, fitting.equivalentLength stores eqDiameters from fittingOptions
+          individualFittingTotalEqLengthM = fitting.equivalentLength * actualDiameterM * fitting.quantity;
+        }
+
+        const pressureDropForThisFittingGroup = (frictionFactor * individualFittingTotalEqLengthM * density * Math.pow(velocity, 2)) / (2 * actualDiameterM * 100000); // Convert Pa to bar
         
-        // Calculate pressure drop using the same formula as straight pipe
-        const fittingPressureDrop = (frictionFactor * eqLengthM * density * Math.pow(velocity, 2)) / (2 * actualDiameterM * 100000);
-        
-        fittingsPressureDrop += fittingPressureDrop;
-        fittingDetails.push({
+        totalFittingsPressureDrop += pressureDropForThisFittingGroup;
+        fittingDetailsResults.push({
           type: fitting.type,
           quantity: fitting.quantity,
-          equivalentLength: fitting.equivalentLength,
-          pressureDrop: fittingPressureDrop,
+          equivalentLength: individualFittingTotalEqLengthM, // Store the calculated total equivalent length in meters
+          pressureDrop: pressureDropForThisFittingGroup,
           isCustom: fitting.isCustom
         });
       });
       
       // Total pressure drop for this segment
-      const totalSegmentPressureDrop = straightPipePressureDrop + fittingsPressureDrop;
+      const totalSegmentPressureDrop = straightPipePressureDrop + totalFittingsPressureDrop;
       currentTotalPressureDrop += totalSegmentPressureDrop;
       
       // Check if pressure drop is within allowable limit
       const pressureDropPercent = (totalSegmentPressureDrop / steamPressure) * 100;
-      const normalizedDropPer100m = (pressureDropPercent * 100) / segment.length;
+      const normalizedDropPer100m = segment.length > 0 ? (pressureDropPercent * 100) / segment.length : Infinity;
       const isPressureDropCompliant = normalizedDropPer100m <= allowablePressureDrop;
       
       if (!isPressureDropCompliant) {
@@ -299,12 +332,13 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
         specificVolume: steamProperties.specificVolume,
         densityKgM3: steamProperties.density,
         steamType: steamProperties.steamType,
-        fittingDetails,
+        fittingDetails: fittingDetailsResults,
         flowRateActual: segment.flowRate,
         velocityLimit,
         isVelocityCompliant,
         normalizedDropPer100m,
-        isPressureDropCompliant
+        isPressureDropCompliant,
+        error: undefined
       });
     });
     
@@ -316,7 +350,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
     setMaxOverallVelocity(highestOverallVelocity);
     setIsSystemCompliant(systemIsCompliant);
     
-  }, [pipeSegments, steamProperties, allowablePressureDrop, safetyFactor]);
+  }, [pipeSegments, steamProperties, allowablePressureDrop, safetyFactor, steamPressure]); // Added steamPressure dependency for pressureDropPercent calc
   
   // Functions to manage pipe segments
   const addPipeSegment = () => {
@@ -346,57 +380,39 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
   };
   
   // Functions to manage fittings
-  const addFitting = (segmentId: string, fittingType: string) => {
-    if (fittingType === 'custom') {
-      // Add custom fitting
-      const newFitting: PipeFitting = {
+  const addFittingToSegment = (segmentId: string, fittingTypeOrId: string) => {
+    const segment = pipeSegments.find(s => s.id === segmentId);
+    if (!segment) return;
+
+    let newFitting: PipeFitting;
+
+    if (fittingTypeOrId === 'custom') {
+      if (!customFittingName.trim() || customFittingEquivLength <= 0) {
+        alert("Please provide a name and a valid equivalent length (>0) for the custom fitting.");
+        return;
+      }
+      newFitting = {
         id: Date.now().toString(),
         type: customFittingName || 'Custom Fitting',
-        equivalentLength: customFittingEquivLength,
+        equivalentLength: customFittingEquivLength, // This is in meters for custom
         quantity: 1,
         isCustom: true
       };
-      
-      setPipeSegments(
-        pipeSegments.map(segment => {
-          if (segment.id === segmentId) {
-            return {
-              ...segment,
-              fittings: [...segment.fittings, newFitting]
-            };
-          }
-          return segment;
-        })
-      );
-      
-      // Reset custom fitting values
       setCustomFittingName('');
       setCustomFittingEquivLength(1);
     } else {
-      // Add standard fitting
-      const fitting = fittingOptions.find(f => f.id === fittingType);
-      if (!fitting) return;
-      
-      setPipeSegments(
-        pipeSegments.map(segment => {
-          if (segment.id === segmentId) {
-            const newFitting: PipeFitting = {
-              id: Date.now().toString(),
-              type: fitting.name,
-              equivalentLength: fitting.eqDiameters,
-              quantity: 1,
-              isCustom: false
-            };
-            
-            return {
-              ...segment,
-              fittings: [...segment.fittings, newFitting]
-            };
-          }
-          return segment;
-        })
-      );
+      const fittingOption = fittingOptions.find(f => f.id === fittingTypeOrId);
+      if (!fittingOption) return;
+      newFitting = {
+        id: Date.now().toString(),
+        type: fittingOption.name,
+        equivalentLength: fittingOption.eqDiameters, // This is in diameters for standard
+        quantity: 1,
+        isCustom: false
+      };
     }
+    
+    updatePipeSegment(segmentId, { fittings: [...segment.fittings, newFitting] });
   };
   
   const removeFitting = (segmentId: string, fittingId: string) => {
@@ -434,8 +450,8 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
     if (segment.customMaterial) {
       return 'custom';
     }
-    const material = materialOptions.find(m => Math.abs(m.roughness - segment.roughness) < 0.0001);
-    return material ? material.id : '';
+    const material = materialOptions.find(m => Math.abs(m.roughness - segment.roughness) < 0.0001 && m.id !== 'custom');
+    return material ? material.id : 'custom'; // Fallback to custom if somehow not found or if it's the custom placeholder
   };
 
   // Handle material change with support for custom roughness
@@ -445,14 +461,15 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
       const segment = pipeSegments.find(s => s.id === segmentId);
       updatePipeSegment(segmentId, { 
         customMaterial: true,
-        // Keep current roughness value as starting point for custom
-        roughness: segment?.roughness || 0.05
+        // Keep current roughness value as starting point for custom, or default if none
+        roughness: segment?.roughness || 0.05 
       });
     } else {
       // Use predefined material
       const material = materialOptions.find(m => m.id === materialId);
       if (material) {
         updatePipeSegment(segmentId, { 
+          material: material.id, // Store the material ID
           customMaterial: false,
           roughness: material.roughness 
         });
@@ -461,11 +478,18 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
   };
   
   // Handle toggle for steam type (superheated vs saturated)
-  const handleSteamTypeChange = (isSuperheated: boolean) => {
-    setIsSuperheated(isSuperheated);
-    if (!isSuperheated) {
+  const handleSteamTypeChange = (newIsSuperheated: boolean) => {
+    setIsSuperheated(newIsSuperheated);
+    if (!newIsSuperheated) {
       // If switching to saturated, force quality to 1 for dry saturated steam by default
       setSteamQuality(1);
+      // Temperature will be set to saturation temp in the useEffect
+    } else {
+      // If switching to superheated, ensure temperature is above current saturation temp or a sensible default
+      const currentSaturationTemp = steamProperties.saturationTemp || 100 * Math.pow(((steamPressure + 1.013)/1.013), 0.25);
+      if (steamTemperature <= currentSaturationTemp) {
+        setSteamTemperature(currentSaturationTemp + 10); // Set slightly above
+      }
     }
   };
   
@@ -494,7 +518,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
             <input 
               type="number" 
               value={steamPressure} 
-              onChange={(e) => setSteamPressure(Number(e.target.value))} 
+              onChange={(e) => setSteamPressure(Number(e.target.value) > 0 ? Number(e.target.value) : 0.1)} 
               className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
               step="0.1"
               min="0.1"
@@ -536,7 +560,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 onChange={(e) => setSteamTemperature(Number(e.target.value))} 
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                 step="1"
-                min={steamProperties.saturationTemp + 1}
+                min={steamProperties.saturationTemp ? (steamProperties.saturationTemp + 0.1).toFixed(1) : "0"}
               />
               <p className="text-xs text-blue-600 mt-1">
                 Saturation temperature at this pressure: {steamProperties.saturationTemp.toFixed(1)}°C. 
@@ -556,8 +580,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 max="1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                1.0 = Dry saturated steam, &lt;1.0 = Wet steam with water droplets.
-                Temperature: {steamProperties.saturationTemp.toFixed(1)}°C
+                1.0 = Dry saturated steam, less than 1.0 = Wet steam. Temp: {steamProperties.saturationTemp.toFixed(1)}°C
               </p>
             </div>
           )}
@@ -568,13 +591,13 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
               <input 
                 type="number" 
                 value={allowablePressureDrop} 
-                onChange={(e) => setAllowablePressureDrop(Number(e.target.value))} 
+                onChange={(e) => setAllowablePressureDrop(Number(e.target.value) > 0 ? Number(e.target.value) : 0.1)} 
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                 step="0.5"
-                min="0.5"
+                min="0.1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Typically 5-10% per 100m for steam systems
+                Typically 5-10% per 100m
               </p>
             </div>
             <div>
@@ -582,13 +605,13 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
               <input 
                 type="number" 
                 value={safetyFactor} 
-                onChange={(e) => setSafetyFactor(Number(e.target.value))} 
+                onChange={(e) => setSafetyFactor(Number(e.target.value) >=1 ? Number(e.target.value) : 1)} 
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                 step="0.05"
                 min="1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Typically 1.1-1.5 (10-50% safety margin)
+                Typically 1.1-1.5 (10-50%)
               </p>
             </div>
           </div>
@@ -619,7 +642,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 )}
               </div>
               
-              {/* Pipe Type Selection */}
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pipe Type</label>
                 <select
@@ -638,7 +660,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   <input 
                     type="number" 
                     value={segment.length} 
-                    onChange={(e) => updatePipeSegment(segment.id, { length: Number(e.target.value) })} 
+                    onChange={(e) => updatePipeSegment(segment.id, { length: Number(e.target.value) > 0 ? Number(e.target.value) : 0.1 })} 
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                     step="0.1"
                     min="0.1"
@@ -649,14 +671,13 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   <input 
                     type="number" 
                     value={segment.flowRate} 
-                    onChange={(e) => updatePipeSegment(segment.id, { flowRate: Number(e.target.value) })} 
+                    onChange={(e) => updatePipeSegment(segment.id, { flowRate: Number(e.target.value) > 0 ? Number(e.target.value) : 1 })} 
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                     min="1"
                   />
                 </div>
               </div>
               
-              {/* Material Selection with Custom Option */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pipe Material</label>
                 <select 
@@ -673,7 +694,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 </select>
               </div>
               
-              {/* Custom Roughness Input */}
               {segment.customMaterial && (
                 <div className="mb-4 pl-4 border-l-4 border-blue-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -682,7 +702,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   <input 
                     type="number" 
                     value={segment.roughness} 
-                    onChange={(e) => updatePipeSegment(segment.id, { roughness: Number(e.target.value) })} 
+                    onChange={(e) => updatePipeSegment(segment.id, { roughness: Number(e.target.value) >= 0 ? Number(e.target.value) : 0 })} 
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                     step="0.001"
                     min="0"
@@ -693,32 +713,29 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 </div>
               )}
               
-              {/* Fittings Section */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Fittings and Valves</label>
                 
-                {/* Standard Fittings Dropdown */}
                 <div className="mb-2">
                   <select
                     className="w-full p-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     onChange={(e) => {
                       if (e.target.value) {
-                        addFitting(segment.id, e.target.value);
-                        e.target.value = '';
+                        addFittingToSegment(segment.id, e.target.value);
+                        e.target.value = ''; // Reset dropdown
                       }
                     }}
-                    defaultValue=""
+                    value="" // Controlled by onChange to reset
                   >
                     <option value="" disabled>Add standard fitting...</option>
-                    {fittingOptions.filter(f => f.id !== 'custom').map(fitting => (
+                    {fittingOptions.map(fitting => (
                       <option key={fitting.id} value={fitting.id}>
-                        {fitting.name} (EqL: {fitting.eqDiameters} diameters)
+                        {fitting.name} (EqL: {fitting.eqDiameters} dia.)
                       </option>
                     ))}
                   </select>
                 </div>
                 
-                {/* Custom Fitting Controls */}
                 <div className="mb-3">
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-5">
@@ -737,7 +754,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                       <input
                         type="number"
                         value={customFittingEquivLength}
-                        onChange={(e) => setCustomFittingEquivLength(Number(e.target.value))}
+                        onChange={(e) => setCustomFittingEquivLength(Number(e.target.value) > 0 ? Number(e.target.value) : 0.1)}
                         className="w-full p-2 text-sm border border-gray-300 rounded-md"
                         step="0.1"
                         min="0.1"
@@ -746,7 +763,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                     
                     <div className="col-span-2 flex items-end">
                       <button
-                        onClick={() => addFitting(segment.id, 'custom')}
+                        onClick={() => addFittingToSegment(segment.id, 'custom')}
                         className="w-full h-10 bg-blue-600 text-white px-1 py-2 rounded-md text-xl font-medium hover:bg-blue-700 flex items-center justify-center"
                       >
                         +
@@ -755,7 +772,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   </div>
                 </div>
                 
-                {/* Fittings List */}
                 <div className="mt-3">
                   {segment.fittings.length === 0 ? (
                     <p className="text-sm text-gray-500 italic">No fittings added.</p>
@@ -764,17 +780,14 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                       {segment.fittings.map(fitting => (
                         <li key={fitting.id} className="bg-gray-50 rounded-md border border-gray-200">
                           <div className="flex items-center p-2">
-                            {/* Fitting Name - Left Side */}
                             <div className="flex-grow">
                               <span className="text-sm font-medium text-gray-700">{fitting.type}</span>
                               <span className="text-xs text-blue-600 ml-2">
-                                (Eq. Length: {fitting.equivalentLength} m)
+                                (Eq. Length: {fitting.equivalentLength.toFixed(2)} {fitting.isCustom ? 'm' : 'dia.'})
                               </span>
                             </div>
                             
-                            {/* Controls - Right Side */}
                             <div className="flex items-center space-x-3">
-                              {/* Quantity */}
                               <div className="flex items-center">
                                 <label className="text-xs text-gray-600 mr-1">Qty:</label>
                                 <input
@@ -790,7 +803,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                                 />
                               </div>
                               
-                              {/* Remove button */}
                               <button
                                 onClick={() => removeFitting(segment.id, fitting.id)}
                                 className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100"
@@ -822,11 +834,11 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                 </div>
                 <div className="mt-2">
                   <p className="text-sm text-gray-600">Specific Volume:</p>
-                  <p className="font-semibold text-gray-800">{steamProperties.specificVolume.toFixed(4)} m³/kg</p>
+                  <p className="font-semibold text-gray-800">{steamProperties.specificVolume > 0 ? steamProperties.specificVolume.toFixed(4) : 'N/A'} m³/kg</p>
                 </div>
                 <div className="mt-2">
                   <p className="text-sm text-gray-600">Density:</p>
-                  <p className="font-semibold text-gray-800">{steamProperties.density.toFixed(4)} kg/m³</p>
+                  <p className="font-semibold text-gray-800">{steamProperties.density > 0 ? steamProperties.density.toFixed(4) : 'N/A'} kg/m³</p>
                 </div>
                 <div className="mt-2">
                   <p className="text-sm text-gray-600">Saturation Temperature:</p>
@@ -840,9 +852,9 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   <p className="font-bold text-lg text-blue-600">{totalPressureDrop.toFixed(3)} bar</p>
                 </div>
                 <div className="mt-2">
-                  <p className="text-sm text-gray-600">As Percentage of Supply Pressure:</p>
+                  <p className="text-sm text-gray-600">As % of Supply Pressure:</p>
                   <p className="font-semibold text-gray-800">
-                    {((totalPressureDrop / steamPressure) * 100).toFixed(2)}% of {steamPressure.toFixed(1)} bar-g
+                    {steamPressure > 0 ? ((totalPressureDrop / steamPressure) * 100).toFixed(2) : 'N/A'}% of {steamPressure.toFixed(1)} bar-g
                   </p>
                 </div>
                 <div className="mt-2">
@@ -856,7 +868,8 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
             <div className="mt-4">
               <div className={`rounded-md p-3 ${isSystemCompliant ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
                 <p className={`text-sm font-medium ${isSystemCompliant ? 'text-green-800' : 'text-red-800'}`}>
-                  {isSystemCompliant 
+                  {sectionResults.length === 0 ? "Enter parameters to calculate." : 
+                   isSystemCompliant 
                     ? 'System Compliance: All pipe segments meet velocity and pressure drop requirements.'
                     : 'System Compliance: Warning! One or more pipe segments exceed recommended velocity or pressure drop limits. Review section details.'}
                 </p>
@@ -869,14 +882,13 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
           {sectionResults.map((result, index) => (
             result.error ? (
               <div key={`error-${index}`} className="bg-red-100 p-3 rounded-md mb-3 border border-red-300">
-                <h5 className="font-medium text-red-700">Segment {pipeSegments.find(s => s.id === result.sectionId)?.id || index + 1} - Error</h5>
+                <h5 className="font-medium text-red-700">Segment {index + 1} - Error</h5>
                 <p className="text-sm text-red-600">{result.error}</p>
               </div>
             ) : (
               <div key={result.sectionId || index} className="bg-white p-3 rounded-md mb-3 shadow-sm border border-gray-200">
-                <h5 className="font-medium text-gray-700">Segment {index + 1} (Type: <span className="capitalize">{pipeSegments[index].type}</span>)</h5>
+                <h5 className="font-medium text-gray-700">Segment {index + 1} (Type: <span className="capitalize">{pipeSegments[index]?.type || 'N/A'}</span>)</h5>
                 
-                {/* Pipe Size Recommendation */}
                 <div className="mb-2 bg-gray-50 p-2 rounded border border-gray-200">
                   <p className="text-sm font-medium text-gray-700">Recommended Pipe Size:</p>
                   <p className="text-lg font-bold text-blue-600">DN {result.recommendedDiameter} mm</p>
@@ -906,8 +918,9 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   </div>
                   <div>
                     <p className="text-gray-600">Pressure Drop / 100m:</p>
-                    <p className={`font-semibold ${!result.isPressureDropCompliant ? 'text-red-600' : 'text-green-600'}`}>
-                      {result.normalizedDropPer100m.toFixed(2)}% {result.isPressureDropCompliant ? '(OK)' : '(High)'}
+                    <p className={`font-semibold ${result.isPressureDropCompliant === false ? 'text-red-600' : (result.isPressureDropCompliant === true ? 'text-green-600' : 'text-gray-800')}`}>
+                      {result.normalizedDropPer100m !== undefined ? result.normalizedDropPer100m.toFixed(2) : 'N/A'}% 
+                      {result.isPressureDropCompliant === true ? ' (OK)' : (result.isPressureDropCompliant === false ? ' (High)' : '')}
                     </p>
                   </div>
                   <div>
@@ -916,7 +929,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                   </div>
                 </div>
                 
-                {/* Fittings Breakdown Table */}
                 {result.fittingDetails && result.fittingDetails.length > 0 && (
                   <div className="mt-3">
                     <p className="text-sm font-medium text-gray-700 mb-1">Fitting Breakdown:</p>
@@ -926,7 +938,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                           <tr>
                             <th className="p-2 text-left font-semibold text-gray-600 border border-gray-300">Fitting</th>
                             <th className="p-2 text-right font-semibold text-gray-600 border border-gray-300">Qty</th>
-                            <th className="p-2 text-right font-semibold text-gray-600 border border-gray-300">Eq. Length (m)</th>
+                            <th className="p-2 text-right font-semibold text-gray-600 border border-gray-300">Total Eq. L (m)</th>
                             <th className="p-2 text-right font-semibold text-gray-600 border border-gray-300">Pressure Drop (bar)</th>
                           </tr>
                         </thead>
@@ -941,7 +953,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
                                 {fitting.quantity}
                               </td>
                               <td className="p-2 text-right text-gray-700 border border-gray-300">
-                                {fitting.equivalentLength}
+                                {fitting.equivalentLength.toFixed(2)} 
                               </td>
                               <td className="p-2 text-right font-medium text-gray-700 border border-gray-300">
                                 {fitting.pressureDrop.toFixed(4)}
@@ -957,7 +969,6 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
             )
           ))}
           
-          {/* Steam Trap Selection Guide (Additional Helpful Information) */}
           <div className="mt-6 bg-blue-100 p-4 rounded-md border border-blue-300">
             <h4 className="font-medium mb-2 text-blue-700">Steam Trap Selection Guidance</h4>
             <p className="text-sm text-blue-800">For condensate handling, consider the following:</p>
@@ -980,11 +991,12 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
       <div className="mt-8 bg-gray-100 p-4 rounded-lg border border-gray-200">
         <h3 className="font-medium text-lg mb-2 text-gray-700">Important Considerations</h3>
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-          <li>Calculations use the Darcy-Weisbach equation for pressure drop and Colebrook-White for friction factor.</li>
+          <li>Calculations use the Darcy-Weisbach equation for pressure drop and an explicit approximation (Swamee-Jain) of the Colebrook-White equation for friction factor.</li>
+          <li>Steam properties (specific volume, density, saturation temperature, viscosity) are calculated using simplified engineering approximations. For high-precision or critical design, industry-standard steam tables (e.g., IAPWS-IF97) or specialized software should be consulted.</li>
           <li>Velocity limits: Supply Steam ({SUPPLY_VELOCITY_LIMIT} m/s), Condensate Return ({RETURN_VELOCITY_LIMIT} m/s) based on industry standards.</li>
           <li>Pipe sizes are selected from standard nominal diameters (DN) in millimeters.</li>
           <li>High velocity steam can cause noise, erosion, and water hammer in condensate lines.</li>
-          <li>For wet steam (quality &lt;1.0), consider installing separators to improve quality.</li>
+          <li>For wet steam (quality less than 1.0), consider installing separators to improve quality.</li>
           <li>This calculator provides sizing guidance only. Always consult relevant codes and standards.</li>
           <li>Insulation is highly recommended for all steam pipes to reduce heat loss and improve efficiency.</li>
           <li>Steam systems should include proper condensate drainage points at natural low points.</li>
