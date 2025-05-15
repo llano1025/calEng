@@ -30,6 +30,8 @@ interface CalculationResults {
   voltageDropFactorType: string;
   systemType: string;
   tableDetails: TableLookupDetails;
+  loadedConductorsPerPhase?: string;
+  currentPerCable?: string;
   error?: string;
 }
 
@@ -72,6 +74,7 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     systemVoltage: '380', // system voltage (V)
     systemType: 'ac', // 'ac' or 'dc'
     cableConfig: 'standard', // 'standard', 'flat', 'trefoil' (for single-core cables)
+    loadedConductorsPerPhase: '1', // NEW field: number of cables per phase for load sharing
   });
 
   // State for protective conductor inputs
@@ -344,6 +347,7 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     const systemVoltage = parseFloat(cableSizingInputs.systemVoltage);
     const systemType = cableSizingInputs.systemType as 'ac' | 'dc';
     const cableConfig = cableSizingInputs.cableConfig;
+    const loadedConductorsPerPhase = parseInt(cableSizingInputs.loadedConductorsPerPhase) || 1;
 
     if (isNaN(current) || isNaN(length) || isNaN(ambientTemp) || isNaN(numCircuits) ||
         isNaN(maxVDropPercent) || isNaN(systemVoltage) || isNaN(numLoadedConductors)) {
@@ -351,6 +355,16 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       setCableSizingResults({ error: "Invalid input values." });
       return;
     }
+
+    // Calculate current per cable for load sharing (only applied for single-core)
+    const currentPerCable = cableArrangement === 'singleCore' && loadedConductorsPerPhase > 1 
+                          ? current / loadedConductorsPerPhase 
+                          : current;
+
+    // Update grouping factor for load sharing
+    const effectiveNumCircuits = cableArrangement === 'singleCore' && loadedConductorsPerPhase > 1 
+                              ? numCircuits * loadedConductorsPerPhase 
+                              : numCircuits;
 
     // 1. Temperature correction factor (k1 / Ca) - Based on IEC 60364-5-52 Table B.52.14
     let temperatureFactor = 1.0;
@@ -391,39 +405,39 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
     // More detailed grouping factor based on installation method and number of circuits
     if (installMethodKey.includes('methodA') || installMethodKey.includes('methodB')) {
       // Enclosed in conduit or trunking
-      if (numCircuits === 2) groupingFactor = 0.80;
-      else if (numCircuits === 3) groupingFactor = 0.70;
-      else if (numCircuits === 4) groupingFactor = 0.65;
-      else if (numCircuits === 5) groupingFactor = 0.60;
-      else if (numCircuits === 6) groupingFactor = 0.57;
-      else if (numCircuits >= 7 && numCircuits <= 9) groupingFactor = 0.54;
-      else if (numCircuits >= 10 && numCircuits <= 12) groupingFactor = 0.52;
-      else if (numCircuits >= 13 && numCircuits <= 15) groupingFactor = 0.50;
-      else if (numCircuits >= 16 && numCircuits <= 19) groupingFactor = 0.48;
-      else if (numCircuits >= 20) groupingFactor = 0.45;
+      if (effectiveNumCircuits === 2) groupingFactor = 0.80;
+      else if (effectiveNumCircuits === 3) groupingFactor = 0.70;
+      else if (effectiveNumCircuits === 4) groupingFactor = 0.65;
+      else if (effectiveNumCircuits === 5) groupingFactor = 0.60;
+      else if (effectiveNumCircuits === 6) groupingFactor = 0.57;
+      else if (effectiveNumCircuits >= 7 && effectiveNumCircuits <= 9) groupingFactor = 0.54;
+      else if (effectiveNumCircuits >= 10 && effectiveNumCircuits <= 12) groupingFactor = 0.52;
+      else if (effectiveNumCircuits >= 13 && effectiveNumCircuits <= 15) groupingFactor = 0.50;
+      else if (effectiveNumCircuits >= 16 && effectiveNumCircuits <= 19) groupingFactor = 0.48;
+      else if (effectiveNumCircuits >= 20) groupingFactor = 0.45;
     }
     else if (installMethodKey.includes('methodC') || installMethodKey.includes('methodF_touching')) {
       // Touching on surface
-      if (numCircuits === 2) groupingFactor = 0.85;
-      else if (numCircuits === 3) groupingFactor = 0.79;
-      else if (numCircuits === 4) groupingFactor = 0.75;
-      else if (numCircuits === 5) groupingFactor = 0.73;
-      else if (numCircuits === 6) groupingFactor = 0.72;
-      else if (numCircuits >= 7 && numCircuits <= 9) groupingFactor = 0.70;
-      else if (numCircuits >= 10) groupingFactor = 0.68;
+      if (effectiveNumCircuits === 2) groupingFactor = 0.85;
+      else if (effectiveNumCircuits === 3) groupingFactor = 0.79;
+      else if (effectiveNumCircuits === 4) groupingFactor = 0.75;
+      else if (effectiveNumCircuits === 5) groupingFactor = 0.73;
+      else if (effectiveNumCircuits === 6) groupingFactor = 0.72;
+      else if (effectiveNumCircuits >= 7 && effectiveNumCircuits <= 9) groupingFactor = 0.70;
+      else if (effectiveNumCircuits >= 10) groupingFactor = 0.68;
     }
     else if (installMethodKey.includes('methodE') || installMethodKey.includes('methodF_spaced') || installMethodKey === 'methodG') {
       // Spaced on perforated tray or in free air
-      if (numCircuits === 2) groupingFactor = 0.88;
-      else if (numCircuits === 3) groupingFactor = 0.82;
-      else if (numCircuits === 4) groupingFactor = 0.77;
-      else if (numCircuits === 5) groupingFactor = 0.75;
-      else if (numCircuits === 6) groupingFactor = 0.73;
-      else if (numCircuits >= 7) groupingFactor = 0.70;
+      if (effectiveNumCircuits === 2) groupingFactor = 0.88;
+      else if (effectiveNumCircuits === 3) groupingFactor = 0.82;
+      else if (effectiveNumCircuits === 4) groupingFactor = 0.77;
+      else if (effectiveNumCircuits === 5) groupingFactor = 0.75;
+      else if (effectiveNumCircuits === 6) groupingFactor = 0.73;
+      else if (effectiveNumCircuits >= 7) groupingFactor = 0.70;
     }
 
     // 3. Calculate minimum CCC (Current Carrying Capacity) - I'z = Ib / (Ca * Cg)
-    const minimumCCC = current / (temperatureFactor * groupingFactor);
+    const minimumCCC = currentPerCable / (temperatureFactor * groupingFactor);
 
     // 4. Determine cable size based on CoP Appendix 6 tables
     const armourKey = isArmoured ? 'armoured' : 'nonArmoured';
@@ -829,17 +843,21 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       voltageDropStatus = `VD data unavailable for initial size ${cableSizeForCCC} mm²`;
     } else {
       // Calculate voltage drop based on system type and formula
+      // For load sharing, divide the total length by number of conductors per phase
+      // This assumes conductors are properly connected in parallel at ends
+      const effectiveLength = length;
+
       if (systemType === 'dc') {
-        voltageDropV = (vdFactor * current * length) / 1000;
+        voltageDropV = (vdFactor * currentPerCable * effectiveLength) / 1000;
         voltageDropPercent = (voltageDropV / systemVoltage) * 100;
       } else { // AC
         // For AC single-phase
         if (numLoadedConductors === 2) {
-          voltageDropV = (vdFactor * current * length) / 1000;
+          voltageDropV = (vdFactor * currentPerCable * effectiveLength) / 1000;
         } 
         // For AC three-phase
         else {
-          voltageDropV = (vdFactor * current * length) / 1000;
+          voltageDropV = (vdFactor * currentPerCable * effectiveLength) / 1000;
         }
         voltageDropPercent = (voltageDropV / systemVoltage) * 100;
       }
@@ -859,13 +877,15 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
 
         if (nextVdFactor !== null) {
           let nextVoltageDropV;
+          const effectiveLength = length;
+
           if (systemType === 'dc') {
-            nextVoltageDropV = (nextVdFactor * current * length) / 1000;
+            nextVoltageDropV = (nextVdFactor * currentPerCable * effectiveLength) / 1000;
           } else {
             if (numLoadedConductors === 2) {
-              nextVoltageDropV = (nextVdFactor * current * length) / 1000;
+              nextVoltageDropV = (nextVdFactor * currentPerCable * effectiveLength) / 1000;
             } else {
-              nextVoltageDropV = (nextVdFactor * current * length * Math.sqrt(3)) / 1000;
+              nextVoltageDropV = (nextVdFactor * currentPerCable * effectiveLength * Math.sqrt(3)) / 1000;
             }
           }
           
@@ -909,14 +929,15 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       if (finalVdFactor !== null) {
         vdFactor = finalVdFactor;
         vdValueType = finalVdResult.valueType;
+        const effectiveLength = length;
         
         if (systemType === 'dc') {
-          voltageDropV = (finalVdFactor * current * length) / 1000;
+          voltageDropV = (finalVdFactor * currentPerCable * effectiveLength) / 1000;
         } else {
           if (numLoadedConductors === 2) {
-            voltageDropV = (finalVdFactor * current * length) / 1000;
+            voltageDropV = (finalVdFactor * currentPerCable * effectiveLength) / 1000;
           } else {
-            voltageDropV = (finalVdFactor * current * length * Math.sqrt(3)) / 1000;
+            voltageDropV = (finalVdFactor * currentPerCable * effectiveLength * Math.sqrt(3)) / 1000;
           }
         }
         
@@ -952,7 +973,9 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
       voltageDropFactor: vdFactor !== null ? vdFactor.toFixed(4) : 'N/A',
       voltageDropFactorType: vdValueType,
       systemType: systemType,
-      tableDetails: tableDetails
+      tableDetails: tableDetails,
+      loadedConductorsPerPhase: loadedConductorsPerPhase > 1 ? loadedConductorsPerPhase.toString() : null,
+      currentPerCable: currentPerCable !== current ? currentPerCable.toFixed(1) : null
     });
 
     // Calculate protective conductor now that we have the phase conductor size
@@ -1300,6 +1323,21 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
                   className="w-full p-2 border rounded-md text-sm"
                 />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conductors Per Phase
+                </label>
+                <input
+                  type="number"
+                  name="loadedConductorsPerPhase"
+                  value={cableSizingInputs.loadedConductorsPerPhase}
+                  onChange={handleCableSizingInputChange}
+                  className={`w-full p-2 border rounded-md text-sm ${cableSizingInputs.cableArrangement !== 'singleCore' ? 'bg-gray-100' : ''}`}
+                  disabled={cableSizingInputs.cableArrangement !== 'singleCore'}
+                  min="1"
+                />
+              </div>
             </div>
           </div>
           
@@ -1547,6 +1585,15 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
                     <div><span className="font-medium">Required CCC (I'z):</span> {cableSizingResults.requiredCCC} A</div>
                     <div><span className="font-medium">Size for CCC:</span> {cableSizingResults.recommendedCableSize.forCurrentCapacity}</div>
                     <div><span className="font-medium">Size for VDrop:</span> {cableSizingResults.recommendedCableSize.forVoltageDrop}</div>
+                    {/* Display load sharing details if applicable */}
+                    {cableSizingResults.loadedConductorsPerPhase && (
+                      <div className="col-span-2 mt-1 pt-1 border-t border-gray-100">
+                        <span className="font-medium">Load Sharing:</span> {cableSizingResults.loadedConductorsPerPhase} cables per phase
+                        {cableSizingResults.currentPerCable && (
+                          <span className="ml-2">({cableSizingResults.currentPerCable} A per cable)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="mt-3 pt-2 border-t">
@@ -1676,6 +1723,7 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
           <li>Protective conductor sizing follows BS 7671 requirements based on phase conductor size and material.</li>
           <li>CoP recommends voltage drop not exceeding 4% from origin to load point for most installations.</li>
           <li>For armoured single-core cables, avoid running in steel enclosures to prevent hysteresis losses.</li>
+          <li>When using multiple cables per phase, each cable carries its share of the total current while the grouping factor is adjusted accordingly.</li>
         </ul>
       </div>
 
