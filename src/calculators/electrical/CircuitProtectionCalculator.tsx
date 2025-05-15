@@ -35,7 +35,7 @@ const CircuitProtectionCalculator: React.FC<CircuitProtectionCalculatorProps> = 
           }`}
           onClick={() => setActiveTab('coordination')}
         >
-          Fault Current
+          Cable Protection
         </button>
         <button
           className={`py-2 px-4 ${
@@ -45,7 +45,7 @@ const CircuitProtectionCalculator: React.FC<CircuitProtectionCalculatorProps> = 
           }`}
           onClick={() => setActiveTab('standard')}
         >
-          Cable Protection
+          Fault Current
         </button>
       </div>
 
