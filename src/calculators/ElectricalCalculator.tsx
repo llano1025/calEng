@@ -15,6 +15,7 @@ import UPSCalculator from './electrical/UPSCalculator';
 import GensetLouverSizingCalculator from './electrical/GensetLouverSizingCalculator';
 import CombinedGeneratorCalculator from './electrical/GeneratorSizingCalculator';
 import TransformerSizingCalculator from './electrical/TransformerSizingCalculator';
+import ElectricalLoadEstimationCalculator from './electrical/ElectricalLoadEstimationCalculator';
 import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
@@ -67,6 +68,8 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
         return <CombinedGeneratorCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'transformer':
         return <TransformerSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'load':
+        return <ElectricalLoadEstimationCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -92,6 +95,67 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">Select Calculator Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          {/* Electrical Load Estimation */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
+              calculatorType === 'load'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('load')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'load' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Electrical Load Estimation</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'load' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Electrical load
+              </p>
+            </div>
+          </button>
+          
+          {/* Transformer Calculator*/}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
+              calculatorType === 'transformer'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('transformer')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'transformer' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Transformer</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'transformer' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Transformer sizing
+              </p>
+            </div>
+          </button>
+
+          {/* Genset Calculator*/}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
+              calculatorType === 'genset'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('genset')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'genset' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Generator Set</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'genset' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Generator sizing
+              </p>
+            </div>
+          </button>
+
           {/* Cable Sizing */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
@@ -112,22 +176,22 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             </div>
           </button>
 
-          {/* Copper Loss */}
+          {/* Circuit Protection */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'copperLoss'
+              calculatorType === 'circuitProtection'
                 ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
                 : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
             }`}
-            onClick={() => setCalculatorType('copperLoss')}
+            onClick={() => setCalculatorType('circuitProtection')}
           >
             <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'copperLoss' ? 'text-white' : 'text-indigo-500'}`} />
+              <Icons.Calculator className={`${calculatorType === 'circuitProtection' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Copper Loss</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'copperLoss' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Circuit copper loss calculation
+              <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Circuit Protection check
               </p>
             </div>
           </button>
@@ -148,6 +212,26 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               <h3 className="font-semibold text-sm sm:text-base">Cable Containment</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'cableContainment' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Conduit & trunking capacity
+              </p>
+            </div>
+          </button>
+
+          {/* Copper Loss */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'copperLoss'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('copperLoss')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'copperLoss' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Copper Loss</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'copperLoss' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Circuit copper loss calculation
               </p>
             </div>
           </button>
@@ -192,27 +276,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             </div>
           </button>
 
-          {/* Circuit Protection */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'circuitProtection'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('circuitProtection')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'circuitProtection' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Circuit Protection check
-              </p>
-            </div>
-          </button>
-
-          {/* UPS Calculator - New addition */}
+          {/* UPS Calculator*/}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'ups'
@@ -225,51 +289,12 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
               <Icons.Calculator className={`${calculatorType === 'ups' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Uninterruptible Power Supply</h3>
+              <h3 className="font-semibold text-sm sm:text-base">Uninterruptible Power</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'ups' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> UPS & battery calculations
               </p>
             </div>
           </button>
-
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
-              calculatorType === 'genset'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('genset')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'genset' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Generator Set</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'genset' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Generator sizing
-              </p>
-            </div>
-          </button>
-
-      <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3  ${
-              calculatorType === 'transformer'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('transformer')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'transformer' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Transformer</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'transformer' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Transformer sizing
-              </p>
-            </div>
-          </button>
-
         </div>
       </div>
 

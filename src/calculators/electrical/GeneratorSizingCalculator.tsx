@@ -130,6 +130,9 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
     overallPassed: false
   });
   
+  // State for editing load
+  const [editingLoadId, setEditingLoadId] = useState<string | null>(null);
+  
   // Calculate derived generator values
   const gensetRatingKW = gensetRatingKVA * gensetPowerFactor;
   const maxAcceptableStepLoad = gensetRatingKW * (stepLoadAcceptance / 100);
@@ -384,42 +387,48 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
         
         <div className="border-t border-gray-300 my-4"></div>
         
+        {/* RESTYLED LOAD CONFIGURATION SECTION */}
         <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-medium text-lg">Load Configuration</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">Load Configuration</h3>
             <button
               onClick={addLoad}
-              className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
             >
-              <span className="mr-1">+</span> Add Load
+              Add Load
             </button>
           </div>
           
-          <div className="overflow-x-auto bg-white rounded-md">
-            <table className="min-w-full border border-gray-200 text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-3 py-2 text-left">Equipment</th>
-                  <th className="px-3 py-2 text-left">PF</th>
-                  <th className="px-3 py-2 text-left">kW</th>
-                  <th className="px-3 py-2 text-left">Starting</th>
-                  <th className="px-3 py-2 text-left">Step</th>
-                  <th className="px-3 py-2 text-left">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loads.map((load) => (
-                  <tr key={load.id} className="border-t border-gray-200">
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={load.name}
-                        onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
-                        className="w-full p-1 border rounded-md text-sm"
-                        placeholder="Equipment name"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
+          {loads.map((load) => (
+            <div key={load.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{load.name || "Unnamed Load"}</h4>
+                {loads.length > 1 && (
+                  <button 
+                    onClick={() => removeLoad(load.id)} 
+                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              
+              {editingLoadId === load.id ? (
+                <div className="pl-3 border-l-4 border-blue-400">
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                    <input
+                      type="text"
+                      value={load.name}
+                      onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Equipment name"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
                       <input
                         type="number"
                         min="0.1"
@@ -427,24 +436,29 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
                         step="0.01"
                         value={load.powerFactor}
                         onChange={(e) => updateLoad(load.id, 'powerFactor', Number(e.target.value))}
-                        className="w-16 p-1 border rounded-md text-sm"
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       />
-                    </td>
-                    <td className="px-3 py-2">
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Steady kW</label>
                       <input
                         type="number"
                         min="0"
                         step="0.1"
                         value={load.steadyKW}
                         onChange={(e) => updateLoad(load.id, 'steadyKW', Number(e.target.value))}
-                        className="w-16 p-1 border rounded-md text-sm"
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       />
-                    </td>
-                    <td className="px-3 py-2">
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Starting Method</label>
                       <select
                         value={load.startingMethod}
                         onChange={(e) => updateLoad(load.id, 'startingMethod', e.target.value)}
-                        className="w-full p-1 border rounded-md text-sm"
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
                         {STARTING_METHODS.map(method => (
                           <option key={method.value} value={method.value}>
@@ -452,37 +466,87 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-3 py-2">
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Step Assignment</label>
                       <select
                         value={load.stepAssignment}
                         onChange={(e) => updateLoad(load.id, 'stepAssignment', Number(e.target.value))}
-                        className="w-16 p-1 border rounded-md text-sm"
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
                         {Array.from({ length: numberOfSteps }, (_, i) => i + 1).map(step => (
                           <option key={step} value={step}>{step}</option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <button
-                        onClick={() => removeLoad(load.id)}
-                        disabled={loads.length === 1}
-                        className={`p-1 rounded-md ${
-                          loads.length === 1
-                            ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-red-600 hover:text-red-800'
-                        }`}
-                      >
-                        <span className="text-xs">Remove</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-3">
+                    <button 
+                      onClick={() => setEditingLoadId(null)} 
+                      className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mb-3 text-sm">
+                    <div>
+                      <p className="text-gray-600">Power Factor:</p>
+                      <p className="font-semibold text-gray-800">{load.powerFactor}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Steady kW:</p>
+                      <p className="font-semibold text-gray-800">{load.steadyKW}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Starting Method:</p>
+                      <p className="font-semibold text-gray-800">
+                        {STARTING_METHODS.find(m => m.value === load.startingMethod)?.label || 'None'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Step:</p>
+                      <p className="font-semibold text-gray-800">{load.stepAssignment}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mb-3 text-sm">
+                    <div>
+                      <p className="text-gray-600">Steady kVA:</p>
+                      <p className="font-semibold text-gray-800">{load.steadyKVA.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Starting kW:</p>
+                      <p className="font-semibold text-gray-800">{load.startingKW.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Starting kVA:</p>
+                      <p className="font-semibold text-gray-800">{load.startingKVA.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Multiplier:</p>
+                      <p className="font-semibold text-gray-800">{load.currentMultiplier}x</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={() => setEditingLoadId(load.id)} 
+                      className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded-md text-sm hover:bg-blue-50 flex items-center"
+                    >
+                      <Icons.Edit />
+                      <span className="ml-1">Edit</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
+        {/* END OF RESTYLED LOAD CONFIGURATION SECTION */}
 
         <div className="mt-4">
           <button
