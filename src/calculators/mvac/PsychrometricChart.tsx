@@ -6,19 +6,47 @@ interface PsychrometricChartProps {
   onBack?: () => void;
 }
 
+// Define parameter types
+type ParameterType = 'dbTemp' | 'rh' | 'wbTemp' | 'dewPoint' | 'humidity' | 'enthalpy' | 'specificVolume' | 'vaporPressure';
+
+// Define parameter display info
+interface ParameterInfo {
+  id: ParameterType;
+  name: string;
+  unit: string;
+  description: string;
+}
+
+// Parameter display definitions
+const PARAMETER_INFO: Record<ParameterType, ParameterInfo> = {
+  dbTemp: { id: 'dbTemp', name: 'Dry Bulb Temp', unit: '°C', description: 'Air temperature measured by a regular thermometer' },
+  rh: { id: 'rh', name: 'Relative Humidity', unit: '%', description: 'Ratio of actual water vapor pressure to saturation vapor pressure' },
+  wbTemp: { id: 'wbTemp', name: 'Wet Bulb Temp', unit: '°C', description: 'Temperature indicated by a thermometer covered with a wet cloth in moving air' },
+  dewPoint: { id: 'dewPoint', name: 'Dew Point', unit: '°C', description: 'Temperature at which air becomes saturated when cooled at constant pressure' },
+  humidity: { id: 'humidity', name: 'Humidity Ratio', unit: 'g/kg', description: 'Mass of water vapor per unit mass of dry air' },
+  enthalpy: { id: 'enthalpy', name: 'Enthalpy', unit: 'kJ/kg', description: 'Total heat content of the air (per kg of dry air)' },
+  specificVolume: { id: 'specificVolume', name: 'Specific Volume', unit: 'm³/kg', description: 'Volume occupied by unit mass of dry air' },
+  vaporPressure: { id: 'vaporPressure', name: 'Vapor Pressure', unit: 'kPa', description: 'Partial pressure of water vapor in the air' }
+};
+
 // Define the psychrometric point interface
 interface PsychrometricPoint {
   id: string;
   name: string;
-  dbTemp: number; // Dry bulb temperature (°C)
-  rh: number; // Relative humidity (%)
-  // Calculated properties:
+  // All potential properties - some will be input, others calculated
+  dbTemp?: number; // Dry bulb temperature (°C)
+  rh?: number; // Relative humidity (%)
   wbTemp?: number; // Wet bulb temperature (°C)
   dewPoint?: number; // Dew point temperature (°C)
   humidity?: number; // Humidity ratio (g/kg dry air)
   enthalpy?: number; // Enthalpy (kJ/kg dry air)
   specificVolume?: number; // Specific volume (m³/kg dry air)
   vaporPressure?: number; // Partial vapor pressure (kPa)
+  
+  // Track which parameters are the input parameters
+  parameterOne: ParameterType;
+  parameterTwo: ParameterType;
+  
   color: string; // Color for visualization
 }
 
@@ -85,7 +113,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   const [barometricPressure, setBarometricPressure] = useState<number>(STANDARD_PRESSURE); // kPa
   const [unitSystem, setUnitSystem] = useState<'SI' | 'IP'>('SI');
   
-  // State for psychrometric points
+  // State for points
   const [points, setPoints] = useState<PsychrometricPoint[]>([
     {
       id: '1',
@@ -93,6 +121,8 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
       dbTemp: 25,
       rh: 50,
       color: POINT_COLORS[0],
+      parameterOne: 'dbTemp',
+      parameterTwo: 'rh',
     }
   ]);
   
@@ -168,8 +198,8 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   // Effect hook to calculate psychrometric properties for all points
   useEffect(() => {
     const updatedPoints = points.map(point => {
-      // Calculate humidity, enthalpy, wet bulb temp, etc.
-      const properties = calculatePsychrometricProperties(point.dbTemp, point.rh, barometricPressure);
+      // Calculate properties using the available parameters
+      const properties = calculatePsychrometricProperties(point, barometricPressure);
       return { ...point, ...properties };
     });
     
@@ -205,49 +235,316 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     
     setProcesses(updatedProcesses);
   };
+
+// Function to calculate psychrometric properties from any two parameters
+const calculatePsychrometricProperties = (point: Partial<PsychrometricPoint>, pressure: number): Partial<PsychrometricPoint> => {
+  // Determine which parameters we have and use appropriate calculation methods
+  const paramOne = point.parameterOne;
+  const paramTwo = point.parameterTwo;
   
-  // Function to calculate psychrometric properties
-  const calculatePsychrometricProperties = (dbTemp: number, rh: number, pressure: number) => {
-    // Convert dry bulb temperature to Kelvin for some calculations
-    const dbTempK = dbTemp + 273.15;
+  if (!paramOne || !paramTwo || paramOne === paramTwo) {
+    return point; // Invalid parameter selection
+  }
+  
+  // Copy original point properties
+  const result: Partial<PsychrometricPoint> = { ...point };
+  
+  // Most common case: db temp and RH
+  if (
+    (paramOne === 'dbTemp' && paramTwo === 'rh') || 
+    (paramOne === 'rh' && paramTwo === 'dbTemp')
+  ) {
+    if (point.dbTemp === undefined || point.rh === undefined) {
+      return point;
+    }
     
-    // Saturation vapor pressure calculation (kPa)
-    // Using Hyland and Wexler equation
-    const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+    return calculateFromDBandRH(point.dbTemp, point.rh, pressure);
+  }
+  
+  // DB temp and wet bulb temp
+  else if (
+    (paramOne === 'dbTemp' && paramTwo === 'wbTemp') || 
+    (paramOne === 'wbTemp' && paramTwo === 'dbTemp')
+  ) {
+    if (point.dbTemp === undefined || point.wbTemp === undefined) {
+      return point;
+    }
     
-    // Actual vapor pressure (kPa)
-    const vaporPressure = satVaporPressure * (rh / 100);
+    return calculateFromDBandWB(point.dbTemp, point.wbTemp, pressure);
+  }
+  
+  // DB temp and dew point
+  else if (
+    (paramOne === 'dbTemp' && paramTwo === 'dewPoint') || 
+    (paramOne === 'dewPoint' && paramTwo === 'dbTemp')
+  ) {
+    if (point.dbTemp === undefined || point.dewPoint === undefined) {
+      return point;
+    }
     
-    // Humidity ratio (kg water / kg dry air)
-    const humidityRatio = 0.622 * (vaporPressure / (pressure - vaporPressure));
+    return calculateFromDBandDP(point.dbTemp, point.dewPoint, pressure);
+  }
+  
+  // DB temp and humidity ratio
+  else if (
+    (paramOne === 'dbTemp' && paramTwo === 'humidity') || 
+    (paramOne === 'humidity' && paramTwo === 'dbTemp')
+  ) {
+    if (point.dbTemp === undefined || point.humidity === undefined) {
+      return point;
+    }
     
-    // Convert to g/kg for display
-    const humidity = humidityRatio * 1000;
+    return calculateFromDBandHumidity(point.dbTemp, point.humidity, pressure);
+  }
+  
+  // DB temp and enthalpy
+  else if (
+    (paramOne === 'dbTemp' && paramTwo === 'enthalpy') || 
+    (paramOne === 'enthalpy' && paramTwo === 'dbTemp')
+  ) {
+    if (point.dbTemp === undefined || point.enthalpy === undefined) {
+      return point;
+    }
     
-    // Specific volume calculation (m³/kg dry air)
-    const specificVolume = (SPECIFIC_GAS_CONSTANT_DRY_AIR * dbTempK) / 
-                          ((pressure - vaporPressure) * 1000) * 
-                          (1 + 1.608 * humidityRatio);
+    return calculateFromDBandEnthalpy(point.dbTemp, point.enthalpy, pressure);
+  }
+  
+  // RH and wet bulb temp
+  else if (
+    (paramOne === 'rh' && paramTwo === 'wbTemp') || 
+    (paramOne === 'wbTemp' && paramTwo === 'rh')
+  ) {
+    if (point.rh === undefined || point.wbTemp === undefined) {
+      return point;
+    }
     
-    // Enthalpy calculation (kJ/kg dry air)
-    const enthalpy = SPECIFIC_HEAT_CAPACITY_AIR * dbTemp + 
-                    humidityRatio * (HEAT_VAPORIZATION_WATER + 1.86 * dbTemp);
-    
-    // Dew point calculation
-    const dewPoint = calculateDewPoint(vaporPressure);
-    
-    // Wet bulb calculation (iterative process)
-    const wbTemp = calculateWetBulbTemperature(dbTemp, humidityRatio, pressure);
-    
-    return {
-      wbTemp,
-      dewPoint,
-      humidity,
-      enthalpy,
-      specificVolume,
-      vaporPressure,
-    };
+    return calculateFromRHandWB(point.rh, point.wbTemp, pressure);
+  }
+  
+  // Any other combination - fallback to original values
+  return result;
+};
+
+// Calculate properties from dry bulb temperature and relative humidity
+const calculateFromDBandRH = (dbTemp: number, rh: number, pressure: number): Partial<PsychrometricPoint> => {
+  // Convert dry bulb temperature to Kelvin for some calculations
+  const dbTempK = dbTemp + 273.15;
+  
+  // Saturation vapor pressure calculation (kPa)
+  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+  
+  // Actual vapor pressure (kPa)
+  const vaporPressure = satVaporPressure * (rh / 100);
+  
+  // Humidity ratio (kg water / kg dry air)
+  const humidityRatio = 0.622 * (vaporPressure / (pressure - vaporPressure));
+  
+  // Convert to g/kg for display
+  const humidity = humidityRatio * 1000;
+  
+  // Specific volume calculation (m³/kg dry air)
+  const specificVolume = (SPECIFIC_GAS_CONSTANT_DRY_AIR * dbTempK) / 
+                        ((pressure - vaporPressure) * 1000) * 
+                        (1 + 1.608 * humidityRatio);
+  
+  // Enthalpy calculation (kJ/kg dry air)
+  const enthalpy = SPECIFIC_HEAT_CAPACITY_AIR * dbTemp + 
+                  humidityRatio * (HEAT_VAPORIZATION_WATER + 1.86 * dbTemp);
+  
+  // Dew point calculation
+  const dewPoint = calculateDewPoint(vaporPressure);
+  
+  // Wet bulb calculation (iterative process)
+  const wbTemp = calculateWetBulbFromDBandRH(dbTemp, humidityRatio, pressure);
+  
+  return {
+    dbTemp,
+    rh,
+    wbTemp,
+    dewPoint,
+    humidity,
+    enthalpy,
+    specificVolume,
+    vaporPressure,
   };
+};
+
+// Calculate properties from dry bulb temperature and wet bulb temperature
+const calculateFromDBandWB = (dbTemp: number, wbTemp: number, pressure: number): Partial<PsychrometricPoint> => {
+  // Calculate saturation vapor pressure at wet bulb temperature
+  const wbSatVaporPressure = calculateSaturationVaporPressure(wbTemp);
+  
+  // Calculate humidity ratio using psychrometric equation
+  // This is an approximation of the psychrometric equation
+  const A = 6.66e-4;
+  const humidity = ((calculateSaturationHumidityRatio(wbTemp, pressure) - A * (dbTemp - wbTemp) * pressure) * 1000);
+  
+  // Convert back to humidityRatio for calculations
+  const humidityRatio = humidity / 1000;
+  
+  // Calculate vapor pressure from humidity ratio
+  const vaporPressure = (humidityRatio * pressure) / (0.622 + humidityRatio);
+  
+  // Calculate relative humidity
+  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+  const rh = (vaporPressure / satVaporPressure) * 100;
+  
+  // Now that we have DB temp and RH, we can use the standard calculation function
+  return calculateFromDBandRH(dbTemp, rh, pressure);
+};
+
+// Calculate properties from dry bulb temperature and dew point
+const calculateFromDBandDP = (dbTemp: number, dewPoint: number, pressure: number): Partial<PsychrometricPoint> => {
+  // Calculate vapor pressure from dew point temperature
+  const vaporPressure = calculateSaturationVaporPressure(dewPoint);
+  
+  // Calculate saturation vapor pressure at dry bulb temperature
+  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+  
+  // Calculate relative humidity
+  const rh = (vaporPressure / satVaporPressure) * 100;
+  
+  // Use the DB and RH calculation for the rest
+  return calculateFromDBandRH(dbTemp, rh, pressure);
+};
+
+// Calculate properties from dry bulb temperature and humidity ratio
+const calculateFromDBandHumidity = (dbTemp: number, humidity: number, pressure: number): Partial<PsychrometricPoint> => {
+  // Convert g/kg to kg/kg
+  const humidityRatio = humidity / 1000;
+  
+  // Calculate vapor pressure from humidity ratio
+  const vaporPressure = (humidityRatio * pressure) / (0.622 + humidityRatio);
+  
+  // Calculate saturation vapor pressure at dry bulb temperature
+  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+  
+  // Calculate relative humidity
+  const rh = (vaporPressure / satVaporPressure) * 100;
+  
+  // Use the DB and RH calculation for the rest
+  return calculateFromDBandRH(dbTemp, rh, pressure);
+};
+
+// Calculate properties from dry bulb temperature and enthalpy
+const calculateFromDBandEnthalpy = (dbTemp: number, enthalpy: number, pressure: number): Partial<PsychrometricPoint> => {
+  // Rearrange enthalpy equation to find humidity ratio
+  // h = cp,air * t + W * (hfg + cp,vapor * t)
+  // W = (h - cp,air * t) / (hfg + cp,vapor * t)
+  const cp_air = SPECIFIC_HEAT_CAPACITY_AIR;
+  const cp_vapor = 1.86; // kJ/(kg·K)
+  const h_fg = HEAT_VAPORIZATION_WATER;
+  
+  // Calculate humidity ratio
+  const humidityRatio = (enthalpy - cp_air * dbTemp) / (h_fg + cp_vapor * dbTemp);
+  const humidity = humidityRatio * 1000; // Convert to g/kg
+  
+  // Now use DB and humidity calculation for the rest
+  return calculateFromDBandHumidity(dbTemp, humidity, pressure);
+};
+
+// Calculate properties from relative humidity and wet bulb temperature
+const calculateFromRHandWB = (rh: number, wbTemp: number, pressure: number): Partial<PsychrometricPoint> => {
+  // We need to iteratively find dry bulb temperature
+  // Try a range of DB temps and find the one where the calculated WB matches the given WB
+  let dbGuess = wbTemp + 5; // Start with a guess 5°C above wet bulb
+  const tolerance = 0.1; // Tolerance for wet bulb match
+  let iterations = 0;
+  const maxIterations = 100;
+  
+  while (iterations < maxIterations) {
+    // Calculate properties using current DB guess and given RH
+    const properties = calculateFromDBandRH(dbGuess, rh, pressure);
+    
+    // Check how close our calculated wet bulb is to the target
+    if (properties.wbTemp && Math.abs(properties.wbTemp - wbTemp) < tolerance) {
+      // We found a good match, return these properties
+      return properties;
+    }
+    
+    // Adjust our guess based on whether calculated WB is too high or too low
+    if (properties.wbTemp && properties.wbTemp > wbTemp) {
+      dbGuess -= 1.0; // Try a lower DB temp
+    } else {
+      dbGuess += 0.5; // Try a higher DB temp
+    }
+    
+    iterations++;
+  }
+  
+  // If we couldn't converge, use our best guess
+  return calculateFromDBandRH(dbGuess, rh, pressure);
+};
+
+// Calculate wet bulb temperature from dry bulb and RH
+const calculateWetBulbFromDBandRH = (dbTemp: number, humidityRatio: number, pressure: number): number => {
+  // This is an iterative solver for wet bulb temperature
+  let wbGuess = dbTemp;
+  let deltaT = 1.0;
+  let wbPrev = wbGuess;
+  let maxIterations = 100;
+  let iterations = 0;
+  
+  // First guess - closer to dew point than dry bulb for higher RH
+  if (humidityRatio > 0.01) { // Higher humidity
+    wbGuess = dbTemp - 2.0;
+  } else { // Lower humidity
+    wbGuess = dbTemp - 8.0;
+  }
+  
+  // Don't go below freezing for first guess
+  wbGuess = Math.max(wbGuess, 0.5);
+  
+  while (Math.abs(deltaT) > 0.01 && iterations < maxIterations) {
+    // Calculate saturation vapor pressure at wet bulb temp
+    const wbSatVaporPressure = calculateSaturationVaporPressure(wbGuess);
+    
+    // Calculate humidity ratio at saturation for wet bulb temp
+    const wbSatHumidityRatio = 0.622 * (wbSatVaporPressure / (pressure - wbSatVaporPressure));
+    
+    // Calculate humidity ratio using psychrometric equation
+    const psychrometricConstant = 0.000662; // simplified constant
+    const calculatedHumidityRatio = ((HEAT_VAPORIZATION_WATER - 1.86 * wbGuess) * wbSatHumidityRatio - 
+                                    SPECIFIC_HEAT_CAPACITY_AIR * (dbTemp - wbGuess)) / 
+                                    (HEAT_VAPORIZATION_WATER + 1.86 * dbTemp - 1.86 * wbGuess);
+    
+    // Calculate error and adjust wet bulb guess
+    const error = humidityRatio - calculatedHumidityRatio;
+    
+    if (Math.abs(error) < 0.0001) break;
+    
+    // Use modified secant method for faster convergence
+    if (iterations > 0) {
+      const slope = error / (wbGuess - wbPrev);
+      wbPrev = wbGuess;
+      
+      if (Math.abs(slope) < 0.0001) {
+        // Prevent division by near-zero
+        wbGuess += error > 0 ? 0.5 : -0.5;
+      } else {
+        wbGuess += error / slope;
+      }
+    } else {
+      // For first iteration, use simpler step
+      wbPrev = wbGuess;
+      wbGuess += error > 0 ? 1.0 : -1.0;
+    }
+    
+    // Ensure wet bulb is within reasonable range
+    wbGuess = Math.max(Math.min(wbGuess, dbTemp), -50);
+    
+    iterations++;
+    deltaT = wbGuess - wbPrev;
+  }
+  
+  return wbGuess;
+};
+
+// Calculate saturation humidity ratio
+const calculateSaturationHumidityRatio = (temp: number, pressure: number): number => {
+  const satVaporPressure = calculateSaturationVaporPressure(temp);
+  return 0.622 * (satVaporPressure / (pressure - satVaporPressure));
+};
   
   // Function to calculate saturation vapor pressure (kPa)
   const calculateSaturationVaporPressure = (tempC: number) => {
@@ -277,70 +574,6 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     }
   };
   
-  // Function to calculate wet bulb temperature (°C)
-  const calculateWetBulbTemperature = (dbTemp: number, humidityRatio: number, pressure: number) => {
-    // This is an iterative solver for wet bulb temperature
-    let wbGuess = dbTemp;
-    let deltaT = 1.0;
-    let wbPrev = wbGuess;
-    let maxIterations = 100;
-    let iterations = 0;
-    
-    // First guess - closer to dew point than dry bulb for higher RH
-    if (humidityRatio > 0.01) { // Higher humidity
-      wbGuess = dbTemp - 2.0;
-    } else { // Lower humidity
-      wbGuess = dbTemp - 8.0;
-    }
-    
-    // Don't go below freezing for first guess
-    wbGuess = Math.max(wbGuess, 0.5);
-    
-    while (Math.abs(deltaT) > 0.01 && iterations < maxIterations) {
-      // Calculate saturation vapor pressure at wet bulb temp
-      const wbSatVaporPressure = calculateSaturationVaporPressure(wbGuess);
-      
-      // Calculate humidity ratio at saturation for wet bulb temp (Carrier equation)
-      const wbSatHumidityRatio = 0.622 * (wbSatVaporPressure / (pressure - wbSatVaporPressure));
-      
-      // Calculate humidity ratio using psychrometric equation
-      const psychrometricConstant = 0.000662; // simplified constant
-      const calculatedHumidityRatio = ((HEAT_VAPORIZATION_WATER - 1.86 * wbGuess) * wbSatHumidityRatio - 
-                                      SPECIFIC_HEAT_CAPACITY_AIR * (dbTemp - wbGuess)) / 
-                                      (HEAT_VAPORIZATION_WATER + 1.86 * dbTemp - 1.86 * wbGuess);
-      
-      // Calculate error and adjust wet bulb guess
-      const error = humidityRatio - calculatedHumidityRatio;
-      
-      if (Math.abs(error) < 0.0001) break;
-      
-      // Use modified secant method for faster convergence
-      if (iterations > 0) {
-        const slope = error / (wbGuess - wbPrev);
-        wbPrev = wbGuess;
-        
-        if (Math.abs(slope) < 0.0001) {
-          // Prevent division by near-zero
-          wbGuess += error > 0 ? 0.5 : -0.5;
-        } else {
-          wbGuess += error / slope;
-        }
-      } else {
-        // For first iteration, use simpler step
-        wbPrev = wbGuess;
-        wbGuess += error > 0 ? 1.0 : -1.0;
-      }
-      
-      // Ensure wet bulb is within reasonable range
-      wbGuess = Math.max(Math.min(wbGuess, dbTemp), -50);
-      
-      iterations++;
-      deltaT = wbGuess - wbPrev;
-    }
-    
-    return wbGuess;
-  };
-  
   // Function to add a new psychrometric point
   const addPoint = () => {
     const newId = (points.length + 1).toString();
@@ -350,6 +583,8 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
       dbTemp: 25,
       rh: 50,
       color: POINT_COLORS[(points.length) % POINT_COLORS.length],
+      parameterOne: 'dbTemp',
+      parameterTwo: 'rh',
     };
     
     setPoints([...points, newPoint]);
@@ -450,7 +685,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     const rh = 100 - (y / chartContentHeight) * 100;
     
     // Calculate other properties for this point
-    const properties = calculatePsychrometricProperties(dbTemp, rh, barometricPressure);
+    const properties = calculateFromDBandRH(dbTemp, rh, barometricPressure);
     
     setHoverInfo({
       visible: true,
@@ -497,6 +732,8 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
       dbTemp: Math.round(constrainedDbTemp * 10) / 10, // Round to 1 decimal
       rh: Math.round(constrainedRH),
       color: POINT_COLORS[(points.length) % POINT_COLORS.length],
+      parameterOne: 'dbTemp',
+      parameterTwo: 'rh',
     };
     
     setPoints([...points, newPoint]);
@@ -519,7 +756,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   };
   
   const rhToY = (rh: number, temp: number) => {
-    const props = calculatePsychrometricProperties(temp, rh, barometricPressure);
+    const props = calculateFromDBandRH(temp, rh, barometricPressure);
     return humidityToY(props.humidity || 0);
   };
   
@@ -613,12 +850,12 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
           
           // Start at lowest temp
           const startTemp = CHART_CONFIG.tempMin;
-          const startProps = calculatePsychrometricProperties(startTemp, rh, barometricPressure);
+          const startProps = calculateFromDBandRH(startTemp, rh, barometricPressure);
           pathData = `M ${tempToX(startTemp)} ${humidityToY(startProps.humidity || 0)}`;
           
           // Add points along the curve
           for (let t = startTemp + 1; t <= CHART_CONFIG.tempMax; t++) {
-            const props = calculatePsychrometricProperties(t, rh, barometricPressure);
+            const props = calculateFromDBandRH(t, rh, barometricPressure);
             pathData += ` L ${tempToX(t)} ${humidityToY(props.humidity || 0)}`;
           }
           
@@ -666,7 +903,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
           for (let t = CHART_CONFIG.tempMin; t <= CHART_CONFIG.tempMax; t += 1) {
             // Try different RH values to find where WB matches
             for (let rh = 1; rh <= 100; rh += 2) {
-              const props = calculatePsychrometricProperties(t, rh, barometricPressure);
+              const props = calculateFromDBandRH(t, rh, barometricPressure);
               
               if (props.wbTemp && Math.abs(props.wbTemp - wb) < 0.3) {
                 const x = tempToX(t);
@@ -725,7 +962,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
           for (let t = CHART_CONFIG.tempMin; t <= CHART_CONFIG.tempMax; t += 1) {
             // Try different RH values to find where enthalpy matches
             for (let rh = 1; rh <= 100; rh += 2) {
-              const props = calculatePsychrometricProperties(t, rh, barometricPressure);
+              const props = calculateFromDBandRH(t, rh, barometricPressure);
               
               if (props.enthalpy && Math.abs(props.enthalpy - enthalpy) < 1) {
                 const x = tempToX(t);
@@ -816,7 +1053,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
         {points.map((point) => {
           if (point.humidity === undefined) return null;
           
-          const x = tempToX(point.dbTemp);
+          const x = tempToX(point.dbTemp!);
           const y = humidityToY(point.humidity);
           
           return (
@@ -868,9 +1105,9 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
             return null;
           }
           
-          const startX = tempToX(startPoint.dbTemp);
+          const startX = tempToX(startPoint.dbTemp!);
           const startY = humidityToY(startPoint.humidity);
-          const endX = tempToX(endPoint.dbTemp);
+          const endX = tempToX(endPoint.dbTemp!);
           const endY = humidityToY(endPoint.humidity);
           
           let pathData = `M ${startX} ${startY} `;
@@ -1120,101 +1357,132 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
                           </button>
                         </div>
                         
+                        {/* Parameter Selection Dropdowns */}
                         <div className="grid grid-cols-2 gap-3 mb-2">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Dry Bulb Temp (°C)
+                              Parameter 1
                             </label>
-                            <input 
-                              type="number" 
-                              value={point.dbTemp} 
-                              onChange={(e) => updatePoint(point.id, { dbTemp: Number(e.target.value) })} 
-                              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
-                              step="0.1"
-                            />
+                            <select
+                              value={point.parameterOne}
+                              onChange={(e) => updatePoint(point.id, { 
+                                parameterOne: e.target.value as ParameterType,
+                                // Ensure parameters are different
+                                parameterTwo: e.target.value === point.parameterTwo ? 
+                                  (point.parameterOne !== 'rh' ? 'rh' : 'dbTemp') : 
+                                  point.parameterTwo
+                              })}
+                              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              {Object.values(PARAMETER_INFO).map(param => (
+                                <option key={`param1-${param.id}`} value={param.id}>
+                                  {param.name} ({param.unit})
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Relative Humidity (%)
+                              Parameter 2
                             </label>
-                            <input 
-                              type="number" 
-                              value={point.rh} 
-                              onChange={(e) => updatePoint(point.id, { rh: Number(e.target.value) })} 
-                              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
-                              min="0" 
-                              max="100" 
-                              step="1"
-                            />
+                            <select
+                              value={point.parameterTwo}
+                              onChange={(e) => updatePoint(point.id, { 
+                                parameterTwo: e.target.value as ParameterType,
+                                // Ensure parameters are different
+                                parameterOne: e.target.value === point.parameterOne ? 
+                                  (point.parameterTwo !== 'dbTemp' ? 'dbTemp' : 'rh') : 
+                                  point.parameterOne
+                              })}
+                              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              {Object.values(PARAMETER_INFO)
+                                .filter(param => param.id !== point.parameterOne)
+                                .map(param => (
+                                  <option key={`param2-${param.id}`} value={param.id}>
+                                    {param.name} ({param.unit})
+                                  </option>
+                                ))
+                              }
+                            </select>
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* Parameter Value Inputs */}
+                        <div className="grid grid-cols-2 gap-3 mb-2">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Wet Bulb Temp (°C)
+                              {PARAMETER_INFO[point.parameterOne].name} ({PARAMETER_INFO[point.parameterOne].unit})
                             </label>
-                            <input 
-                              type="number" 
-                              value={point.wbTemp?.toFixed(1) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
+                            <div className="relative">
+                              <input 
+                                type="number" 
+                                value={point[point.parameterOne] !== undefined ? 
+                                  (point.parameterOne === 'humidity' ? 
+                                    point[point.parameterOne]?.toFixed(2) : 
+                                    point[point.parameterOne]?.toFixed(1)) : 
+                                  ''}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  if (!isNaN(value)) {
+                                    updatePoint(point.id, { [point.parameterOne]: value });
+                                  }
+                                }} 
+                                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                                step={point.parameterOne === 'humidity' ? '0.1' : '0.5'}
+                              />
+                              <div className="absolute bottom-0 right-0 transform translate-y-6 text-xs text-gray-500 italic">
+                                {PARAMETER_INFO[point.parameterOne].description}
+                              </div>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Dew Point (°C)
+                              {PARAMETER_INFO[point.parameterTwo].name} ({PARAMETER_INFO[point.parameterTwo].unit})
                             </label>
-                            <input 
-                              type="number" 
-                              value={point.dewPoint?.toFixed(1) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
+                            <div className="relative">
+                              <input 
+                                type="number" 
+                                value={point[point.parameterTwo] !== undefined ? 
+                                  (point.parameterTwo === 'humidity' ? 
+                                    point[point.parameterTwo]?.toFixed(2) : 
+                                    point[point.parameterTwo]?.toFixed(1)) : 
+                                  ''}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  if (!isNaN(value)) {
+                                    updatePoint(point.id, { [point.parameterTwo]: value });
+                                  }
+                                }}
+                                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                                step={point.parameterTwo === 'humidity' ? '0.1' : '0.5'}
+                              />
+                              <div className="absolute bottom-0 right-0 transform translate-y-6 text-xs text-gray-500 italic">
+                                {PARAMETER_INFO[point.parameterTwo].description}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Humidity Ratio (g/kg)
-                            </label>
-                            <input 
-                              type="number" 
-                              value={point.humidity?.toFixed(2) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Enthalpy (kJ/kg)
-                            </label>
-                            <input 
-                              type="number" 
-                              value={point.enthalpy?.toFixed(1) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Specific Volume (m³/kg)
-                            </label>
-                            <input 
-                              type="number" 
-                              value={point.specificVolume?.toFixed(3) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Vapor Pressure (kPa)
-                            </label>
-                            <input 
-                              type="number" 
-                              value={point.vaporPressure?.toFixed(3) || ''} 
-                              disabled 
-                              className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md shadow-sm text-gray-600" 
-                            />
+                        </div>
+                        
+                        {/* All Calculated Properties (read-only) */}
+                        <div className="mt-7 pt-3 border-t border-blue-200">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">Calculated Properties:</h5>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                            {Object.values(PARAMETER_INFO)
+                              .filter(param => param.id !== point.parameterOne && param.id !== point.parameterTwo)
+                              .map(param => (
+                                <div key={`calc-${param.id}`} className="flex justify-between">
+                                  <span className="text-gray-600">{param.name}:</span>
+                                  <span className="font-medium text-gray-800">
+                                    {point[param.id] !== undefined ? 
+                                      (param.id === 'humidity' ? 
+                                        point[param.id]?.toFixed(2) : 
+                                        point[param.id]?.toFixed(1)) : 
+                                      '-'} {param.unit}
+                                  </span>
+                                </div>
+                              ))
+                            }
                           </div>
                         </div>
                       </div>
@@ -1243,7 +1511,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
                       ></div>
                       <span className="text-sm font-medium text-gray-700 mr-2">{point.name}</span>
                       <span className="text-xs text-gray-500">
-                        {point.dbTemp.toFixed(1)}°C, {point.rh.toFixed(0)}% RH
+                        {point.dbTemp?.toFixed(1)}°C, {point.rh?.toFixed(0)}% RH
                       </span>
                     </li>
                   ))}
@@ -1578,8 +1846,8 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
                             {point.name}
                           </div>
                         </td>
-                        <td className="p-2 text-right text-gray-700 border border-gray-300">{point.dbTemp.toFixed(1)}</td>
-                        <td className="p-2 text-right text-gray-700 border border-gray-300">{point.rh.toFixed(0)}</td>
+                        <td className="p-2 text-right text-gray-700 border border-gray-300">{point.dbTemp?.toFixed(1) || '-'}</td>
+                        <td className="p-2 text-right text-gray-700 border border-gray-300">{point.rh?.toFixed(0) || '-'}</td>
                         <td className="p-2 text-right text-gray-700 border border-gray-300">{point.wbTemp?.toFixed(1) || '-'}</td>
                         <td className="p-2 text-right text-gray-700 border border-gray-300">{point.dewPoint?.toFixed(1) || '-'}</td>
                         <td className="p-2 text-right text-gray-700 border border-gray-300">{point.humidity?.toFixed(2) || '-'}</td>
@@ -1621,7 +1889,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
                           return null;
                         }
                         
-                        const deltaTemp = endPoint.dbTemp - startPoint.dbTemp;
+                        const deltaTemp = (endPoint.dbTemp || 0) - (startPoint.dbTemp || 0);
                         const deltaHumidity = endPoint.humidity - startPoint.humidity;
                         const deltaEnthalpy = endPoint.enthalpy - startPoint.enthalpy;
                         
@@ -1720,8 +1988,9 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
           <li>Psychrometric calculations are based on ASHRAE fundamentals and include temperature-dependent air properties.</li>
           <li>Barometric pressure affects all psychrometric properties and is automatically calculated based on altitude.</li>
+          <li>Define air points using any two independent parameters - the calculator will determine all other properties.</li>
           <li>For wet bulb temperature calculations, an iterative solver is used to ensure high accuracy.</li>
-          <li>Add points by specifying dry bulb temperature and relative humidity, or by clicking directly on the chart.</li>
+          <li>Add points by specifying any two parameters, or by clicking directly on the chart (uses DB temp and RH).</li>
           <li>Process energy calculations assume steady-state conditions and require a valid mass flow rate.</li>
           <li>Chart visualization is approximate; hover over the chart for precise values at any point.</li>
         </ul>
