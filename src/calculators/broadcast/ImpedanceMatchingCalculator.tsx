@@ -160,13 +160,14 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
       });
       
     } catch (error) {
+      console.error("Matching network calculation error:", error);
       setMatchingResults({
         components: [],
         vswr: 0,
         reflectionCoefficient: 1,
         returnLoss: 0,
         matchingEfficiency: 0,
-        error: "Error in calculations. Check your inputs."
+        error: (error instanceof Error) ? error.message : "Error in calculations. Check your inputs."
       });
     }
   };
@@ -201,382 +202,999 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
     return isNaN(q) || !isFinite(q) || q <= 0 ? 1 : q;
   };
   
-  // Calculate L-Network components - Revised to use true 2-element L-network design
+  // Calculate L-Network components - updated to include the specialized variants
   const calculateLNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number, topology: NetworkTopology) => {
     const components: Component[] = [];
     const omega = 2 * Math.PI * frequency; // angular frequency
     
-    // Input validation - ensure resistances are positive
-    if (source.r <= 0 || load.r <= 0) {
-      throw new Error("Source and load resistances must be positive");
+    try {
+      // Input validation - ensure resistances are positive
+      if (source.r <= 0 || load.r <= 0) {
+        throw new Error("Source and load resistances must be positive");
+      }
+      
+      // Extract impedance parameters
+      const rs = source.r;
+      const xs = source.x;
+      const rl = load.r;
+      const xl = load.x;
+      
+      // Special case: if Rs = Rl and Xs = -Xl, no matching needed
+      if (rs === rl && xs === -xl) {
+        return components;
+      }
+      
+      if (rs < rl) {
+        // Step-up L-network (source R < load R)
+        if (topology === 'lowPass') {
+          // Low-pass: Series L, Shunt C (LCLP configuration)
+          // Directly implement the original LCLP method
+          const rl = source.r;
+          const xl = source.x;
+          const rs = load.r;
+          const xs = load.x;
+          const qs = -xs / rs;
+          const rp = rs * (1 + qs * qs);
+          
+          // Calculate Q based on impedance ratio - note this follows original LCLP function
+          const actualQ = Math.sqrt(rp / rl - 1);
+          if (isNaN(actualQ) || !isFinite(actualQ)) {
+            throw new Error("Invalid Q factor calculated");
+          }
+          
+          // Calculate L and C values
+          const c1 = qs / (rp * omega);
+          const l1 = xl / omega;
+          
+          // Calculate component values - note these mirror original LCLP calculation
+          const cp = actualQ / (rp * omega);
+          const c = cp - c1;
+          const ls = actualQ * rl / omega;
+          const l = ls - l1;
+          
+          // Add components to result
+          if (isFinite(l) && l !== 0) {
+            if (l > 0) {
+              components.push({
+                type: 'inductor',
+                value: l,
+                reactance: omega * l,
+                position: 'Series inductor (LCLP configuration)'
+              });
+            } else {
+              // Need a series capacitor instead
+              const c_series = -1 / (omega * l);
+              components.push({
+                type: 'capacitor',
+                value: c_series,
+                reactance: -1 / (omega * c_series),
+                position: 'Series capacitor (LCLP configuration)'
+              });
+            }
+          }
+          
+          if (isFinite(c) && c !== 0) {
+            if (c > 0) {
+              components.push({
+                type: 'capacitor',
+                value: c,
+                reactance: -1 / (omega * c),
+                position: 'Shunt capacitor (LCLP configuration)'
+              });
+            } else {
+              // Need a shunt inductor instead
+              const l_shunt = -1 / (omega * c);
+              components.push({
+                type: 'inductor',
+                value: l_shunt,
+                reactance: omega * l_shunt,
+                position: 'Shunt inductor (modified LCLP configuration)'
+              });
+            }
+          }
+        } else {
+          // High-pass: Series C, Shunt L (LCHP configuration)
+          // Implement matching LCHP logic
+          const rl = source.r;
+          const xl = source.x;
+          const rs = load.r;
+          const xs = load.x;
+          const ql = -xl / rl;
+          const qs = xs / rs;
+          
+          // Calculate inductance for source reactance compensation
+          let l1 = 0;
+          if (xs !== 0) {
+            if (qs !== 0) {
+              l1 = (1 + qs * qs) * xs / (omega * qs * qs);
+            } else {
+              throw new Error("Invalid source reactance calculation");
+            }
+          }
+          
+          // Calculate capacitance for load reactance
+          let c1 = 0;
+          if (xl !== 0) {
+            c1 = -1 / (omega * xl);
+          }
+          
+          // Calculate parallel equivalent of source impedance
+          const rp = (1 + qs * qs) * rs;
+          
+          // Calculate Q based on impedance ratio
+          const actualQ = Math.sqrt(rp / rl - 1);
+          if (isNaN(actualQ) || !isFinite(actualQ)) {
+            throw new Error("Invalid Q factor calculated");
+          }
+          
+          // Calculate component values
+          const lp = rp / (omega * actualQ);
+          const cs = 1 / (actualQ * omega * rl);
+          
+          // Adjust for reactances
+          let l = 0;
+          let c = 0;
+          
+          if (xs === 0) {
+            l = lp;
+          } else {
+            if (l1 === lp) {
+              l = Number.POSITIVE_INFINITY;
+            } else if (l1 - lp === 0) {
+              throw new Error("Division by zero in inductor calculation");
+            } else {
+              l = lp * l1 / (l1 - lp);
+            }
+          }
+          
+          if (xl === 0) {
+            c = cs;
+          } else {
+            if (c1 === cs) {
+              c = Number.POSITIVE_INFINITY;
+            } else if (c1 - cs === 0) {
+              throw new Error("Division by zero in capacitor calculation");
+            } else {
+              c = c1 * cs / (c1 - cs);
+            }
+          }
+          
+          // Add components to result
+          if (isFinite(c) && c > 0) {
+            components.push({
+              type: 'capacitor',
+              value: c,
+              reactance: -1 / (omega * c),
+              position: 'Series capacitor (LCHP configuration)'
+            });
+          } else {
+            // If c is invalid, use a simplified approach
+            if (cs > 0 && isFinite(cs)) {
+              components.push({
+                type: 'capacitor',
+                value: cs,
+                reactance: -1 / (omega * cs),
+                position: 'Series capacitor (LCHP configuration)'
+              });
+            } else {
+              throw new Error("Invalid capacitor value calculated");
+            }
+          }
+          
+          if (isFinite(l) && l > 0) {
+            components.push({
+              type: 'inductor',
+              value: l,
+              reactance: omega * l,
+              position: 'Shunt inductor (LCHP configuration)'
+            });
+          } else {
+            // If l is invalid, use simplified value
+            if (lp > 0 && isFinite(lp)) {
+              components.push({
+                type: 'inductor',
+                value: lp,
+                reactance: omega * lp,
+                position: 'Shunt inductor (LCHP configuration)'
+              });
+            } else {
+              throw new Error("Invalid inductor value calculated");
+            }
+          }
+        }
+      } else {
+        // Step-down L-network (source R > load R)
+        if (topology === 'lowPass') {
+          // Low-pass: Shunt C, Series L (CLLP configuration)
+          
+          // Calculate key parameters - match original CLLP function
+          const qs = -xs / rs;
+          const ql = xl / rl;
+          const rp = rs * (1 + qs * qs);
+          
+          // Calculate Q based on impedance ratio - follows original CLLP function
+          const actualQ = Math.sqrt(rp / rl - 1);
+          if (isNaN(actualQ) || !isFinite(actualQ)) {
+            throw new Error("Invalid Q factor calculated");
+          }
+          
+          // Calculate L and C values
+          const c1 = qs / (rp * omega);
+          const l1 = xl / omega;
+          
+          // Calculate component values - mirrors original CLLP calculation
+          const cp = actualQ / (rp * omega);
+          const c = cp - c1;
+          const ls = actualQ * rl / omega;
+          const l = ls - l1;
+          
+          // Add components to result
+          if (isFinite(c) && c !== 0) {
+            if (c > 0) {
+              components.push({
+                type: 'capacitor',
+                value: c,
+                reactance: -1 / (omega * c),
+                position: 'Shunt capacitor (CLLP configuration)'
+              });
+            } else {
+              // Need a shunt inductor instead
+              const l_shunt = -1 / (omega * c);
+              components.push({
+                type: 'inductor',
+                value: l_shunt,
+                reactance: omega * l_shunt,
+                position: 'Shunt inductor (modified CLLP configuration)'
+              });
+            }
+          }
+          
+          if (isFinite(l) && l !== 0) {
+            if (l > 0) {
+              components.push({
+                type: 'inductor',
+                value: l,
+                reactance: omega * l,
+                position: 'Series inductor (CLLP configuration)'
+              });
+            } else {
+              // Need a series capacitor instead
+              const c_series = -1 / (omega * l);
+              components.push({
+                type: 'capacitor',
+                value: c_series,
+                reactance: -1 / (omega * c_series),
+                position: 'Series capacitor (CLLP configuration)'
+              });
+            }
+          }
+        } else {
+          // High-pass: Shunt L, Series C (CLHP configuration)
+          
+          // Implement matching the original CLHP calculation (with source and load swapped)
+          const rs_clhp = rl;  // Swap source and load as in original CLHP
+          const xs_clhp = xl;
+          const rl_clhp = rs;
+          const xl_clhp = xs;
+          
+          const ql_clhp = -xl_clhp / rl_clhp;
+          const qs_clhp = xs_clhp / rs_clhp;
+          
+          // Calculate inductance for source reactance compensation
+          let l1 = 0;
+          if (xs_clhp !== 0) {
+            if (qs_clhp !== 0) {
+              l1 = (1 + qs_clhp * qs_clhp) * xs_clhp / (omega * qs_clhp * qs_clhp);
+            } else {
+              throw new Error("Invalid source reactance calculation");
+            }
+          }
+          
+          // Calculate capacitance for load reactance
+          let c1 = 0;
+          if (xl_clhp !== 0) {
+            c1 = -1 / (omega * xl_clhp);
+          }
+          
+          // Calculate parallel equivalent of source impedance
+          const rp = (1 + qs_clhp * qs_clhp) * rs_clhp;
+          
+          // Calculate Q based on impedance ratio
+          const actualQ = Math.sqrt(rp / rl_clhp - 1);
+          if (isNaN(actualQ) || !isFinite(actualQ)) {
+            throw new Error("Invalid Q factor calculated");
+          }
+          
+          // Calculate component values
+          const lp = rp / (omega * actualQ);
+          const cs = 1 / (actualQ * omega * rl_clhp);
+          
+          // Adjust for reactances
+          let l = 0;
+          let c = 0;
+          
+          if (xs_clhp === 0) {
+            l = lp;
+          } else {
+            if (l1 === lp) {
+              l = Number.POSITIVE_INFINITY;
+            } else if (l1 - lp === 0) {
+              throw new Error("Division by zero in inductor calculation");
+            } else {
+              l = lp * l1 / (l1 - lp);
+            }
+          }
+          
+          if (xl_clhp === 0) {
+            c = cs;
+          } else {
+            if (c1 === cs) {
+              c = Number.POSITIVE_INFINITY;
+            } else if (c1 - cs === 0) {
+              throw new Error("Division by zero in capacitor calculation");
+            } else {
+              c = c1 * cs / (c1 - cs);
+            }
+          }
+          
+          // For CLHP, the shunt inductor comes first, then series capacitor
+          if (isFinite(l) && l > 0) {
+            components.push({
+              type: 'inductor',
+              value: l,
+              reactance: omega * l,
+              position: 'Shunt inductor (CLHP configuration)'
+            });
+          } else {
+            // Fallback
+            if (lp > 0 && isFinite(lp)) {
+              components.push({
+                type: 'inductor',
+                value: lp,
+                reactance: omega * lp,
+                position: 'Shunt inductor (CLHP configuration)'
+              });
+            } else {
+              throw new Error("Invalid inductor value calculated");
+            }
+          }
+          
+          if (isFinite(c) && c > 0) {
+            components.push({
+              type: 'capacitor',
+              value: c,
+              reactance: -1 / (omega * c),
+              position: 'Series capacitor (CLHP configuration)'
+            });
+          } else {
+            // Fallback
+            if (cs > 0 && isFinite(cs)) {
+              components.push({
+                type: 'capacitor',
+                value: cs,
+                reactance: -1 / (omega * cs),
+                position: 'Series capacitor (CLHP configuration)'
+              });
+            } else {
+              throw new Error("Invalid capacitor value calculated");
+            }
+          }
+        }
+      }
+      
+      return components;
+    } catch (error) {
+      console.error("L-Network calculation error:", error);
+      throw error; // Re-throw to be handled by the main calculation
     }
+  };
+  
+  // Calculate Pi-Network components based on the original Pi() function
+  const calculatePiNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number, topology: NetworkTopology) => {
+    const components: Component[] = [];
+    const omega = 2 * Math.PI * frequency;
     
-    // Direct 2-element L-network matching between complex impedances
-    // There are typically two possible solutions (high-pass and low-pass)
+    try {
+      // Extract values from source and load
+      const rs = source.r;
+      const xs = source.x;
+      const rl = load.r;
+      const xl = load.x;
+      
+      if (q < 0) {
+        throw new Error("Q factor must be positive for Pi network");
+      }
+      
+      // Special case: if Q is 0 and Rs = Rl, no matching needed
+      if (q === 0 && rs === rl) {
+        return components;
+      }
+      
+      // Verify if Q is sufficient for matching
+      const minQ = Math.sqrt(Math.max(rs, rl) / Math.min(rs, rl) - 1);
+      if (q < minQ) {
+        throw new Error(`Q must be at least ${minQ.toFixed(2)} for Pi network with these impedances`);
+      }
+      
+      // Calculate virtual resistance in the middle (as per original Pi function)
+      const rv = Math.max(rs, rl) / (q * q + 1);
+      if (rv <= 0 || !isFinite(rv)) {
+        throw new Error("Invalid virtual resistance calculated");
+      }
+      
+      // Find parallel circuit values
+      const qs = -xs / rs;
+      const ql = -xl / rl;
+      const rps = rs * (1 + qs * qs);
+      const rpl = rl * (1 + ql * ql);
+      
+      // Calculate parallel capacitances
+      const cps = qs / (rps * omega);
+      const cpl = ql / (rpl * omega);
+      
+      if (topology === 'lowPass') {
+        // Low-pass Pi: Cs, L, Cl
+        
+        // Source side matching
+        const q1 = Math.sqrt(rps / rv - 1);
+        if (isNaN(q1) || !isFinite(q1)) {
+          throw new Error("Invalid Q1 factor calculated for Pi network");
+        }
+        
+        const cs = q1 / (omega * rps) - cps;
+        
+        // Load side matching
+        const q2 = Math.sqrt(rpl / rv - 1);
+        if (isNaN(q2) || !isFinite(q2)) {
+          throw new Error("Invalid Q2 factor calculated for Pi network");
+        }
+        
+        const cl = q2 / (omega * rpl) - cpl;
+        
+        // Series inductor
+        const l = q1 * rv / omega + q2 * rv / omega;
+        
+        // Add components to result
+        if (isFinite(cs) && cs !== 0) {
+          components.push({
+            type: 'capacitor',
+            value: cs,
+            reactance: -1 / (omega * cs),
+            position: 'Source-side shunt capacitor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid source-side capacitor value");
+        }
+        
+        if (isFinite(l) && l > 0) {
+          components.push({
+            type: 'inductor',
+            value: l,
+            reactance: omega * l,
+            position: 'Series inductor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid inductor value");
+        }
+        
+        if (isFinite(cl) && cl !== 0) {
+          components.push({
+            type: 'capacitor',
+            value: cl,
+            reactance: -1 / (omega * cl),
+            position: 'Load-side shunt capacitor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid load-side capacitor value");
+        }
+      } else {
+        // High-pass Pi: Ls, C, Ll
+        
+        // Source side matching
+        const q1 = Math.sqrt(rps / rv - 1);
+        if (isNaN(q1) || !isFinite(q1)) {
+          throw new Error("Invalid Q1 factor calculated for Pi network");
+        }
+        
+        let ls = rps / (omega * q1);
+        
+        // Account for source reactance
+        if (qs !== 0) {
+          const lps = rps / (qs * omega);
+          if (ls === lps) {
+            throw new Error("Division by zero in inductor calculation");
+          }
+          ls = ls * lps / (ls - lps);
+        }
+        
+        // Load side matching
+        const q2 = Math.sqrt(rpl / rv - 1);
+        if (isNaN(q2) || !isFinite(q2)) {
+          throw new Error("Invalid Q2 factor calculated for Pi network");
+        }
+        
+        let ll = rpl / (omega * q2);
+        
+        // Account for load reactance
+        if (ql !== 0) {
+          const lpl = rpl / (ql * omega);
+          if (ll === lpl) {
+            throw new Error("Division by zero in inductor calculation");
+          }
+          ll = ll * lpl / (ll - lpl);
+        }
+        
+        // Calculate series capacitor
+        const cs = 1 / (omega * q1 * rv);
+        const cl = 1 / (omega * q2 * rv);
+        if (cs === 0 || cl === 0) {
+          throw new Error("Division by zero in capacitor calculation");
+        }
+        
+        const c = cs * cl / (cs + cl);
+        
+        // Add components to result
+        if (isFinite(ls) && ls > 0) {
+          components.push({
+            type: 'inductor',
+            value: ls,
+            reactance: omega * ls,
+            position: 'Source-side shunt inductor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid source-side inductor value");
+        }
+        
+        if (isFinite(c) && c > 0) {
+          components.push({
+            type: 'capacitor',
+            value: c,
+            reactance: -1 / (omega * c),
+            position: 'Series capacitor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid series capacitor value");
+        }
+        
+        if (isFinite(ll) && ll > 0) {
+          components.push({
+            type: 'inductor',
+            value: ll,
+            reactance: omega * ll,
+            position: 'Load-side shunt inductor (Pi-network)'
+          });
+        } else {
+          throw new Error("Invalid load-side inductor value");
+        }
+      }
+      
+      return components;
+    } catch (error) {
+      console.error("Pi-Network calculation error:", error);
+      throw error; // Re-throw to be handled by the main calculation
+    }
+  };
+  
+  // Calculate T-Network components based on the original Tnet() function
+  const calculateTNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number, topology: NetworkTopology) => {
+    const components: Component[] = [];
+    const omega = 2 * Math.PI * frequency;
     
-    // Normalize the complex impedances
+    try {
+      // Extract values from source and load
+      const rs = source.r;
+      const xs = source.x;
+      const rl = load.r;
+      const xl = load.x;
+      
+      if (q < 0) {
+        throw new Error("Q factor must be positive for T network");
+      }
+      
+      // Special case: if Q is 0 and Rs = Rl, no matching needed
+      if (q === 0 && rs === rl) {
+        return components;
+      }
+      
+      // Verify if Q is sufficient for matching
+      const minQ = Math.sqrt(Math.max(rs, rl) / Math.min(rs, rl) - 1);
+      if (q < minQ) {
+        throw new Error(`Q must be at least ${minQ.toFixed(2)} for T network with these impedances`);
+      }
+      
+      // Calculate virtual resistance in the middle (as per original Tnet function)
+      const rv = Math.min(rs, rl) * (q * q + 1);
+      if (rv <= 0 || !isFinite(rv)) {
+        throw new Error("Invalid virtual resistance calculated");
+      }
+      
+      if (topology === 'lowPass') {
+        // Low-pass T: Ls, C, Ll
+        
+        // Source-side matching
+        const q1 = Math.sqrt(rv / rs - 1);
+        if (isNaN(q1) || !isFinite(q1)) {
+          throw new Error("Invalid Q1 factor calculated for T network");
+        }
+        
+        const ls = q1 * rs / omega - xs / omega;
+        
+        // Load-side matching
+        const q2 = Math.sqrt(rv / rl - 1);
+        if (isNaN(q2) || !isFinite(q2)) {
+          throw new Error("Invalid Q2 factor calculated for T network");
+        }
+        
+        const ll = q2 * rl / omega - xl / omega;
+        
+        // Shunt capacitor
+        const c = (q1 + q2) / (omega * rv);
+        
+        // Add components to result
+        if (isFinite(ls) && ls !== 0) {
+          components.push({
+            type: 'inductor',
+            value: ls,
+            reactance: omega * ls,
+            position: 'Source-side series inductor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid source-side inductor value");
+        }
+        
+        if (isFinite(c) && c > 0) {
+          components.push({
+            type: 'capacitor',
+            value: c,
+            reactance: -1 / (omega * c),
+            position: 'Shunt capacitor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid shunt capacitor value");
+        }
+        
+        if (isFinite(ll) && ll !== 0) {
+          components.push({
+            type: 'inductor',
+            value: ll,
+            reactance: omega * ll,
+            position: 'Load-side series inductor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid load-side inductor value");
+        }
+      } else {
+        // High-pass T: Cs, L, Cl
+        
+        // Source-side matching
+        const q1 = Math.sqrt(rv / rs - 1);
+        if (isNaN(q1) || !isFinite(q1)) {
+          throw new Error("Invalid Q1 factor calculated for T network");
+        }
+        
+        let cs = 1 / (omega * rs * q1);
+        
+        // Adjust for source reactance
+        if (xs !== 0) {
+          const cs_reactance = -1 / (omega * xs);
+          if (cs === cs_reactance) {
+            cs = Number.POSITIVE_INFINITY;
+            throw new Error("Division by zero in source capacitor calculation");
+          } else if (cs + cs_reactance === 0) {
+            throw new Error("Division by zero in source capacitor adjustment");
+          } else {
+            cs = cs * cs_reactance / (cs + cs_reactance);
+          }
+        }
+        
+        // Load-side matching
+        const q2 = Math.sqrt(rv / rl - 1);
+        if (isNaN(q2) || !isFinite(q2)) {
+          throw new Error("Invalid Q2 factor calculated for T network");
+        }
+        
+        let cl = 1 / (omega * rl * q2);
+        
+        // Adjust for load reactance
+        if (xl !== 0) {
+          const cl_reactance = -1 / (omega * xl);
+          if (cl === cl_reactance) {
+            cl = Number.POSITIVE_INFINITY;
+            throw new Error("Division by zero in load capacitor calculation");
+          } else if (cl + cl_reactance === 0) {
+            throw new Error("Division by zero in load capacitor adjustment");
+          } else {
+            cl = cl * cl_reactance / (cl + cl_reactance);
+          }
+        }
+        
+        // Shunt inductor
+        const l = rv / (omega * (q1 + q2));
+        
+        // Add components to result
+        if (isFinite(cs) && cs > 0) {
+          components.push({
+            type: 'capacitor',
+            value: cs,
+            reactance: -1 / (omega * cs),
+            position: 'Source-side series capacitor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid source-side capacitor value");
+        }
+        
+        if (isFinite(l) && l > 0) {
+          components.push({
+            type: 'inductor',
+            value: l,
+            reactance: omega * l,
+            position: 'Shunt inductor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid shunt inductor value");
+        }
+        
+        if (isFinite(cl) && cl > 0) {
+          components.push({
+            type: 'capacitor',
+            value: cl,
+            reactance: -1 / (omega * cl),
+            position: 'Load-side series capacitor (T-network)'
+          });
+        } else {
+          throw new Error("Invalid load-side capacitor value");
+        }
+      }
+      
+      return components;
+    } catch (error) {
+      console.error("T-Network calculation error:", error);
+      throw error; // Re-throw to be handled by the main calculation
+    }
+  };
+  
+  // LCHP Network (LC High-Pass) based on the original LCHP() function
+  const calculateLCHPNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number) => {
+    const components: Component[] = [];
+    const omega = 2 * Math.PI * frequency;
+    
+    // Extract values from source and load
     const rs = source.r;
     const xs = source.x;
     const rl = load.r;
     const xl = load.x;
     
-    // We'll implement the solution based on selected topology
-    if (rs < rl) {
-      // Step-up L-network (source R < load R)
-      if (topology === 'lowPass') {
-        // Low-pass: Series L, Shunt C
-        
-        // Calculate Q based on impedance ratio
-        const actualQ = Math.sqrt((rl / rs) - 1);
-        
-        // Calculate component reactances
-        const xl_series = actualQ * rs;  // Series inductor reactance
-        const xc_shunt = rl / actualQ;   // Shunt capacitor reactance
-        
-        // Calculate the actual component values needed when including source and load reactances
-        // The series inductor needs to contribute xl_series - xs since xs is already in series
-        const x_series_needed = xl_series - xs;
-        
-        // The parallel capacitor needs to create an equivalent reactance of -xc_shunt
-        // when combined with xl, taking into account the impedance transfer
-        
-        // First component (series)
-        if (x_series_needed > 0) {
-          // Add an inductor
-          const l = x_series_needed / omega;
-          components.push({
-            type: 'inductor',
-            value: l,
-            reactance: x_series_needed,
-            position: 'Series inductor (step-up low-pass L-network)'
-          });
-        } else if (x_series_needed < 0) {
-          // Need a series capacitor instead
-          const c = -1 / (omega * x_series_needed);
-          components.push({
-            type: 'capacitor',
-            value: c,
-            reactance: x_series_needed,
-            position: 'Series capacitor (step-up low-pass L-network)'
-          });
-        }
-        
-        // Calculate the equivalent parallel reactance needed at the load side
-        // This is more complex as we need to consider the parallel combination of the load reactance
-        // and our shunt component
-        
-        // For parallel components:
-        // Y_equiv = Y_load + Y_shunt
-        // Y_load = 1/(rl + j*xl)
-        // Y_shunt = j*B_shunt (where B_shunt is susceptance)
-        
-        // We want the imaginary part of Y_equiv to be -1/xc_shunt
-        // The math gets complex, so for now, we'll simplify and just adjust the shunt component
-        
-        // Simplified approach: directly add a shunt capacitor with reactance -xc_shunt
-        const c_shunt = 1 / (omega * xc_shunt);
-        components.push({
-          type: 'capacitor',
-          value: c_shunt,
-          reactance: -xc_shunt,
-          position: 'Shunt capacitor (step-up low-pass L-network)'
-        });
-        
-      } else {
-        // High-pass: Series C, Shunt L
-        
-        // Calculate Q based on impedance ratio
-        const actualQ = Math.sqrt((rl / rs) - 1);
-        
-        // Calculate component reactances
-        const xc_series = rs / actualQ;   // Series capacitor reactance
-        const xl_shunt = actualQ * rl;    // Shunt inductor reactance
-        
-        // First component (series capacitor)
-        const x_series_needed = -xc_series - xs;  // Need to provide -xc_series total with xs already there
-        
-        if (x_series_needed < 0) {
-          // Add a series capacitor
-          const c = -1 / (omega * x_series_needed);
-          components.push({
-            type: 'capacitor',
-            value: c,
-            reactance: x_series_needed,
-            position: 'Series capacitor (step-up high-pass L-network)'
-          });
-        } else {
-          // Need a series inductor instead
-          const l = x_series_needed / omega;
-          components.push({
-            type: 'inductor',
-            value: l,
-            reactance: x_series_needed,
-            position: 'Series inductor (step-up high-pass L-network)'
-          });
-        }
-        
-        // Shunt inductor
-        const l_shunt = xl_shunt / omega;
-        components.push({
-          type: 'inductor',
-          value: l_shunt,
-          reactance: xl_shunt,
-          position: 'Shunt inductor (step-up high-pass L-network)'
-        });
-      }
+    // Calculate key parameters
+    const ql = -xl / rl;
+    const qs = xs / rs;
+    const c1 = -1 / (omega * xl);
+    const l1 = (1 + qs * qs) * xs / (omega * qs * qs);
+    const rp = (1 + qs * qs) * rs;
+    
+    // Use the load as the driving end (reversed in original LCHP)
+    const r_source = rl;
+    
+    // Check if matching is possible
+    if (r_source > rp) {
+      throw new Error("Load resistance is larger than source resistance. Cannot use LC match");
+    }
+    
+    // Calculate Q based on impedance ratio
+    const actualQ = Math.sqrt(rp / r_source - 1);
+    
+    // Calculate primary component values
+    const lp = rp / (omega * actualQ);
+    const cs = 1 / (actualQ * omega * r_source);
+    
+    // Adjust for reactances
+    let c = 0;
+    let l = 0;
+    
+    if (xl === 0) {
+      c = cs;
     } else {
-      // Step-down L-network (source R > load R)
-      if (topology === 'lowPass') {
-        // Low-pass: Shunt C, Series L
-        
-        // Calculate Q based on impedance ratio
-        const actualQ = Math.sqrt((rs / rl) - 1);
-        
-        // Calculate component reactances
-        const xc_shunt = rs / actualQ;   // Shunt capacitor reactance
-        const xl_series = actualQ * rl;  // Series inductor reactance
-        
-        // First component (shunt capacitor at source)
-        const c_shunt = 1 / (omega * xc_shunt);
-        components.push({
-          type: 'capacitor',
-          value: c_shunt,
-          reactance: -xc_shunt,
-          position: 'Shunt capacitor (step-down low-pass L-network)'
-        });
-        
-        // Second component (series inductor)
-        // The series inductor needs to contribute xl_series - xl since xl is already in series
-        const x_series_needed = xl_series - xl;
-        
-        if (x_series_needed > 0) {
-          // Add a series inductor
-          const l = x_series_needed / omega;
-          components.push({
-            type: 'inductor',
-            value: l,
-            reactance: x_series_needed,
-            position: 'Series inductor (step-down low-pass L-network)'
-          });
-        } else if (x_series_needed < 0) {
-          // Need a series capacitor instead
-          const c = -1 / (omega * x_series_needed);
-          components.push({
-            type: 'capacitor',
-            value: c,
-            reactance: x_series_needed,
-            position: 'Series capacitor (step-down low-pass L-network)'
-          });
-        }
+      if (c1 === cs) {
+        c = Number.POSITIVE_INFINITY;
       } else {
-        // High-pass: Shunt L, Series C
-        
-        // Calculate Q based on impedance ratio
-        const actualQ = Math.sqrt((rs / rl) - 1);
-        
-        // Calculate component reactances
-        const xl_shunt = rs * actualQ;    // Shunt inductor reactance
-        const xc_series = rl / actualQ;   // Series capacitor reactance
-        
-        // First component (shunt inductor at source)
-        const l_shunt = xl_shunt / omega;
-        components.push({
-          type: 'inductor',
-          value: l_shunt,
-          reactance: xl_shunt,
-          position: 'Shunt inductor (step-down high-pass L-network)'
-        });
-        
-        // Second component (series capacitor)
-        const x_series_needed = -xc_series - xl;  // Need to provide -xc_series total with xl already there
-        
-        if (x_series_needed < 0) {
-          // Add a series capacitor
-          const c = -1 / (omega * x_series_needed);
-          components.push({
-            type: 'capacitor',
-            value: c,
-            reactance: x_series_needed,
-            position: 'Series capacitor (step-down high-pass L-network)'
-          });
-        } else {
-          // Need a series inductor instead
-          const l = x_series_needed / omega;
-          components.push({
-            type: 'inductor',
-            value: l,
-            reactance: x_series_needed,
-            position: 'Series inductor (step-down high-pass L-network)'
-          });
-        }
+        c = c1 * cs / (c1 - cs);
       }
     }
+    
+    if (xs === 0) {
+      l = lp;
+    } else {
+      if (l1 === lp) {
+        l = Number.POSITIVE_INFINITY;
+      } else {
+        l = lp * l1 / (l1 - lp);
+      }
+    }
+    
+    // Add components to result
+    components.push({
+      type: 'inductor',
+      value: l,
+      reactance: omega * l,
+      position: 'Series inductor (LCHP network)'
+    });
+    
+    components.push({
+      type: 'capacitor',
+      value: c,
+      reactance: -1 / (omega * c),
+      position: 'Shunt capacitor (LCHP network)'
+    });
     
     return components;
   };
   
-  // Calculate Pi-Network components (simplified approach)
-  const calculatePiNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number, topology: NetworkTopology) => {
+  // CLLP Network (CL Low-Pass) based on the original CLLP() function
+  const calculateCLLPNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number) => {
     const components: Component[] = [];
     const omega = 2 * Math.PI * frequency;
     
-    // Pi networks can be viewed as two L networks back-to-back
-    // with a virtual resistor in the middle
+    // Extract values
+    const rs = source.r;
+    const xs = source.x;
+    const rl = load.r;
+    const xl = load.x;
     
-    // Use a higher Q for Pi-networks
-    const enhancedQ = q * 1.5;
+    // Calculate key parameters
+    const qs = -xs / rs;
+    const ql = xl / rl;
+    const rp = rs * (1 + qs * qs);
+    const c1 = qs / (rp * omega);
+    const l1 = xl / omega;
     
-    // Create virtual resistance in the middle (typically higher than both source and load)
-    const rm = Math.max(source.r, load.r) * (1 + enhancedQ * enhancedQ);
-    
-    if (topology === 'lowPass') {
-      // Low-pass Pi: Shunt C, Series L, Shunt C
-      
-      // First shunt capacitor (source side)
-      const xc1 = source.r / enhancedQ;
-      const c1 = 1 / (omega * xc1);
-      components.push({
-        type: 'capacitor',
-        value: c1,
-        reactance: -xc1,
-        position: 'Source-side shunt C (Pi-network)'
-      });
-      
-      // Series inductor
-      const xl = enhancedQ * Math.sqrt(source.r * load.r);
-      const l = xl / omega;
-      components.push({
-        type: 'inductor',
-        value: l,
-        reactance: xl,
-        position: 'Series L (Pi-network)'
-      });
-      
-      // Second shunt capacitor (load side)
-      const xc2 = load.r / enhancedQ;
-      const c2 = 1 / (omega * xc2);
-      components.push({
-        type: 'capacitor',
-        value: c2,
-        reactance: -xc2,
-        position: 'Load-side shunt C (Pi-network)'
-      });
-    } else {
-      // High-pass Pi: Shunt L, Series C, Shunt L
-      
-      // First shunt inductor (source side)
-      const xl1 = source.r * enhancedQ;
-      const l1 = xl1 / omega;
-      components.push({
-        type: 'inductor',
-        value: l1,
-        reactance: xl1,
-        position: 'Source-side shunt L (Pi-network)'
-      });
-      
-      // Series capacitor
-      const xc = 1 / (enhancedQ * Math.sqrt(1 / (source.r * load.r)));
-      const c = 1 / (omega * xc);
-      components.push({
-        type: 'capacitor',
-        value: c,
-        reactance: -xc,
-        position: 'Series C (Pi-network)'
-      });
-      
-      // Second shunt inductor (load side)
-      const xl2 = load.r * enhancedQ;
-      const l2 = xl2 / omega;
-      components.push({
-        type: 'inductor',
-        value: l2,
-        reactance: xl2,
-        position: 'Load-side shunt L (Pi-network)'
-      });
+    // Check if matching is possible
+    if (rl > rp) {
+      throw new Error("Load Resistance is larger than source resistance. Cannot use C para, L series");
     }
+    
+    // Calculate Q and component values
+    const actualQ = Math.sqrt(rp / rl - 1);
+    const cp = actualQ / (rp * omega);
+    const c = cp - c1;
+    const ls = actualQ * rl / omega;
+    const l = ls - l1;
+    
+    // Add components to result
+    components.push({
+      type: 'capacitor',
+      value: c,
+      reactance: -1 / (omega * c),
+      position: 'Shunt capacitor (CLLP network)'
+    });
+    
+    components.push({
+      type: 'inductor',
+      value: l,
+      reactance: omega * l,
+      position: 'Series inductor (CLLP network)'
+    });
     
     return components;
   };
   
-  // Calculate T-Network components
-  const calculateTNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number, topology: NetworkTopology) => {
+  // LCLP Network (LC Low-Pass) based on the original LCLP() function
+  const calculateLCLPNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number) => {
     const components: Component[] = [];
     const omega = 2 * Math.PI * frequency;
     
-    // T networks can be thought of as two L networks back-to-back
-    // with a virtual resistor in the middle
+    // Swap source and load (as per original LCLP function)
+    const rs = load.r;
+    const xs = load.x;
+    const rl = source.r;
+    const xl = source.x;
     
-    // Use a higher Q for T-networks
-    const enhancedQ = q * 1.5;
+    // Calculate key parameters
+    const qs = -xs / rs;
+    const ql = xl / rl;
+    const rp = rs * (1 + qs * qs);
+    const c1 = qs / (rp * omega);
+    const l1 = xl / omega;
     
-    // Create virtual resistance in the middle (typically lower than both source and load)
-    const rm = Math.min(source.r, load.r) / (1 + enhancedQ * enhancedQ);
-    
-    if (topology === 'lowPass') {
-      // Low-pass T: Series L, Shunt C, Series L
-      
-      // First series inductor (source side)
-      const xl1 = enhancedQ * Math.sqrt(source.r * rm);
-      const l1 = xl1 / omega;
-      components.push({
-        type: 'inductor',
-        value: l1,
-        reactance: xl1,
-        position: 'Source-side series L (T-network)'
-      });
-      
-      // Shunt capacitor
-      const xc = rm / enhancedQ;
-      const c = 1 / (omega * xc);
-      components.push({
-        type: 'capacitor',
-        value: c,
-        reactance: -xc,
-        position: 'Shunt C (T-network)'
-      });
-      
-      // Second series inductor (load side)
-      const xl2 = enhancedQ * Math.sqrt(load.r * rm);
-      const l2 = xl2 / omega;
-      components.push({
-        type: 'inductor',
-        value: l2,
-        reactance: xl2,
-        position: 'Load-side series L (T-network)'
-      });
-    } else {
-      // High-pass T: Series C, Shunt L, Series C
-      
-      // First series capacitor (source side)
-      const xc1 = 1 / (enhancedQ * Math.sqrt(source.r / rm));
-      const c1 = 1 / (omega * xc1);
-      components.push({
-        type: 'capacitor',
-        value: c1,
-        reactance: -xc1,
-        position: 'Source-side series C (T-network)'
-      });
-      
-      // Shunt inductor
-      const xl = rm * enhancedQ;
-      const l = xl / omega;
-      components.push({
-        type: 'inductor',
-        value: l,
-        reactance: xl,
-        position: 'Shunt L (T-network)'
-      });
-      
-      // Second series capacitor (load side)
-      const xc2 = 1 / (enhancedQ * Math.sqrt(load.r / rm));
-      const c2 = 1 / (omega * xc2);
-      components.push({
-        type: 'capacitor',
-        value: c2,
-        reactance: -xc2,
-        position: 'Load-side series C (T-network)'
-      });
+    // Check if matching is possible
+    if (rl > rp) {
+      throw new Error("Load Resistance is larger than source resistance. Cannot use LCLP match");
     }
+    
+    // Calculate Q and component values
+    const actualQ = Math.sqrt(rp / rl - 1);
+    const cp = actualQ / (rp * omega);
+    const c = cp - c1;
+    const ls = actualQ * rl / omega;
+    const l = ls - l1;
+    
+    // Add components to result
+    components.push({
+      type: 'inductor',
+      value: l,
+      reactance: omega * l,
+      position: 'Series inductor (LCLP network)'
+    });
+    
+    components.push({
+      type: 'capacitor',
+      value: c,
+      reactance: -1 / (omega * c),
+      position: 'Shunt capacitor (LCLP network)'
+    });
+    
+    return components;
+  };
+  
+  // CLHP Network (CL High-Pass) based on the original CLHP() function
+  const calculateCLHPNetwork = (source: { r: number, x: number }, load: { r: number, x: number }, frequency: number, q: number) => {
+    const components: Component[] = [];
+    const omega = 2 * Math.PI * frequency;
+    
+    // Swap source and load (as per original CLHP function)
+    const rs = load.r;
+    const xs = load.x;
+    const rl = source.r;
+    const xl = source.x;
+    
+    // Calculate key parameters
+    const ql = -xl / rl;
+    const qs = xs / rs;
+    const c1 = -1 / (omega * xl);
+    const l1 = (1 + qs * qs) * xs / (omega * qs * qs);
+    const rp = (1 + qs * qs) * rs;
+    
+    // Use rs as r_source
+    const r_source = rl;
+    
+    // Check if matching is possible
+    if (r_source > rp) {
+      throw new Error("Load resistance is larger than source resistance. Cannot use CLHP match");
+    }
+    
+    // Calculate Q based on impedance ratio
+    const actualQ = Math.sqrt(rp / r_source - 1);
+    
+    // Calculate primary component values
+    const lp = rp / (omega * actualQ);
+    const cs = 1 / (actualQ * omega * r_source);
+    
+    // Adjust for reactances
+    let c = 0;
+    let l = 0;
+    
+    if (xl === 0) {
+      c = cs;
+    } else {
+      if (c1 === cs) {
+        c = Number.POSITIVE_INFINITY;
+      } else {
+        c = c1 * cs / (c1 - cs);
+      }
+    }
+    
+    if (xs === 0) {
+      l = lp;
+    } else {
+      if (l1 === lp) {
+        l = Number.POSITIVE_INFINITY;
+      } else {
+        l = lp * l1 / (l1 - lp);
+      }
+    }
+    
+    // Add components to result
+    components.push({
+      type: 'capacitor',
+      value: c,
+      reactance: -1 / (omega * c),
+      position: 'Series capacitor (CLHP network)'
+    });
+    
+    components.push({
+      type: 'inductor',
+      value: l,
+      reactance: omega * l,
+      position: 'Shunt inductor (CLHP network)'
+    });
     
     return components;
   };
@@ -768,6 +1386,35 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
     return value.toFixed(3) + ' ' + prefixes[prefixIndex] + unit;
   };
 
+  // Get circuit diagram based on network type
+  const getCircuitDiagram = () => {
+    if (networkType === 'lNetwork') {
+      if (networkTopology === 'lowPass') {
+        if (sourceImpedance.resistance < loadImpedance.resistance) {
+          return "Source ⟡—[ L ]—⟡—| |—⟡ Load"; // LCLP configuration
+        } else {
+          return "Source ⟡—| |—⟡—[ L ]—⟡ Load"; // CLLP configuration
+        }
+      } else { // highPass
+        if (sourceImpedance.resistance < loadImpedance.resistance) {
+          return "Source ⟡—|⊥|—⟡—( L )—⟡ Load"; // LCHP configuration
+        } else {
+          return "Source ⟡—( L )—⟡—|⊥|—⟡ Load"; // CLHP configuration
+        }
+      }
+    } else if (networkType === 'piNetwork') {
+      return networkTopology === 'lowPass' 
+        ? "Source ⟡—| |—⟡—[ L ]—⟡—| |—⟡ Load"
+        : "Source ⟡—( L )—⟡—|⊥|—⟡—( L )—⟡ Load";
+    } else if (networkType === 'tNetwork') {
+      return networkTopology === 'lowPass'
+        ? "Source ⟡—[ L ]—⟡—| |—⟡—[ L ]—⟡ Load"
+        : "Source ⟡—|⊥|—⟡—( L )—⟡—|⊥|—⟡ Load";
+    } else {
+      return "Custom Network Configuration";
+    }
+  };
+
   // Update source impedance
   const updateSourceImpedance = (field: 'resistance' | 'reactance', value: number) => {
     setSourceImpedance({
@@ -910,17 +1557,19 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
             </select>
           </div>
           
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Topology</label>
-            <select
-              value={networkTopology}
-              onChange={(e) => setNetworkTopology(e.target.value as NetworkTopology)}
-              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="lowPass">Low Pass (Better for lower frequencies)</option>
-              <option value="highPass">High Pass (Better for higher frequencies)</option>
-            </select>
-          </div>
+          {(networkType === 'lNetwork' || networkType === 'piNetwork' || networkType === 'tNetwork') && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Topology</label>
+              <select
+                value={networkTopology}
+                onChange={(e) => setNetworkTopology(e.target.value as NetworkTopology)}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="lowPass">Low Pass (Better for lower frequencies)</option>
+                <option value="highPass">High Pass (Better for higher frequencies)</option>
+              </select>
+            </div>
+          )}
           
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Match At</label>
@@ -1028,67 +1677,9 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
                   </table>
                 </div>
                 
-                {/* Dynamic Circuit diagram visualization based on actual components */}
+                {/* Dynamic Circuit diagram visualization */}
                 <div className="mt-4 p-3 bg-gray-50 rounded-md text-center font-mono text-sm">
-                  {networkType === 'lNetwork' && matchingResults?.components?.length === 2 && (
-                    <div>
-                      {(() => {
-                        const comp1 = matchingResults.components[0];
-                        const comp2 = matchingResults.components[1];
-                        const isFirstSeries = comp1.position.toLowerCase().includes('series');
-                        const isSecondSeries = comp2.position.toLowerCase().includes('series');
-                        
-                        if (isFirstSeries && !isSecondSeries) {
-                          // Series first, shunt second
-                          return comp1.type === 'inductor' ? (
-                            comp2.type === 'capacitor' ? (
-                              <p>Source ⟡—[ L ]—⟡—| |—⟡ Load</p>
-                            ) : (
-                              <p>Source ⟡—[ L ]—⟡—( L )—⟡ Load</p>
-                            )
-                          ) : (
-                            comp2.type === 'capacitor' ? (
-                              <p>Source ⟡—|⊥|—⟡—| |—⟡ Load</p>
-                            ) : (
-                              <p>Source ⟡—|⊥|—⟡—( L )—⟡ Load</p>
-                            )
-                          );
-                        } else if (!isFirstSeries && isSecondSeries) {
-                          // Shunt first, series second
-                          return comp1.type === 'capacitor' ? (
-                            comp2.type === 'inductor' ? (
-                              <p>Source ⟡—| |—⟡—[ L ]—⟡ Load</p>
-                            ) : (
-                              <p>Source ⟡—| |—⟡—|⊥|—⟡ Load</p>
-                            )
-                          ) : (
-                            comp2.type === 'inductor' ? (
-                              <p>Source ⟡—( L )—⟡—[ L ]—⟡ Load</p>
-                            ) : (
-                              <p>Source ⟡—( L )—⟡—|⊥|—⟡ Load</p>
-                            )
-                          );
-                        } else {
-                          // Fallback for other configurations
-                          return <p>Custom L-Network Configuration</p>;
-                        }
-                      })()}
-                    </div>
-                  )}
-                  {networkType === 'piNetwork' && (
-                    networkTopology === 'lowPass' ? (
-                      <p>Source ⟡—| |—⟡—[ L ]—⟡—| |—⟡ Load</p>
-                    ) : (
-                      <p>Source ⟡—( L )—⟡—|⊥|—⟡—( L )—⟡ Load</p>
-                    )
-                  )}
-                  {networkType === 'tNetwork' && (
-                    networkTopology === 'lowPass' ? (
-                      <p>Source ⟡—[ L ]—⟡—| |—⟡—[ L ]—⟡ Load</p>
-                    ) : (
-                      <p>Source ⟡—|⊥|—⟡—( L )—⟡—|⊥|—⟡ Load</p>
-                    )
-                  )}
+                  <p>{getCircuitDiagram()}</p>
                   <p className="text-xs mt-1">
                     [ L ] = Series Inductor, |⊥| = Series Capacitor
                     <br/>
@@ -1183,7 +1774,7 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
           <div className="bg-blue-100 p-4 rounded-md border border-blue-300">
             <h4 className="font-medium mb-2 text-blue-700">Matching Network Selection Guide</h4>
             <ul className="list-disc pl-5 text-sm space-y-1 text-blue-800">
-              <li><strong>L-Network:</strong> Simplest option, can match any two resistive impedances, but limited bandwidth control</li>
+              <li><strong>L-Network:</strong> Simplest option, can match any two resistive impedances, but limited bandwidth control. Auto-selects between LCHP/CLHP/LCLP/CLLP configurations based on impedance ratio.</li>
               <li><strong>Pi-Network:</strong> Can match source and load while controlling bandwidth. Good for filtering unwanted harmonics</li>
               <li><strong>T-Network:</strong> Similar to Pi but with series elements. Can achieve very high Q for selective filtering</li>
               <li><strong>Low Pass:</strong> Attenuates high frequencies, useful when harmonics need filtering</li>
