@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
+import PsychrometricChart from './mvac/PsychrometricChart';
 import DuctStaticPressureCalculator from './mvac/DuctStaticPressureCalculator';
 import ChilledWaterPipeSizingCalculator from './mvac/ChilledWaterPipeSizingCalculator';
 import SteamPipeSizingCalculator from './mvac/SteamPipeSizingCalculator';
+import AHUSizingCalculator from './mvac/AHUSizingCalculator';
 // import CoolingLoadCalculator from './mvac/CoolingLoadCalculator';
 // import FanPowerCalculator from './mvac/FanPowerCalculator';
 // import AirDiffusionCalculator from './mvac/AirDiffusionCalculator';
@@ -32,12 +34,16 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
 
     // Otherwise show the selected calculator
     switch (calculatorType) {
+      case 'psyChart':
+        return <PsychrometricChart onShowTutorial={() => setShowTutorial(true)} />;
       case 'ductPressure':
         return <DuctStaticPressureCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'chillerPipe':
         return <ChilledWaterPipeSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'steamPipe':
         return <SteamPipeSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'ahu':
+        return <AHUSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'coolingLoad':
         return <CoolingLoadCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'fanPower':
@@ -77,6 +83,26 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">Select Calculator Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Psy Chart */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'psyChart'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('psyChart')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'psyChart' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Psychrometric Chart</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'psyChart' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Psychrometric chart
+              </p>
+            </div>
+          </button>
+
           {/* Duct Static Pressure */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
@@ -134,6 +160,26 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
               <h3 className="font-semibold text-sm sm:text-base">Steam Pipe</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'steamPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Pipework sizing
+              </p>
+            </div>
+          </button>
+
+          {/* AHU */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'ahu'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('ahu')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'ahu' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Air Handling Unit</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'ahu' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> AHU sizing
               </p>
             </div>
           </button>
