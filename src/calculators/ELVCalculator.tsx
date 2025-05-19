@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
-import TVSignalStrengthCalculator from './broadcast/TVSignalStrengthCalculator';
-import OpticalFiberCalculator from './broadcast/OpticalFiberCalculator';
-import ImpedanceMatchingCalculator from './broadcast/ImpedanceMatchingCalculator';
-import RFParameterConverter from './broadcast/RFParameterConverter';
-import MicrostripCalculator from './broadcast/MicrostripCalculator';
+import TVSignalStrengthCalculator from './elv/TVSignalStrengthCalculator';
+import OpticalFiberCalculator from './elv/OpticalFiberCalculator';
+import ImpedanceMatchingCalculator from './elv/ImpedanceMatchingCalculator';
+import RFParameterConverter from './elv/RFParameterConverter';
+import MicrostripCalculator from './elv/MicrostripCalculator';
+import CCTVSystemCalculator from './elv/CCTVSystemCalculator';
+import PublicAddressCalculator from './elv/PublicAddressCalculator';
 // Import additional calculators as they are developed
 
 // Define props type for the component
@@ -37,6 +39,10 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <RFParameterConverter onShowTutorial={() => setShowTutorial(true)} />;
       case 'microStrip':
         return <MicrostripCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'cctv':
+        return <CCTVSystemCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'pa':
+        return <PublicAddressCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -55,7 +61,7 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
 
       {/* Title specific to this discipline */}
       <h1 className="text-2xl font-bold text-center mb-6 text-blue-700">
-        Broadcast Reception Installation
+        Extra Low Voltage Installation
       </h1>
 
       {/* Calculator Type Selection - UPDATED STYLING to match ElectricalCalculator.tsx */}
@@ -159,6 +165,46 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <h3 className="font-semibold text-sm sm:text-base">Microstrip Line</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'microStrip' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate microstrip impedance and dimensions
+              </p>
+            </div>
+          </button>
+
+          {/* CCTV */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'cctv'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('cctv')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'cctv' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">CCTV Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'cctv' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate CCTV storage, bandwidth, coverage and power
+              </p>
+            </div>
+          </button>
+
+          {/* PA */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'pa'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('pa')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'pa' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Public Address Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'pa' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate PA coverage, SPL, power, cable loss, reverbation time
               </p>
             </div>
           </button>

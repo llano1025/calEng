@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { engineeringSystemsData } from './data/systems'; // Import data
 import DisciplineSelection from './components/DisciplineSelection'; // Import selection component
 import GenericCalculator from './calculators/GenericCalculator'; // Import generic calc
-import BroadcastReceptionCalculator from './calculators/BroadcastCalculator'; // Import specific calc
+import BroadcastReceptionCalculator from './calculators/ELVCalculator'; // Import specific calc
 import ElectricalCalculator from './calculators/ElectricalCalculator'; // Import electrical calc
 import MVACalculator from './calculators/MVACalculator'; // Import MVAC calc
 import { Icons } from './components/Icons'; // Import Icons if needed directly in App (unlikely now)

@@ -111,7 +111,7 @@ export const engineeringSystemsData: EngineeringSystemsData = {
       formulas: {}
     },
     'broadcast': {
-      name: 'Broadcast Reception',
+      name: 'Extra Low Voltage',
       icon: <Icons.BroadcastTower /> as React.ReactElement,
       // No formulas needed here; the BroadcastCalculator component handles its own logic.
       formulas: {}
