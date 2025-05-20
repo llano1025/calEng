@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Icons } from '../../components/Icons';
 
 // Define props type for the component
@@ -122,14 +122,17 @@ interface SpeakerCoverageCalculatorProps {
   onShowTutorial?: () => void;
 }
 
+// Speaker types with default dispersion angles
 const SPEAKER_TYPES_COVERAGE = [
   { value: 'ceiling', label: 'Ceiling Speaker', defaultDispersion: 90 },
-  { value: 'horn', label: 'Horn Speaker', defaultDispersion: 60 },
+  { value: 'horn', label: 'Horn Speaker', defaultDispersion: 60, isWallMounted: true },
   { value: 'column', label: 'Column Speaker', defaultDispersion: 120 },
   { value: 'pendant', label: 'Pendant Speaker', defaultDispersion: 180 },
+  { value: 'wall', label: 'Wall-Mount Speaker', defaultDispersion: 90, isWallMounted: true },
   { value: 'custom', label: 'Custom Speaker', defaultDispersion: 90 }
 ];
 
+// Mounting environments with coverage factors
 const MOUNTING_ENVIRONMENTS = [
   { value: 'standard', label: 'Standard (Indoor)', factor: 1.0 },
   { value: 'highCeiling', label: 'High Ceiling (10m+)', factor: 0.9 },
@@ -138,6 +141,7 @@ const MOUNTING_ENVIRONMENTS = [
   { value: 'reverberant', label: 'Highly Reverberant Space', factor: 0.75 }
 ];
 
+// Standard ceiling heights with option for custom input
 const CEILING_HEIGHTS = [
   { value: 2.4, label: '2.4m (8ft) - Standard Office' },
   { value: 3, label: '3.0m (10ft) - Commercial Space' },
@@ -148,281 +152,1265 @@ const CEILING_HEIGHTS = [
   { value: 12, label: '12.0m (40ft) - Terminal/Hangar' }
 ];
 
-const SpeakerCoverageCalculator: React.FC<SpeakerCoverageCalculatorProps> = ({ onShowTutorial }) => {
-  const [roomLength, setRoomLength] = useState<number>(20);
-  const [roomWidth, setRoomWidth] = useState<number>(15);
-  const [ceilingHeight, setCeilingHeight] = useState<string | number>(3);
+// Standard speaker layout patterns with descriptions
+const LAYOUT_PATTERNS = [
+  { 
+    value: 'noOverlap',
+    label: 'No Overlap (2r)',
+    description: 'Spacing = 2r. Coverage areas meet but don\'t overlap. Used for low-cost background music.'
+  },
+  { 
+    value: 'minimumOverlap',
+    label: 'Minimum Overlap (r√2/r√3)',
+    description: 'Spacing = r√2 (square) or r√3 (hex). Just enough overlap to avoid gaps in coverage.'
+  },
+  { 
+    value: 'edgeToCenter',
+    label: 'Edge-to-Center (r)',
+    description: 'Spacing = r. Highest density for best performance in poor acoustics or high noise.'
+  },
+  { 
+    value: 'linear', 
+    label: 'Linear Pattern', 
+    description: 'Speakers arranged in lines along the room'
+  },
+  { 
+    value: 'perimeter', 
+    label: 'Perimeter Pattern', 
+    description: 'Speakers placed around the edges of the room'
+  },
+];
+
+// Wall options for wall-mounted speakers
+const WALL_POSITIONS = [
+  { value: 'north', label: 'North Wall (Top)', description: 'Top wall in the layout' },
+  { value: 'east', label: 'East Wall (Right)', description: 'Right wall in the layout' },
+  { value: 'south', label: 'South Wall (Bottom)', description: 'Bottom wall in the layout' },
+  { value: 'west', label: 'West Wall (Left)', description: 'Left wall in the layout' }
+];
+
+// Grid pattern options
+const GRID_PATTERNS = [
+  { value: 'square', label: 'Square Grid', description: 'Speakers arranged in a square pattern' },
+  { value: 'hexagonal', label: 'Hexagonal Grid', description: 'Speakers arranged in a hexagonal pattern' }
+];
+
+interface SpeakerPosition {
+  x: number;
+  y: number;
+  z?: number; // For 3D positioning (height)
+  tiltAngle?: number; // For wall-mounted speakers
+  wallPosition?: string; // For wall-mounted speakers
   
+  // New properties for wall-mounted speaker projection
+  projectionCenterDist?: number; // Distance from wall to projection center
+  projectedRadiusX?: number; // Semi-axis in X direction (horizontal)
+  projectedRadiusY?: number; // Semi-axis in Y direction (vertical)
+}
+
+interface GridConfig {
+  rows: number;
+  cols: number;
+  spacingX: number;
+  spacingY: number;
+  pattern: string; // 'square' or 'hexagonal'
+}
+
+interface SpeakerLayoutVisualizerProps {
+  roomLength: number;
+  roomWidth: number;
+  roomHeight: number;
+  speakerPositions: SpeakerPosition[];
+  coverageRadius: number; // actual radius in meters (for ceiling speakers)
+  mountingType: string; // 'ceiling' or 'wall'
+  canvasWidth?: number;
+  canvasHeight?: number;
+  gridPattern?: string;
+}
+
+// Visualizer component for showing speaker layout
+const SpeakerLayoutVisualizer: React.FC<SpeakerLayoutVisualizerProps> = ({
+  roomLength,
+  roomWidth,
+  roomHeight,
+  speakerPositions,
+  coverageRadius,
+  mountingType,
+  canvasWidth = 400,
+  gridPattern = 'hexagonal',
+}) => {
+  if (roomLength <= 0 || roomWidth <= 0) {
+    return <p className="text-sm text-gray-500">Room dimensions must be positive.</p>;
+  }
+
+  // Maintain aspect ratio for the canvas
+  const aspectRatio = roomWidth / roomLength;
+  const actualCanvasHeight = canvasWidth * aspectRatio;
+
+  // Scale everything to fit the canvas
+  const scaleFactor = Math.min(canvasWidth / roomLength, actualCanvasHeight / roomWidth);
+  const scaledRadius = coverageRadius * scaleFactor;
+
+  return (
+    <div className="bg-gray-200 p-2 rounded flex justify-center items-center" style={{ minHeight: actualCanvasHeight + 20 }}>
+      <svg width={canvasWidth} height={actualCanvasHeight} viewBox={`0 0 ${canvasWidth} ${actualCanvasHeight}`} className="border border-gray-400 bg-white">
+        {/* Room Outline */}
+        <rect x="0" y="0" width={canvasWidth} height={actualCanvasHeight} fill="none" stroke="#A0A0A0" strokeWidth="1" />
+
+        {/* Grid lines for reference (light gray) */}
+        {gridPattern === 'square' && Array.from({ length: 10 }).map((_, i) => (
+          <React.Fragment key={`grid-${i}`}>
+            <line 
+              x1={0} 
+              y1={i * actualCanvasHeight / 10} 
+              x2={canvasWidth} 
+              y2={i * actualCanvasHeight / 10} 
+              stroke="#e5e5e5" 
+              strokeWidth="0.5" 
+            />
+            <line 
+              x1={i * canvasWidth / 10} 
+              y1={0} 
+              x2={i * canvasWidth / 10} 
+              y2={actualCanvasHeight} 
+              stroke="#e5e5e5" 
+              strokeWidth="0.5" 
+            />
+          </React.Fragment>
+        ))}
+
+        {/* Draw speaker coverage */}
+        {speakerPositions.map((pos, index) => {
+          // Scale coordinates properly for speaker position
+          const sx = pos.x * scaleFactor;
+          const sy = pos.y * scaleFactor;
+          
+          // For wall-mounted speakers, draw differently with oval coverage
+          if (mountingType === 'wall' && pos.wallPosition && pos.projectionCenterDist !== undefined) {
+            // Calculate center of the ellipse (at the projection center)
+            let ellipseCX = sx;
+            let ellipseCY = sy;
+            
+            // Scale the projection parameters
+            const scaledProjectionCenterDist = pos.projectionCenterDist * scaleFactor;
+            const scaledProjectedRadiusX = (pos.projectedRadiusX || coverageRadius) * scaleFactor;
+            const scaledProjectedRadiusY = (pos.projectedRadiusY || coverageRadius) * scaleFactor;
+            
+            // Calculate the center of the coverage ellipse based on wall position
+            switch(pos.wallPosition) {
+              case 'north': // Top wall
+                ellipseCY = sy + scaledProjectionCenterDist; // Projection extends downward
+                break;
+              case 'east': // Right wall
+                ellipseCX = sx - scaledProjectionCenterDist; // Projection extends leftward
+                break;
+              case 'south': // Bottom wall
+                ellipseCY = sy - scaledProjectionCenterDist; // Projection extends upward
+                break;
+              case 'west': // Left wall
+                ellipseCX = sx + scaledProjectionCenterDist; // Projection extends rightward
+                break;
+            }
+            
+            return (
+              <g key={index}>
+                {/* Oval coverage area */}
+                {isFinite(scaledProjectedRadiusX) && scaledProjectedRadiusX > 0 && 
+                 isFinite(scaledProjectedRadiusY) && scaledProjectedRadiusY > 0 && (
+                  <ellipse
+                    cx={ellipseCX}
+                    cy={ellipseCY}
+                    rx={scaledProjectedRadiusX}
+                    ry={scaledProjectedRadiusY}
+                    fill="rgba(59, 130, 246, 0.15)" // Lighter blue for wall speaker coverage
+                    stroke="rgba(37, 99, 235, 0.3)"
+                    strokeWidth="1"
+                    strokeDasharray="4,2" // Dashed line to indicate projection
+                  />
+                )}
+                
+                {/* Speaker direction line (from speaker location to ellipse center) */}
+                <path
+                  d={`M ${sx} ${sy} L ${ellipseCX} ${ellipseCY}`}
+                  stroke="rgb(37, 99, 235)"
+                  strokeWidth="2"
+                />
+                
+                {/* Speaker marker at wall position */}
+                <circle
+                  cx={sx}
+                  cy={sy}
+                  r="4" // Wall speaker marker
+                  fill="rgb(37, 99, 235)"
+                  stroke="#fff"
+                  strokeWidth="1"
+                />
+              </g>
+            );
+          }
+          
+          // Default ceiling-mounted speaker with circular coverage
+          return (
+            <g key={index}>
+              {isFinite(scaledRadius) && scaledRadius > 0 && (
+                <circle
+                  cx={sx}
+                  cy={sy}
+                  r={scaledRadius}
+                  fill="rgba(59, 130, 246, 0.2)" // blue-500 with opacity
+                  stroke="rgba(37, 99, 235, 0.4)" // blue-600 with opacity
+                  strokeWidth="1"
+                />
+              )}
+              <circle
+                cx={sx}
+                cy={sy}
+                r="3" // Center marker
+                fill="rgb(37, 99, 235)" // blue-600
+              />
+            </g>
+          );
+        })}
+        
+        {/* Scale indicator */}
+        <g transform={`translate(10, ${actualCanvasHeight - 20})`}>
+          <line x1="0" y1="0" x2={scaleFactor * 5} y2="0" stroke="#666" strokeWidth="2" />
+          <text x={scaleFactor * 2.5} y="-5" textAnchor="middle" fontSize="10" fill="#666">5m</text>
+        </g>
+      </svg>
+    </div>
+  );
+};
+
+// Main calculator component
+const SpeakerCoverageCalculator: React.FC<SpeakerCoverageCalculatorProps> = ({ onShowTutorial }) => {
+  // Room dimensions
+  const [roomLength, setRoomLength] = useState<number>(10);
+  const [roomWidth, setRoomWidth] = useState<number>(5);
+  
+  // Ceiling/room height handling
+  const [ceilingHeight, setCeilingHeight] = useState<number | string>(2.4);
+  const [customCeilingHeightValue, setCustomCeilingHeightValue] = useState<number>(3);
+  
+  // Speaker configuration
   const [speakerType, setSpeakerType] = useState<string>('ceiling');
   const [dispersionAngle, setDispersionAngle] = useState<number>(90);
   const [mountingHeight, setMountingHeight] = useState<number>(2.4);
   const [listeningHeight, setListeningHeight] = useState<number>(1.2);
   const [mountingEnvironment, setMountingEnvironment] = useState<string>('standard');
+
+  // Wall-mount specific settings
+  const [mountingType, setMountingType] = useState<string>('ceiling');
+  const [tiltAngle, setTiltAngle] = useState<number>(45);
+  const [wallPosition, setWallPosition] = useState<string>('north');
   
+  // Grid pattern selection - default to hexagonal
+  const [gridPattern, setGridPattern] = useState<string>('hexagonal');
+
+  // Calculation results
   const [coverageRadius, setCoverageRadius] = useState<number>(0);
   const [coverageArea, setCoverageArea] = useState<number>(0);
   const [recommendedSpeakers, setRecommendedSpeakers] = useState<number>(0);
   const [recommendedSpacing, setRecommendedSpacing] = useState<number>(0);
   const [coverageGapWarning, setCoverageGapWarning] = useState<boolean>(false);
   const [overlapWarning, setOverlapWarning] = useState<boolean>(false);
-  const [layoutPattern, setLayoutPattern] = useState<string>('grid');
-  
+  const [layoutPattern, setLayoutPattern] = useState<string>('noOverlap'); // Default to no overlap
+
+  // Generated speaker layout
+  const [speakerPositions, setSpeakerPositions] = useState<SpeakerPosition[]>([]);
+  const [gridConfig, setGridConfig] = useState<GridConfig>({ 
+    rows: 0, 
+    cols: 0, 
+    spacingX: 0, 
+    spacingY: 0,
+    pattern: 'hexagonal'
+  });
+
+  // Update speaker type properties and mounting type
   useEffect(() => {
     const selectedSpeaker = SPEAKER_TYPES_COVERAGE.find(s => s.value === speakerType);
-    if (selectedSpeaker) {
+    if (selectedSpeaker && !isNaN(selectedSpeaker.defaultDispersion)) {
       setDispersionAngle(selectedSpeaker.defaultDispersion);
     }
+    
+    // Set mounting type based on speaker type (horn and wall are wall-mounted)
+    if (selectedSpeaker?.isWallMounted) {
+      setMountingType('wall');
+    } else {
+      setMountingType('ceiling');
+    }
   }, [speakerType]);
-  
+
+  // Calculate effective ceiling height based on selection
+  const effectiveCeilingHeight = useMemo(() => {
+    return ceilingHeight === 'custom' ? customCeilingHeightValue : Number(ceilingHeight);
+  }, [ceilingHeight, customCeilingHeightValue]);
+
+  // Update mounting height when ceiling height changes
   useEffect(() => {
-    if (mountingHeight <= listeningHeight || roomLength <=0 || roomWidth <=0 || dispersionAngle <=0) {
+    if (effectiveCeilingHeight < mountingHeight) {
+      setMountingHeight(effectiveCeilingHeight);
+    }
+  }, [effectiveCeilingHeight, mountingHeight]);
+
+  // Main calculation effect
+  useEffect(() => {
+    // Validate inputs
+    if (mountingHeight <= listeningHeight || roomLength <= 0 || roomWidth <= 0 || dispersionAngle <= 0 || !isFinite(dispersionAngle)) {
       setCoverageRadius(0);
       setCoverageArea(0);
       setRecommendedSpeakers(0);
       setRecommendedSpacing(0);
-      setCoverageGapWarning(false);
-      setOverlapWarning(true); 
+      setSpeakerPositions([]);
+      setGridConfig({ rows: 0, cols: 0, spacingX: 0, spacingY: 0, pattern: gridPattern });
+      setCoverageGapWarning(roomLength > 0 && roomWidth > 0);
+      setOverlapWarning(false);
       return;
     }
-    
+
     const envFactor = MOUNTING_ENVIRONMENTS.find(env => env.value === mountingEnvironment)?.factor || 1.0;
     const effectiveHeight = mountingHeight - listeningHeight;
-    
-    const angleInRadians = (dispersionAngle / 2) * (Math.PI / 180);
-    let calculatedRadius: number;
 
-    if (angleInRadians <= 0) {
-        calculatedRadius = 0;
-    } else if (angleInRadians >= Math.PI / 2) { // tan(PI/2) is Infinity
-        calculatedRadius = Infinity;
-    } else {
-        calculatedRadius = effectiveHeight * Math.tan(angleInRadians);
-    }
-    
-    const adjustedRadius = calculatedRadius * envFactor;
-    const calculatedArea = Math.PI * Math.pow(adjustedRadius, 2);
-    
-    setCoverageRadius(adjustedRadius);
-    setCoverageArea(calculatedArea);
-    
-    const roomArea = roomLength * roomWidth;
-
-    if (calculatedArea === 0 || !isFinite(calculatedArea) || roomArea <= 0) {
-        setRecommendedSpeakers(calculatedArea === 0 && roomArea > 0 ? Infinity : 0);
+    if (effectiveHeight <= 0) {
+        setCoverageRadius(0);
+        setCoverageArea(0);
+        setRecommendedSpeakers(0);
         setRecommendedSpacing(0);
-        setCoverageGapWarning(calculatedArea === 0 && roomArea > 0); 
-        setOverlapWarning(!isFinite(calculatedArea)); 
+        setSpeakerPositions([]);
+        setGridConfig({ rows: 0, cols: 0, spacingX: 0, spacingY: 0, pattern: gridPattern });
+        setCoverageGapWarning(true);
+        setOverlapWarning(false);
         return;
     }
+
+    // Calculate coverage radius and projection parameters for wall or ceiling speakers
+    let calculatedRadius: number;
+    let projectionCenterDist: number = 0;
+    let projectedRadiusX: number = 0;
+    let projectedRadiusY: number = 0;
     
-    const speakers = Math.ceil(roomArea / calculatedArea);
-    setRecommendedSpeakers(speakers);
-    
-    let idealSpacing: number;
-    
-    if (speakers === 0 || !isFinite(speakers)) { 
-        idealSpacing = 0;
-    } else if (layoutPattern === 'grid') {
-      const colsForSpacing = Math.ceil(Math.sqrt(speakers * roomLength / roomWidth));
-      const rowsForSpacing = Math.ceil(Math.sqrt(speakers * roomWidth / roomLength));
+    if (mountingType === 'ceiling' || mountingType === 'pendant') {
+      // Regular ceiling speaker calculation
+      const angleInRadians = (dispersionAngle / 2) * (Math.PI / 180);
       
-      const gridSpacingX = colsForSpacing > 0 ? roomLength / colsForSpacing : roomLength;
-      const gridSpacingY = rowsForSpacing > 0 ? roomWidth / rowsForSpacing : roomWidth;
-      idealSpacing = Math.min(gridSpacingX, gridSpacingY);
-    } else if (layoutPattern === 'perimeter') {
-      const perimeter = 2 * (roomLength + roomWidth);
-      idealSpacing = speakers > 0 ? perimeter / speakers : perimeter;
-    } else { // linear
-      const divisor = speakers > 1 ? (speakers / 2) : 1; // Assume at least one "row" or line of speakers
-      idealSpacing = Math.max(roomLength, roomWidth) / divisor;
+      if (angleInRadians <= 0) {
+        calculatedRadius = 0;
+      } else if (angleInRadians >= Math.PI / 2) {
+        calculatedRadius = Infinity;
+      } else {
+        calculatedRadius = effectiveHeight * Math.tan(angleInRadians);
+      }
+    } else if (mountingType === 'wall') {
+      // Improved wall speaker calculation that accounts for dispersion angle
+      const dispersionRadians = (dispersionAngle / 2) * (Math.PI / 180);
+      const tiltRadians = (tiltAngle * Math.PI) / 180;
+      
+      // Ensure tilt is valid and positive
+      if (tiltRadians <= 0 || tiltRadians >= Math.PI/2) {
+        calculatedRadius = 0;
+      } else {
+        // STEP 1: Calculate distance to where speaker axis intersects listening plane
+        projectionCenterDist = effectiveHeight / Math.tan(tiltRadians);
+        
+        // STEP 2: Calculate distance along the speaker's tilted axis to the listening plane
+        // This is used to find the proper cross-section of the cone
+        const distAlongAxis = effectiveHeight / Math.sin(tiltRadians);
+        
+        // STEP 3: Calculate semi-minor axis (half-width of the coverage area)
+        // This uses the standard cone projection geometry
+        const semiMinorAxis = distAlongAxis * Math.tan(dispersionRadians);
+        
+        // STEP 4: Calculate semi-major axis (half-length of the coverage area)
+        // For a tilted cone projection, we can use the following approach:
+        // Calculate where the top and bottom edges of the cone intersect the listening plane
+        
+        // Make sure tilt angle is larger than dispersion angle to avoid negative tangent
+        // This isn't physically realistic anyway (speaker would be pointing upward)
+        if (tiltRadians > dispersionRadians) {
+          // Angle from horizontal to top edge of cone (shallower angle)
+          const topEdgeAngle = Math.max(0, tiltRadians - dispersionRadians);
+          
+          // Angle from horizontal to bottom edge of cone (steeper angle)
+          const bottomEdgeAngle = Math.min(Math.PI/2, tiltRadians + dispersionRadians);
+          
+          // Distance from wall to furthest coverage point
+          const farDistance = effectiveHeight / Math.tan(topEdgeAngle);
+          
+          // Distance from wall to nearest coverage point
+          const nearDistance = effectiveHeight / Math.tan(bottomEdgeAngle);
+          
+          // Semi-major axis is half the distance between furthest and nearest points
+          const semiMajorAxis = (farDistance - nearDistance) / 2;
+          
+          // For wallPosition 'north' or 'south', X is parallel to wall and Y is perpendicular
+          // For wallPosition 'east' or 'west', Y is parallel to wall and X is perpendicular
+          if (wallPosition === 'north' || wallPosition === 'south') {
+            projectedRadiusX = semiMinorAxis; // Width (parallel to wall)
+            projectedRadiusY = semiMajorAxis; // Depth (perpendicular to wall)
+          } else {
+            projectedRadiusX = semiMajorAxis; // Depth (perpendicular to wall)
+            projectedRadiusY = semiMinorAxis; // Width (parallel to wall)
+          }
+          
+          // Use an average radius for general calculations
+          calculatedRadius = (semiMinorAxis + semiMajorAxis) / 2;
+        } else {
+          // Fallback for invalid angles
+          calculatedRadius = effectiveHeight * Math.tan(dispersionRadians);
+          projectedRadiusX = calculatedRadius;
+          projectedRadiusY = calculatedRadius;
+        }
+      }
+    } else {
+      calculatedRadius = effectiveHeight * Math.tan((dispersionAngle / 2) * (Math.PI / 180));
+    }
+
+    // Apply environment factor to all radius calculations
+    const adjustedRadius = calculatedRadius * envFactor;
+    const adjustedProjectionCenterDist = projectionCenterDist * envFactor;
+    const adjustedProjectedRadiusX = projectedRadiusX * envFactor;
+    const adjustedProjectedRadiusY = projectedRadiusY * envFactor;
+    
+    // Calculate coverage area based on projection type
+    let calculatedArea: number;
+    if (mountingType === 'wall') {
+      // For wall speakers, use the elliptical area formula: π * a * b
+      calculatedArea = Math.PI * adjustedProjectedRadiusX * adjustedProjectedRadiusY;
+    } else {
+      // For ceiling speakers, use the circular area formula: π * r²
+      calculatedArea = Math.PI * Math.pow(adjustedRadius, 2);
+    }
+
+    setCoverageRadius(adjustedRadius);
+    setCoverageArea(calculatedArea);
+
+    const roomArea = roomLength * roomWidth;
+    let currentSpeakers = 0;
+
+    if (calculatedArea === 0 || !isFinite(calculatedArea) || roomArea <= 0) {
+      currentSpeakers = (calculatedArea === 0 && roomArea > 0) ? Infinity : 0;
+      setRecommendedSpacing(0);
+      setCoverageGapWarning(calculatedArea === 0 && roomArea > 0);
+      setOverlapWarning(!isFinite(calculatedArea) && calculatedArea !==0);
+      setSpeakerPositions([]);
+      setGridConfig({ rows: 0, cols: 0, spacingX: 0, spacingY: 0, pattern: gridPattern });
+      return;
+    }
+
+    // Adjust spacing based on layout pattern
+    let spacing: number = 0;
+    switch(layoutPattern) {
+      case 'noOverlap':
+        spacing = 2 * adjustedRadius; // No overlap = 2r
+        break;
+      case 'minimumOverlap':
+        spacing = gridPattern === 'hexagonal' ? 
+          adjustedRadius * Math.sqrt(3) : // For hexagonal grid
+          adjustedRadius * Math.sqrt(2);  // For square grid
+        break;
+      case 'edgeToCenter':
+        spacing = adjustedRadius; // Edge-to-center = r
+        break;
+      default:
+        spacing = 0; // Will be calculated based on room and speaker count
+    }
+    
+    // Estimate number of speakers based on fixed spacing pattern
+    if (spacing > 0) {
+      if (gridPattern === 'hexagonal') {
+        // Estimate for hexagonal pattern
+        const roomLengthUnits = Math.ceil(roomLength / spacing);
+        const roomWidthUnits = Math.ceil(roomWidth / (spacing * 0.866)); // 0.866 = sin(60°)
+        currentSpeakers = roomLengthUnits * roomWidthUnits;
+      } else {
+        // Square grid estimation
+        const rows = Math.ceil(roomWidth / spacing);
+        const cols = Math.ceil(roomLength / spacing);
+        currentSpeakers = rows * cols;
+      }
+    } else {
+      // For linear and perimeter layouts, estimate based on coverage area
+      currentSpeakers = Math.ceil(roomArea / calculatedArea);
+    }
+    
+    setRecommendedSpeakers(currentSpeakers);
+
+    // Generate speaker layout
+    let idealSpacing: number = spacing > 0 ? spacing : 0;
+    let tempSpeakerPositions: SpeakerPosition[] = [];
+    let tempGridConfig: GridConfig = { 
+      rows: 0, 
+      cols: 0, 
+      spacingX: 0, 
+      spacingY: 0,
+      pattern: gridPattern
+    };
+
+    if (currentSpeakers > 0 && isFinite(currentSpeakers)) {
+      // Generate speaker layout based on selected pattern
+      if (layoutPattern === 'noOverlap' || 
+          layoutPattern === 'minimumOverlap' || 
+          layoutPattern === 'edgeToCenter') {
+        
+        if (gridPattern === 'hexagonal') {
+          // Hexagonal grid layout with fixed spacing
+          const horizontalSpacing = spacing;
+          const verticalSpacing = spacing * 0.866; // sin(60°)
+          
+          const cols = Math.ceil(roomLength / horizontalSpacing) + 1;
+          const rows = Math.ceil(roomWidth / verticalSpacing) + 1;
+          
+          tempGridConfig = { 
+            rows, 
+            cols, 
+            spacingX: horizontalSpacing, 
+            spacingY: verticalSpacing,
+            pattern: 'hexagonal'
+          };
+          
+          // Place speakers in hexagonal pattern
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              // Offset every other row
+              const xOffset = r % 2 === 1 ? horizontalSpacing / 2 : 0;
+              const x = c * horizontalSpacing + xOffset;
+              const y = r * verticalSpacing;
+              
+              // Skip if outside room bounds
+              if (x >= 0 && x <= roomLength && y >= 0 && y <= roomWidth) {
+                if (mountingType === 'wall') {
+                  // Wall-mounted speakers
+                  let wallX = x;
+                  let wallY = y;
+                  
+                  // Adjust position based on wall
+                  switch(wallPosition) {
+                    case 'north': // Top wall
+                      wallY = 0;
+                      break;
+                    case 'east': // Right wall
+                      wallX = roomLength;
+                      break;
+                    case 'south': // Bottom wall
+                      wallY = roomWidth;
+                      break;
+                    case 'west': // Left wall
+                      wallX = 0;
+                      break;
+                  }
+                  
+                  tempSpeakerPositions.push({
+                    x: wallX,
+                    y: wallY,
+                    tiltAngle,
+                    wallPosition,
+                    // Add projection parameters
+                    projectionCenterDist: adjustedProjectionCenterDist,
+                    projectedRadiusX: adjustedProjectedRadiusX,
+                    projectedRadiusY: adjustedProjectedRadiusY
+                  });
+                } else {
+                  // Ceiling-mounted speakers
+                  tempSpeakerPositions.push({ x, y });
+                }
+              }
+            }
+          }
+        } else {
+          // Square grid layout with fixed spacing
+          const cols = Math.ceil(roomLength / spacing) + 1;
+          const rows = Math.ceil(roomWidth / spacing) + 1;
+          
+          tempGridConfig = { 
+            rows, 
+            cols, 
+            spacingX: spacing, 
+            spacingY: spacing,
+            pattern: 'square'
+          };
+          
+          // Place speakers in grid
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const x = c * spacing;
+              const y = r * spacing;
+              
+              // Skip if outside room bounds
+              if (x >= 0 && x <= roomLength && y >= 0 && y <= roomWidth) {
+                if (mountingType === 'wall') {
+                  // Wall-mounted speakers
+                  let wallX = x;
+                  let wallY = y;
+                  
+                  // Adjust position based on wall
+                  switch(wallPosition) {
+                    case 'north': // Top wall
+                      wallY = 0;
+                      break;
+                    case 'east': // Right wall
+                      wallX = roomLength;
+                      break;
+                    case 'south': // Bottom wall
+                      wallY = roomWidth;
+                      break;
+                    case 'west': // Left wall
+                      wallX = 0;
+                      break;
+                  }
+                  
+                  tempSpeakerPositions.push({
+                    x: wallX,
+                    y: wallY,
+                    tiltAngle,
+                    wallPosition,
+                    // Add projection parameters
+                    projectionCenterDist: adjustedProjectionCenterDist,
+                    projectedRadiusX: adjustedProjectedRadiusX,
+                    projectedRadiusY: adjustedProjectedRadiusY
+                  });
+                } else {
+                  // Ceiling-mounted speakers
+                  tempSpeakerPositions.push({ x, y });
+                }
+              }
+            }
+          }
+        }
+      } else if (layoutPattern === 'linear') {
+        // Linear layout (rows/columns)
+        const numLines = currentSpeakers === 1 ? 1 : 2;
+        const speakersPerMainLine = Math.ceil(currentSpeakers / numLines);
+        const speakersPerSecondLine = currentSpeakers - speakersPerMainLine;
+
+        if (roomLength >= roomWidth) { // Lines along length
+            const lineY1 = numLines === 1 ? roomWidth / 2 : roomWidth / 4;
+            const lineY2 = roomWidth * 3 / 4;
+            const spacingX1 = speakersPerMainLine > 0 ? roomLength / speakersPerMainLine : roomLength;
+            idealSpacing = spacingX1;
+            for (let i = 0; i < speakersPerMainLine; i++) {
+                const x = (i + 0.5) * spacingX1;
+                const y = lineY1;
+                
+                if (mountingType === 'wall') {
+                  // For wall-mounted linear layout, place on appropriate wall
+                  let wallX = x;
+                  let wallY = y;
+                  
+                  switch(wallPosition) {
+                    case 'north': // Top wall
+                      wallY = 0;
+                      break;
+                    case 'east': // Right wall
+                      wallX = roomLength;
+                      break;
+                    case 'south': // Bottom wall
+                      wallY = roomWidth;
+                      break;
+                    case 'west': // Left wall
+                      wallX = 0;
+                      break;
+                  }
+                  
+                  tempSpeakerPositions.push({
+                    x: wallX,
+                    y: wallY,
+                    tiltAngle,
+                    wallPosition,
+                    // Add projection parameters
+                    projectionCenterDist: adjustedProjectionCenterDist,
+                    projectedRadiusX: adjustedProjectedRadiusX,
+                    projectedRadiusY: adjustedProjectedRadiusY
+                  });
+                } else {
+                  tempSpeakerPositions.push({ x, y });
+                }
+            }
+            if (numLines === 2 && speakersPerSecondLine > 0) {
+                const spacingX2 = speakersPerSecondLine > 0 ? roomLength / speakersPerSecondLine : roomLength;
+                for (let i = 0; i < speakersPerSecondLine; i++) {
+                    const x = (i + 0.5) * spacingX2;
+                    const y = lineY2;
+                    
+                    if (mountingType === 'wall') {
+                      // For wall-mounted linear layout, place on appropriate wall
+                      let wallX = x;
+                      let wallY = y;
+                      
+                      switch(wallPosition) {
+                        case 'north': // Top wall
+                          wallY = 0;
+                          break;
+                        case 'east': // Right wall
+                          wallX = roomLength;
+                          break;
+                        case 'south': // Bottom wall
+                          wallY = roomWidth;
+                          break;
+                        case 'west': // Left wall
+                          wallX = 0;
+                          break;
+                      }
+                      
+                      tempSpeakerPositions.push({
+                        x: wallX,
+                        y: wallY,
+                        tiltAngle,
+                        wallPosition,
+                        // Add projection parameters
+                        projectionCenterDist: adjustedProjectionCenterDist,
+                        projectedRadiusX: adjustedProjectedRadiusX,
+                        projectedRadiusY: adjustedProjectedRadiusY
+                      });
+                    } else {
+                      tempSpeakerPositions.push({ x, y });
+                    }
+                }
+            }
+        } else { // Lines along width
+            const lineX1 = numLines === 1 ? roomLength / 2 : roomLength / 4;
+            const lineX2 = roomLength * 3 / 4;
+            const spacingY1 = speakersPerMainLine > 0 ? roomWidth / speakersPerMainLine : roomWidth;
+            idealSpacing = spacingY1;
+            for (let i = 0; i < speakersPerMainLine; i++) {
+                const x = lineX1;
+                const y = (i + 0.5) * spacingY1;
+                
+                if (mountingType === 'wall') {
+                  // For wall-mounted linear layout, place on appropriate wall
+                  let wallX = x;
+                  let wallY = y;
+                  
+                  switch(wallPosition) {
+                    case 'north': // Top wall
+                      wallY = 0;
+                      break;
+                    case 'east': // Right wall
+                      wallX = roomLength;
+                      break;
+                    case 'south': // Bottom wall
+                      wallY = roomWidth;
+                      break;
+                    case 'west': // Left wall
+                      wallX = 0;
+                      break;
+                  }
+                  
+                  tempSpeakerPositions.push({
+                    x: wallX,
+                    y: wallY,
+                    tiltAngle,
+                    wallPosition,
+                    // Add projection parameters
+                    projectionCenterDist: adjustedProjectionCenterDist,
+                    projectedRadiusX: adjustedProjectedRadiusX,
+                    projectedRadiusY: adjustedProjectedRadiusY
+                  });
+                } else {
+                  tempSpeakerPositions.push({ x, y });
+                }
+            }
+            if (numLines === 2 && speakersPerSecondLine > 0) {
+                const spacingY2 = speakersPerSecondLine > 0 ? roomWidth / speakersPerSecondLine : roomWidth;
+                for (let i = 0; i < speakersPerSecondLine; i++) {
+                    const x = lineX2;
+                    const y = (i + 0.5) * spacingY2;
+                    
+                    if (mountingType === 'wall') {
+                      // For wall-mounted linear layout, place on appropriate wall
+                      let wallX = x;
+                      let wallY = y;
+                      
+                      switch(wallPosition) {
+                        case 'north': // Top wall
+                          wallY = 0;
+                          break;
+                        case 'east': // Right wall
+                          wallX = roomLength;
+                          break;
+                        case 'south': // Bottom wall
+                          wallY = roomWidth;
+                          break;
+                        case 'west': // Left wall
+                          wallX = 0;
+                          break;
+                      }
+                      
+                      tempSpeakerPositions.push({
+                        x: wallX,
+                        y: wallY,
+                        tiltAngle,
+                        wallPosition,
+                        // Add projection parameters
+                        projectionCenterDist: adjustedProjectionCenterDist,
+                        projectedRadiusX: adjustedProjectedRadiusX,
+                        projectedRadiusY: adjustedProjectedRadiusY
+                      });
+                    } else {
+                      tempSpeakerPositions.push({ x, y });
+                    }
+                }
+            }
+        }
+        if (tempSpeakerPositions.length === 0 && currentSpeakers >= 1) {
+          // Add at least one speaker if none were added
+          if (mountingType === 'wall') {
+            let wallX = 0, wallY = 0;
+            
+            switch(wallPosition) {
+              case 'north': // Top wall
+                wallX = roomLength / 2;
+                wallY = 0;
+                break;
+              case 'east': // Right wall
+                wallX = roomLength;
+                wallY = roomWidth / 2;
+                break;
+              case 'south': // Bottom wall
+                wallX = roomLength / 2;
+                wallY = roomWidth;
+                break;
+              case 'west': // Left wall
+                wallX = 0;
+                wallY = roomWidth / 2;
+                break;
+            }
+            
+            tempSpeakerPositions.push({
+              x: wallX,
+              y: wallY,
+              tiltAngle,
+              wallPosition,
+              // Add projection parameters
+              projectionCenterDist: adjustedProjectionCenterDist,
+              projectedRadiusX: adjustedProjectedRadiusX,
+              projectedRadiusY: adjustedProjectedRadiusY
+            });
+          } else {
+            tempSpeakerPositions.push({ 
+              x: roomLength / 2, 
+              y: roomWidth / 2
+            });
+          }
+          idealSpacing = Math.min(roomLength, roomWidth);
+        }
+      } else if (layoutPattern === 'perimeter') {
+        // Perimeter layout (around room edges)
+        const perimeter = 2 * (roomLength + roomWidth);
+        idealSpacing = currentSpeakers > 0 ? perimeter / currentSpeakers : perimeter;
+        let currentPerimeterPos = idealSpacing / 2; // Start half spacing in
+        let count = 0;
+        const wallOffset = Math.min(roomLength * 0.02, roomWidth * 0.02, 0.1); // Minimal offset
+
+        while (count < currentSpeakers && currentPerimeterPos <= perimeter) {
+            let x, y, speakerWallPosition = '';
+            
+            if (currentPerimeterPos <= roomLength) { // Top edge (north)
+                x = currentPerimeterPos; 
+                y = wallOffset;
+                speakerWallPosition = 'north';
+            } else if (currentPerimeterPos <= roomLength + roomWidth) { // Right edge (east)
+                x = roomLength - wallOffset; 
+                y = currentPerimeterPos - roomLength;
+                speakerWallPosition = 'east';
+            } else if (currentPerimeterPos <= roomLength * 2 + roomWidth) { // Bottom edge (south)
+                x = roomLength - (currentPerimeterPos - (roomLength + roomWidth)); 
+                y = roomWidth - wallOffset;
+                speakerWallPosition = 'south';
+            } else { // Left edge (west)
+                x = wallOffset; 
+                y = roomWidth - (currentPerimeterPos - (roomLength * 2 + roomWidth));
+                speakerWallPosition = 'west';
+            }
+            
+            // Only add wall-mounted speakers on the selected wall if wall mounting is selected
+            if (mountingType === 'wall') {
+              if (speakerWallPosition === wallPosition) {
+                tempSpeakerPositions.push({
+                  x: Math.max(wallOffset, Math.min(roomLength - wallOffset, x)),
+                  y: Math.max(wallOffset, Math.min(roomWidth - wallOffset, y)),
+                  tiltAngle,
+                  wallPosition: speakerWallPosition,
+                  // Add projection parameters
+                  projectionCenterDist: adjustedProjectionCenterDist,
+                  projectedRadiusX: adjustedProjectedRadiusX,
+                  projectedRadiusY: adjustedProjectedRadiusY
+                });
+              }
+            } else {
+              // For ceiling speakers, add all perimeter positions
+              tempSpeakerPositions.push({
+                x: Math.max(wallOffset, Math.min(roomLength - wallOffset, x)),
+                y: Math.max(wallOffset, Math.min(roomWidth - wallOffset, y))
+              });
+            }
+            
+            count++;
+            currentPerimeterPos += idealSpacing;
+            if (count >= currentSpeakers) break; // Safety break
+        }
+        
+        // If wall-mounted and no speakers were added (wrong wall selected), add at least one
+        if (mountingType === 'wall' && tempSpeakerPositions.length === 0 && currentSpeakers >= 1) {
+          let wallX = 0, wallY = 0;
+          
+          switch(wallPosition) {
+            case 'north': // Top wall
+              wallX = roomLength / 2;
+              wallY = 0;
+              break;
+            case 'east': // Right wall
+              wallX = roomLength;
+              wallY = roomWidth / 2;
+              break;
+            case 'south': // Bottom wall
+              wallX = roomLength / 2;
+              wallY = roomWidth;
+              break;
+            case 'west': // Left wall
+              wallX = 0;
+              wallY = roomWidth / 2;
+              break;
+          }
+          
+          tempSpeakerPositions.push({
+            x: wallX,
+            y: wallY,
+            tiltAngle,
+            wallPosition,
+            // Add projection parameters
+            projectionCenterDist: adjustedProjectionCenterDist,
+            projectedRadiusX: adjustedProjectedRadiusX,
+            projectedRadiusY: adjustedProjectedRadiusY
+          });
+        }
+        
+        // If no speakers at all, add at least one in the center for ceiling mount
+        if (tempSpeakerPositions.length === 0 && currentSpeakers >= 1) {
+          if (mountingType === 'ceiling') {
+            tempSpeakerPositions.push({ 
+              x: roomLength / 2, 
+              y: roomWidth / 2
+            });
+          } else {
+            // For wall mount, add a speaker in the middle of the selected wall
+            let wallX = 0, wallY = 0;
+            
+            switch(wallPosition) {
+              case 'north': // Top wall
+                wallX = roomLength / 2;
+                wallY = 0;
+                break;
+              case 'east': // Right wall
+                wallX = roomLength;
+                wallY = roomWidth / 2;
+                break;
+              case 'south': // Bottom wall
+                wallX = roomLength / 2;
+                wallY = roomWidth;
+                break;
+              case 'west': // Left wall
+                wallX = 0;
+                wallY = roomWidth / 2;
+                break;
+            }
+            
+            tempSpeakerPositions.push({
+              x: wallX,
+              y: wallY,
+              tiltAngle,
+              wallPosition,
+              // Add projection parameters
+              projectionCenterDist: adjustedProjectionCenterDist,
+              projectedRadiusX: adjustedProjectedRadiusX,
+              projectedRadiusY: adjustedProjectedRadiusY
+            });
+          }
+        }
+      }
     }
     
     setRecommendedSpacing(idealSpacing);
+    setSpeakerPositions(tempSpeakerPositions);
+    setGridConfig(tempGridConfig);
+
+    // Check for coverage issues based on layout pattern
+    let hasGaps = false;
+    let hasExcessiveOverlap = false;
     
-    const hasGaps = idealSpacing > (2 * adjustedRadius);
-    setCoverageGapWarning(hasGaps && isFinite(adjustedRadius) && adjustedRadius > 0);
+    // Gap check depends on layout pattern
+    if (layoutPattern === 'noOverlap') {
+      // By definition, no overlap has gaps between speakers
+      hasGaps = true;
+    } else if (layoutPattern === 'minimumOverlap') {
+      // Minimum overlap should have no gaps
+      hasGaps = false;
+    } else if (layoutPattern === 'edgeToCenter') {
+      // Edge-to-center has significant overlap
+      hasGaps = false;
+      hasExcessiveOverlap = true;
+    } else {
+      // For custom layouts, check spacing
+      hasGaps = idealSpacing > (2 * adjustedRadius) && isFinite(adjustedRadius) && adjustedRadius > 0;
+      hasExcessiveOverlap = idealSpacing < (adjustedRadius * 0.7) && isFinite(adjustedRadius) && adjustedRadius > 0;
+    }
     
-    const hasExcessiveOverlap = idealSpacing < (adjustedRadius * 0.7);
-    setOverlapWarning(hasExcessiveOverlap && isFinite(adjustedRadius) && adjustedRadius > 0);
+    // Also check for infinite radius causing overlap
+    const infiniteRadiusCausesOverlap = !isFinite(adjustedRadius) && currentSpeakers > 1 && roomArea > 0;
     
-  }, [roomLength, roomWidth, dispersionAngle, mountingHeight, listeningHeight, mountingEnvironment, layoutPattern]);
-  
+    setCoverageGapWarning(hasGaps);
+    setOverlapWarning(hasExcessiveOverlap || infiniteRadiusCausesOverlap);
+
+  }, [
+    roomLength, 
+    roomWidth, 
+    dispersionAngle, 
+    mountingHeight, 
+    listeningHeight, 
+    mountingEnvironment, 
+    layoutPattern, 
+    mountingType, 
+    tiltAngle, 
+    wallPosition,
+    gridPattern
+  ]);
+
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Input Section */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="font-medium text-lg mb-4">Room Specifications</h3>
-        
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Room Length (m)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={roomLength}
-              onChange={(e) => setRoomLength(Number(e.target.value) > 0 ? Number(e.target.value) : 1)}
-              className="w-full p-2 border rounded-md"
-            />
+            <label htmlFor="roomLength" className="block text-sm font-medium text-gray-700 mb-1">Room Length (m)</label>
+            <input id="roomLength" type="number" min="1" value={roomLength}
+              onChange={(e) => setRoomLength(Math.max(1, Number(e.target.value)))}
+              className="w-full p-2 border rounded-md" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Room Width (m)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={roomWidth}
-              onChange={(e) => setRoomWidth(Number(e.target.value) > 0 ? Number(e.target.value) : 1)}
-              className="w-full p-2 border rounded-md"
-            />
+            <label htmlFor="roomWidth" className="block text-sm font-medium text-gray-700 mb-1">Room Width (m)</label>
+            <input id="roomWidth" type="number" min="1" value={roomWidth}
+              onChange={(e) => setRoomWidth(Math.max(1, Number(e.target.value)))}
+              className="w-full p-2 border rounded-md" />
           </div>
         </div>
-        
+
+        {/* CEILING HEIGHT SELECTION */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ceiling Height (m)
+          <label htmlFor="ceilingHeight" className="block text-sm font-medium text-gray-700 mb-1">
+            {mountingType === 'wall' ? 'Room Height (m)' : 'Ceiling Height (m)'}
           </label>
-          <select
-            value={ceilingHeight} // This can be 'custom' or a number
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === 'custom') {
-                setCeilingHeight('custom');
-              } else {
-                setCeilingHeight(Number(val));
-              }
-            }}
-            className="w-full p-2 border rounded-md"
-          >
-            {CEILING_HEIGHTS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-            <option value="custom">Custom Height...</option>
-          </select>
-          {ceilingHeight === 'custom' && (
-            <input
-              type="number"
-              min="2" 
-              step="0.1"
-              placeholder="Enter ceiling height (m)"
-              onChange={(e) => setCeilingHeight(Number(e.target.value) >=2 ? Number(e.target.value) : 2)}
-              className="w-full mt-2 p-2 border rounded-md"
-            />
-          )}
+          <div className="grid grid-cols-1 gap-2">
+            <select 
+              id="ceilingHeight" 
+              value={ceilingHeight} 
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'custom') {
+                  setCeilingHeight('custom');
+                } else {
+                  setCeilingHeight(Number(val));
+                  setCustomCeilingHeightValue(Number(val));
+                  // If mounting height > new ceiling height, update it
+                  if (mountingHeight > Number(val)) {
+                    setMountingHeight(Number(val));
+                  }
+                }
+              }}
+              className="w-full p-2 border rounded-md"
+            >
+              {CEILING_HEIGHTS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+              <option value="custom">Custom Height...</option>
+            </select>
+            
+            {ceilingHeight === 'custom' && (
+              <div className="flex items-center">
+                <input 
+                  type="number" 
+                  min="2" 
+                  step="0.1" 
+                  value={customCeilingHeightValue}
+                  onChange={(e) => {
+                    const newHeight = Math.max(2, Number(e.target.value));
+                    setCustomCeilingHeightValue(newHeight);
+                    // If mounting height > new ceiling height, update it
+                    if (mountingHeight > newHeight) {
+                      setMountingHeight(newHeight);
+                    }
+                  }}
+                  className="flex-grow p-2 border rounded-md" 
+                  placeholder="Enter height (meters)"
+                />
+                <span className="ml-2 text-gray-600">meters</span>
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-500">
+              {mountingType === 'wall' 
+                ? 'The room height affects speaker coverage calculations' 
+                : 'The ceiling height affects maximum mounting height'}
+            </p>
+          </div>
         </div>
-        
+
         <div className="border-t border-gray-300 my-6"></div>
         
         <h3 className="font-medium text-lg mb-4">Speaker Specifications</h3>
-        
+
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Speaker Type
-          </label>
-          <select
-            value={speakerType}
-            onChange={(e) => setSpeakerType(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
+          <label htmlFor="speakerType" className="block text-sm font-medium text-gray-700 mb-1">Speaker Type</label>
+          <select id="speakerType" value={speakerType} onChange={(e) => setSpeakerType(e.target.value)}
+            className="w-full p-2 border rounded-md">
             {SPEAKER_TYPES_COVERAGE.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
+              <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Dispersion Angle (degrees)
+          <label htmlFor="dispersionAngle" className="block text-sm font-medium text-gray-700 mb-1">
+            {mountingType === 'wall' ? 'Coverage Angle (degrees)' : 'Dispersion Angle (degrees)'}
           </label>
-          <input
-            type="number"
-            min="1" // tan(0) is 0, so min 1
-            max="359" // Avoid exactly 180 or 360 for simplicity if tan not handled perfectly, though it is now.
+          <input 
+            id="dispersionAngle" 
+            type="number" 
+            min="1" 
+            max="359" 
             value={dispersionAngle}
-            onChange={(e) => setDispersionAngle(Number(e.target.value) > 0 ? Number(e.target.value) : 1)}
-            className="w-full p-2 border rounded-md"
+            onChange={(e) => setDispersionAngle(Math.max(1, Math.min(359, Number(e.target.value))))}
+            className="w-full p-2 border rounded-md" 
           />
           <p className="text-xs text-gray-500 mt-1">
-            Typical values: 60° to 180° (check speaker specifications)
+            Typical: {mountingType === 'wall' ? '90° to 120°' : '60° to 180°'} (check speaker specs)
           </p>
         </div>
-        
+
+        {/* Show tilt angle only for wall-mounted speakers */}
+        {mountingType === 'wall' && (
+          <div className="mb-4">
+            <label htmlFor="tiltAngle" className="block text-sm font-medium text-gray-700 mb-1">
+              Downward Tilt (degrees)
+            </label>
+            <input 
+              id="tiltAngle" 
+              type="number" 
+              min="0" 
+              max="90" 
+              value={tiltAngle}
+              onChange={(e) => setTiltAngle(Math.max(0, Math.min(90, Number(e.target.value))))}
+              className="w-full p-2 border rounded-md" 
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Downward angle the speaker is aimed (0° = horizontal, 90° = straight down)
+            </p>
+          </div>
+        )}
+
+        {/* Show wall position selector for wall-mounted speakers */}
+        {mountingType === 'wall' && (
+          <div className="mb-4">
+            <label htmlFor="wallPosition" className="block text-sm font-medium text-gray-700 mb-1">
+              Wall Position
+            </label>
+            <select 
+              id="wallPosition" 
+              value={wallPosition} 
+              onChange={(e) => setWallPosition(e.target.value)}
+              className="w-full p-2 border rounded-md"
+            >
+              {WALL_POSITIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Wall where speakers will be mounted
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mounting Height (m)
+            <label htmlFor="mountingHeight" className="block text-sm font-medium text-gray-700 mb-1">
+              {mountingType === 'wall' ? 'Speaker Height (m)' : 'Mounting Height (m)'}
             </label>
-            <input
-              type="number"
-              min="0.1" // Must be > listening height
-              max={typeof ceilingHeight === 'number' ? ceilingHeight : undefined}
-              step="0.1"
+            <input id="mountingHeight" type="number" min="0.1" step="0.1"
+              max={effectiveCeilingHeight}
               value={mountingHeight}
-              onChange={(e) => setMountingHeight(Number(e.target.value) > 0 ? Number(e.target.value) : 0.1)}
-              className="w-full p-2 border rounded-md"
-            />
-            <p className="text-xs text-gray-500 mt-1">Height of speaker installation</p>
+              onChange={(e) => setMountingHeight(Math.min(effectiveCeilingHeight, Math.max(0.1, Number(e.target.value))))}
+              className="w-full p-2 border rounded-md" />
+            <p className="text-xs text-gray-500 mt-1">
+              {mountingType === 'wall' 
+                ? `Speaker installation height from floor (max: ${effectiveCeilingHeight}m)` 
+                : `Speaker installation height (max: ${effectiveCeilingHeight}m)`}
+            </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Listening Height (m)
-            </label>
-            <input
-              type="number"
-              min="0"
+            <label htmlFor="listeningHeight" className="block text-sm font-medium text-gray-700 mb-1">Listening Height (m)</label>
+            <input id="listeningHeight" type="number" min="0" step="0.1"
               max={mountingHeight > 0.1 ? mountingHeight - 0.1 : 0}
-              step="0.1"
               value={listeningHeight}
-              onChange={(e) => setListeningHeight(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-            <p className="text-xs text-gray-500 mt-1">Typically 1.2m for seated, 1.7m for standing</p>
+              onChange={(e) => setListeningHeight(Math.max(0, Math.min(mountingHeight - 0.1, Number(e.target.value))))}
+              className="w-full p-2 border rounded-md" />
+            <p className="text-xs text-gray-500 mt-1">E.g., 1.2m seated, 1.7m standing</p>
           </div>
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Mounting Environment
-          </label>
-          <select
-            value={mountingEnvironment}
-            onChange={(e) => setMountingEnvironment(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
+          <label htmlFor="mountingEnv" className="block text-sm font-medium text-gray-700 mb-1">Mounting Environment</label>
+          <select id="mountingEnv" value={mountingEnvironment} onChange={(e) => setMountingEnvironment(e.target.value)}
+            className="w-full p-2 border rounded-md">
             {MOUNTING_ENVIRONMENTS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="border-t border-gray-300 my-6"></div>
+        
+        <h3 className="font-medium text-lg mb-4">Layout Configuration</h3>
+
+        <div className="mb-4">
+          <label htmlFor="layoutPattern" className="block text-sm font-medium text-gray-700 mb-1">Layout Pattern</label>
+          <select id="layoutPattern" value={layoutPattern} onChange={(e) => setLayoutPattern(e.target.value)}
+            className="w-full p-2 border rounded-md">
+            {LAYOUT_PATTERNS.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
+          {/* Show description of selected layout pattern */}
+          <p className="text-xs text-gray-500 mt-1">
+            {LAYOUT_PATTERNS.find(p => p.value === layoutPattern)?.description || ''}
+          </p>
         </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Layout Pattern
-          </label>
-          <select
-            value={layoutPattern}
-            onChange={(e) => setLayoutPattern(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
-            <option value="grid">Grid Pattern (Even Distribution)</option>
-            <option value="linear">Linear Pattern (Rows/Columns)</option>
-            <option value="perimeter">Perimeter Pattern (Around Edges)</option>
-          </select>
-        </div>
+
+        {/* Show grid pattern selection for grid-based layouts */}
+        {(layoutPattern === 'noOverlap' || 
+          layoutPattern === 'minimumOverlap' || 
+          layoutPattern === 'edgeToCenter') && (
+          <div className="mb-4">
+            <label htmlFor="gridPattern" className="block text-sm font-medium text-gray-700 mb-1">Grid Pattern</label>
+            <select id="gridPattern" value={gridPattern} onChange={(e) => setGridPattern(e.target.value)}
+              className="w-full p-2 border rounded-md">
+              {GRID_PATTERNS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {GRID_PATTERNS.find(p => p.value === gridPattern)?.description || ''}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Results Section */}
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="font-medium text-lg mb-4 text-blue-700">Calculation Results</h3>
-        
+
         <div className="bg-white p-4 rounded-md shadow mb-6 border border-gray-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -436,41 +1424,44 @@ const SpeakerCoverageCalculator: React.FC<SpeakerCoverageCalculatorProps> = ({ o
                 <p className="font-semibold text-gray-800">{(roomLength * roomWidth).toFixed(1)} m²</p>
               </div>
               <div className="mt-2">
-                <p className="text-sm text-gray-600">Ceiling Height:</p>
-                <p className="font-semibold text-gray-800">{typeof ceilingHeight === 'number' ? `${ceilingHeight} m` : (ceilingHeight === 'custom' ? 'Custom (input below)' : 'N/A')}</p>
+                <p className="text-sm text-gray-600">
+                  {mountingType === 'wall' ? 'Room Height:' : 'Ceiling Height:'}
+                </p>
+                <p className="font-semibold text-gray-800">{ceilingHeight === 'custom' ? `${customCeilingHeightValue.toFixed(1)} m (Custom)` : `${Number(ceilingHeight).toFixed(1)} m`}</p>
               </div>
             </div>
             <div>
               <h4 className="font-medium text-base text-gray-700">Speaker Coverage</h4>
               <div className="mt-2">
-                <p className="text-sm text-gray-600">Coverage Radius:</p>
+                <p className="text-sm text-gray-600">Coverage Radius (adj.):</p>
                 <p className="font-semibold text-gray-800">{isFinite(coverageRadius) ? coverageRadius.toFixed(2) : 'Infinite'} m</p>
               </div>
               <div className="mt-2">
-                <p className="text-sm text-gray-600">Coverage Area per Speaker:</p>
+                <p className="text-sm text-gray-600">Coverage Area / Speaker:</p>
                 <p className="font-semibold text-gray-800">{isFinite(coverageArea) ? coverageArea.toFixed(2) : 'Infinite'} m²</p>
               </div>
               <div className="mt-2">
                 <p className="text-sm text-gray-600">Recommended Speakers:</p>
-                <p className="font-bold text-blue-600">{isFinite(recommendedSpeakers) ? recommendedSpeakers : 'N/A'}</p>
+                <p className="font-bold text-blue-600">{isFinite(recommendedSpeakers) ? recommendedSpeakers : (coverageArea === 0 && (roomLength*roomWidth)>0 ? 'Infinite (No coverage)' : 'N/A')}</p>
               </div>
             </div>
           </div>
-          
-          <div className="mt-4 bg-gray-50 p-3 rounded-md">
+           <div className="mt-4 bg-gray-50 p-3 rounded-md">
             <h4 className="font-medium text-base text-gray-700 mb-2">Mounting Details</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Mounting Height:</p>
-                <p className="font-semibold text-gray-800">{mountingHeight} m</p>
+                <p className="text-sm text-gray-600">
+                  {mountingType === 'wall' ? 'Speaker Height:' : 'Mounting Height:'}
+                </p>
+                <p className="font-semibold text-gray-800">{mountingHeight.toFixed(1)} m</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Listening Height:</p>
-                <p className="font-semibold text-gray-800">{listeningHeight} m</p>
+                <p className="font-semibold text-gray-800">{listeningHeight.toFixed(1)} m</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Effective Height Difference:</p>
-                <p className="font-semibold text-gray-800">{(mountingHeight - listeningHeight).toFixed(2)} m</p>
+                <p className="text-sm text-gray-600">Effective Height Diff.:</p>
+                <p className="font-semibold text-gray-800">{(mountingHeight - listeningHeight > 0 ? mountingHeight - listeningHeight : 0).toFixed(2)} m</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Environment Factor:</p>
@@ -478,102 +1469,191 @@ const SpeakerCoverageCalculator: React.FC<SpeakerCoverageCalculatorProps> = ({ o
                   {MOUNTING_ENVIRONMENTS.find(env => env.value === mountingEnvironment)?.factor || 1.0}
                 </p>
               </div>
+              
+              {/* Add wall-mount specific details if applicable */}
+              {mountingType === 'wall' && (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-600">Wall Position:</p>
+                    <p className="font-semibold text-gray-800">
+                      {WALL_POSITIONS.find(w => w.value === wallPosition)?.label || 'Unknown'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Downward Tilt:</p>
+                    <p className="font-semibold text-gray-800">{tiltAngle}°</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-4 rounded-md shadow mb-6 border border-gray-200">
           <h4 className="font-medium text-base text-gray-700 mb-3">Speaker Layout Recommendation</h4>
-          
+          <div className="mb-4">
+            <SpeakerLayoutVisualizer
+              roomLength={roomLength}
+              roomWidth={roomWidth}
+              roomHeight={effectiveCeilingHeight}
+              speakerPositions={speakerPositions}
+              coverageRadius={coverageRadius}
+              mountingType={mountingType}
+              gridPattern={gridPattern}
+            />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <p className="text-sm text-gray-600">Layout Pattern:</p>
               <p className="font-semibold text-gray-800">
-                {layoutPattern === 'grid' && 'Grid Pattern (Even Distribution)'}
-                {layoutPattern === 'linear' && 'Linear Pattern (Rows/Columns)'}
-                {layoutPattern === 'perimeter' && 'Perimeter Pattern (Around Edges)'}
+                {LAYOUT_PATTERNS.find(p => p.value === layoutPattern)?.label || 'Unknown'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Recommended Spacing:</p>
+              <p className="text-sm text-gray-600">Recommended Spacing (approx.):</p>
               <p className="font-semibold text-gray-800">{isFinite(recommendedSpacing) && recommendedSpacing > 0 ? recommendedSpacing.toFixed(2) : 'N/A'} m</p>
             </div>
+            
+            {/* Show grid pattern info if applicable */}
+            {(layoutPattern === 'noOverlap' || 
+              layoutPattern === 'minimumOverlap' || 
+              layoutPattern === 'edgeToCenter') && (
+              <div>
+                <p className="text-sm text-gray-600">Grid Pattern:</p>
+                <p className="font-semibold text-gray-800">
+                  {GRID_PATTERNS.find(p => p.value === gridPattern)?.label || 'Unknown'}
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <p className="text-sm text-gray-600">Speaker Count:</p>
+              <p className="font-semibold text-gray-800">{speakerPositions.length}</p>
+            </div>
           </div>
-          
+
+          {/* Coverage details for wall-mounted speakers */}
+          {mountingType === 'wall' && speakerPositions.length > 0 && speakerPositions[0].projectionCenterDist && (
+            <div className="bg-gray-50 p-3 rounded-md mb-3">
+              <h5 className="font-medium text-sm text-gray-700 mb-2">Wall-mounted Coverage Details</h5>
+              <ul className="list-disc pl-5 mt-1 text-sm space-y-1 text-gray-600">
+                <li><strong>Projection Distance:</strong> {speakerPositions[0].projectionCenterDist?.toFixed(2)}m from wall</li>
+                {wallPosition === 'north' || wallPosition === 'south' ? (
+                  <>
+                    <li><strong>Coverage Width:</strong> {(speakerPositions[0].projectedRadiusX || 0) * 2}m (parallel to wall)</li>
+                    <li><strong>Coverage Depth:</strong> {(speakerPositions[0].projectedRadiusY || 0) * 2}m (perpendicular to wall)</li>
+                  </>
+                ) : (
+                  <>
+                    <li><strong>Coverage Width:</strong> {(speakerPositions[0].projectedRadiusY || 0) * 2}m (parallel to wall)</li>
+                    <li><strong>Coverage Depth:</strong> {(speakerPositions[0].projectedRadiusX || 0) * 2}m (perpendicular to wall)</li>
+                  </>
+                )}
+                <li>
+                  <strong>Effective Coverage Area:</strong> {isFinite(coverageArea) ? coverageArea.toFixed(2) : 'N/A'} m²
+                </li>
+              </ul>
+            </div>
+          )}
+
           {recommendedSpeakers > 0 && isFinite(recommendedSpeakers) && isFinite(recommendedSpacing) && recommendedSpacing > 0 && (
             <div className="bg-gray-50 p-3 rounded-md mb-3">
               <h5 className="font-medium text-sm text-gray-700 mb-2">Placement Details</h5>
-              {layoutPattern === 'grid' && (
+              
+              {(layoutPattern === 'noOverlap' || 
+                layoutPattern === 'minimumOverlap' || 
+                layoutPattern === 'edgeToCenter') && 
+                gridConfig.cols > 0 && gridConfig.rows > 0 && (
                 <div>
-                  <p className="text-sm text-gray-700">For a grid layout:</p>
+                  <p className="text-sm text-gray-700">Grid configuration:</p>
                   <ul className="list-disc pl-5 mt-1 text-sm space-y-1 text-gray-600">
-                    <li><strong>Rows: </strong>{Math.max(1, Math.ceil(Math.sqrt(recommendedSpeakers * roomWidth / roomLength)))}</li>
-                    <li><strong>Columns: </strong>{Math.max(1, Math.ceil(Math.sqrt(recommendedSpeakers * roomLength / roomWidth)))}</li>
-                    <li><strong>Row Spacing: </strong>{(roomWidth / Math.max(1, Math.ceil(Math.sqrt(recommendedSpeakers * roomWidth / roomLength)))).toFixed(2)}m</li>
-                    <li><strong>Column Spacing: </strong>{(roomLength / Math.max(1, Math.ceil(Math.sqrt(recommendedSpeakers * roomLength / roomWidth)))).toFixed(2)}m</li>
+                    <li><strong>Rows: </strong>{gridConfig.rows}</li>
+                    <li><strong>Columns: </strong>{gridConfig.cols}</li>
+                    <li><strong>Row Spacing (center-to-center): </strong>{gridConfig.spacingY.toFixed(2)}m</li>
+                    <li><strong>Column Spacing (center-to-center): </strong>{gridConfig.spacingX.toFixed(2)}m</li>
+                    <li><i>Total speakers: {speakerPositions.length}</i></li>
                   </ul>
                 </div>
               )}
+              
               {layoutPattern === 'linear' && (
-                <div>
-                  <p className="text-sm text-gray-700">For a linear layout:</p>
+                 <div>
+                  <p className="text-sm text-gray-700">For a linear layout ({speakerPositions.length} speakers):</p>
                   <ul className="list-disc pl-5 mt-1 text-sm space-y-1 text-gray-600">
-                    <li>Place {Math.ceil(recommendedSpeakers / (recommendedSpeakers > 1 ? 2:1) )} speakers along each of {(recommendedSpeakers > 1 ? 2:1)} lines (approx)</li>
-                    <li>Space speakers approximately {recommendedSpacing.toFixed(2)}m apart</li>
-                    <li>Maintain at least {(isFinite(coverageRadius) && coverageRadius > 0 ? coverageRadius * 0.7 : 0).toFixed(2)}m from walls</li>
+                    <li>Speakers spaced approx. {recommendedSpacing.toFixed(2)}m apart along line(s)</li>
+                    <li>Typically 1 or 2 lines along the longest room dimension</li>
                   </ul>
                 </div>
               )}
+              
               {layoutPattern === 'perimeter' && (
                 <div>
-                  <p className="text-sm text-gray-700">For a perimeter layout:</p>
+                  <p className="text-sm text-gray-700">For a perimeter layout ({speakerPositions.length} speakers):</p>
                   <ul className="list-disc pl-5 mt-1 text-sm space-y-1 text-gray-600">
-                    <li>Place speakers around the room's perimeter, approximately {recommendedSpacing.toFixed(2)}m apart</li>
-                     {/* These are illustrative counts, actual placement would depend on even distribution */}
-                    <li>Approx. {Math.max(1, Math.ceil(roomLength / recommendedSpacing))} speakers along each length if spacing allows.</li>
-                    <li>Approx. {Math.max(1, Math.ceil(roomWidth / recommendedSpacing))} speakers along each width if spacing allows.</li>
+                    <li>Speakers spaced approx. {recommendedSpacing.toFixed(2)}m apart around the room perimeter</li>
+                    {mountingType === 'wall' && (
+                      <li>Speakers mounted on {WALL_POSITIONS.find(w => w.value === wallPosition)?.label || 'selected wall'} only</li>
+                    )}
                   </ul>
                 </div>
               )}
             </div>
           )}
-          
+
+          {/* Coverage warnings */}
           {(coverageGapWarning || overlapWarning) && (
             <div className={`rounded-md p-3 ${coverageGapWarning ? 'bg-red-100 border-red-300' : 'bg-yellow-100 border-yellow-300'} border`}>
               <p className={`text-sm font-medium ${coverageGapWarning ? 'text-red-800' : 'text-yellow-800'}`}>
-                {coverageGapWarning 
+                {coverageGapWarning
                   ? 'Warning: Coverage gaps may exist. Consider more speakers, different layout, or wider dispersion.'
-                  : overlapWarning 
-                    ? 'Note: Significant speaker overlap may occur. This can be desired for evenness but may cause interference if excessive. Consider layout or speaker count.'
+                  : overlapWarning
+                    ? 'Note: Significant speaker overlap may occur or coverage is very wide. This can be desired for evenness but may cause interference if excessive. Consider layout or speaker count.'
                     : ''}
               </p>
             </div>
           )}
         </div>
-        
+
+        {/* Recommendations and best practices */}
         <div className="mt-6 bg-blue-100 p-4 rounded-md border border-blue-300">
           <h4 className="font-medium mb-2 text-blue-700">Design Recommendations</h4>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1 text-blue-800">
-            <li>For critical listening areas like conference rooms, aim for a denser speaker layout (more overlap).</li>
-            <li>Consider acoustic treatments if the space is highly reverberant, as this calculator assumes basic environmental factors.</li>
-            <li>Minimum speaker density should be 1 speaker per {isFinite(coverageArea) && coverageArea > 0 ? coverageArea.toFixed(0) : 'N/A'} m² (based on single speaker coverage).</li>
-            <li>Intra-speaker distance (spacing) should ideally be between {isFinite(coverageRadius) && coverageRadius > 0 ? (coverageRadius * 1.4).toFixed(2) : 'N/A'}m (for ~25% overlap) to {isFinite(coverageRadius) && coverageRadius > 0 ? (coverageRadius * 1.7).toFixed(2) : 'N/A'}m (for ~15% overlap).</li>
-            <li>Avoid placing speakers directly above primary listening positions if possible, to prevent hotspots unless intended.</li>
+            {mountingType === 'ceiling' ? (
+              <>
+                <li>For critical listening, aim for denser layouts (more overlap, e.g., spacing ~1.4 * radius).</li>
+                <li>Consider acoustic treatments for highly reverberant spaces.</li>
+                <li>Min. speaker density: 1 per ~{isFinite(coverageArea) && coverageArea > 0 ? coverageArea.toFixed(0) : 'N/A'} m² (single speaker theoretical).</li>
+                <li>Ideal intra-speaker spacing often between {(coverageRadius * 1.4).toFixed(2)}m (25% overlap) and {(coverageRadius * 1.7).toFixed(2)}m (15% overlap).</li>
+                <li>Avoid placing speakers directly above primary listening positions unless intended.</li>
+              </>
+            ) : (
+              <>
+                <li>For wall-mounted speakers, coverage angle should be aimed toward the farthest listening area.</li>
+                <li>When there is a facing wall up to 30 ft away, speakers should be staggered on opposite walls.</li>
+                <li>For larger spaces, consider using ceiling speakers to supplement wall-mounted coverage.</li>
+                <li>Tilt angle of {tiltAngle}° provides coverage depth of approximately {speakerPositions[0]?.projectionCenterDist?.toFixed(2) || 0}m from the wall.</li>
+                <li>In outdoor areas or large spaces, consider back-to-back mounting for broader coverage.</li>
+              </>
+            )}
           </ul>
           <p className="text-xs mt-2 text-blue-700">
-            Note: These calculations provide design guidance. Validate with acoustic modeling software or on-site testing for critical spaces.
+            Note: These are design guidelines. Validate with acoustic modeling or on-site tests for critical spaces.
           </p>
         </div>
         
         <div className="mt-8 bg-gray-100 p-4 rounded-lg border border-gray-200">
           <h3 className="font-medium text-lg mb-2 text-gray-700">Important Considerations</h3>
           <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-            <li>Speaker dispersion patterns are often not perfectly conical and can vary by frequency. Check manufacturer specifications (polar plots).</li>
-            <li>Room acoustics (reverberation, absorption, obstructions) significantly impact effective coverage and intelligibility.</li>
-            <li>Consider zoning requirements for different areas or for emergency evacuation systems (PAVA).</li>
-            <li>Ambient noise levels may require higher speaker density or SPL capability in noisy environments.</li>
-            <li>For voice evacuation systems, ensure compliance with local fire safety regulations (e.g., EN54, NFPA72).</li>
-            <li>Vertical coverage patterns are especially important for speakers mounted at significant heights or in venues with tiered seating.</li>
+            <li>Dispersion patterns are complex and vary by frequency. Check manufacturer polar plots.</li>
+            <li>Room acoustics (reverberation, absorption, obstructions) greatly impact coverage and intelligibility.</li>
+            <li>Consider zoning for different areas or PAVA systems.</li>
+            <li>Ambient noise may require higher speaker density or SPL.</li>
+            <li>For voice evacuation, comply with local fire safety (e.g., EN54, NFPA72).</li>
+            {mountingType === 'ceiling' ? (
+              <li>Vertical coverage is key for high mounting or tiered seating.</li>
+            ) : (
+              <li>Wall-mounted speakers may create uneven coverage with distance - check manufacturer coverage data.</li>
+            )}
           </ul>
         </div>
       </div>

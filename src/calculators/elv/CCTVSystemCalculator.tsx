@@ -161,7 +161,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
   // State for storage parameters
   const [retentionDays, setRetentionDays] = useState<number>(31);
   const [raidType, setRaidType] = useState<string>('none');
-  const [spareFactor, setSpareFactor] = useState<number>(0); // New: spare factor
+  const [spareFactor, setSpareFactor] = useState<number>(30); // New: spare factor
   const [selectedDriveSize, setSelectedDriveSize] = useState<number>(8); // New: user-selected drive size
   
   // State for camera list
@@ -792,7 +792,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
             <li>Total storage is calculated based on this daily figure, retention period, and camera quantity.</li>
             <li>Motion detection reduces storage by recording only when motion is detected, estimated by the motion percentage.</li>
             <li>Higher resolutions and frame rates increase storage requirements but provide better image quality.</li>
-            <li>H.265/HEVC compression can reduce storage requirements by about 40% compared to H.264.</li>
+            <li>H.265/HEVC compression can reduce storage requirements by about 50% compared to H.264.</li>
             <li>RAID 5 requires N+1 drives (1 drive for parity), RAID 6 requires N+2 drives (2 drives for parity).</li>
             <li>The spare factor adds extra drives as a percentage of the RAID configuration for hot spares.</li>
             <li>Actual storage requirements may vary based on scene complexity, lighting conditions, and specific camera implementations.</li>
@@ -1725,7 +1725,7 @@ const DEVICE_TYPES = [
   { value: 'fixedCamera', label: 'Fixed IP Camera', watts: 5 },
   { value: 'ptzCamera', label: 'PTZ IP Camera', watts: 20 }, // Increased typical for PTZ
   { value: 'domeCamera', label: 'Dome IP Camera', watts: 7 },
-  { value: 'bulletCamera', label: 'Bullet IP Camera', watts: 6 }, // Added Bullet
+  { value: 'bulletCamera', label: 'Bullet IP Camera', watts: 12 }, // Added Bullet
   { value: 'fisheyeCamera', label: 'Fisheye IP Camera', watts: 12 }, // Added Fisheye
   { value: 'thermalCamera', label: 'Thermal Camera', watts: 12 },
   { value: 'encoder', label: 'Video Encoder (1-4ch)', watts: 10 }, // Added Encoder
@@ -2208,7 +2208,7 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
                   <td className="px-4 py-2 text-sm text-gray-900 text-center">
                     {device.poePowered ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        PoE {POE_STANDARDS.find(s => s.value === device.poeStandard)?.label.split(' ')[0] || ''}
+                        {POE_STANDARDS.find(s => s.value === device.poeStandard)?.label.split(' ')[0] || ''}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
