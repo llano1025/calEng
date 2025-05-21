@@ -290,7 +290,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     { category: 'C2. HVAC - Water Side Distribution', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
     { category: 'C3. HVAC - Air Side Distribution', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
     { category: 'C4. HVAC - Mechanical Ventilation', estimatedConnectedLoad: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'D. Fire Service Installations', estimatedConnectedLoad: 0, diversityFactor: 0.5, futureGrowthFactor: 0, diversifiedConnectedLoad: 0 },
+    { category: 'D. Fire Service Installations', estimatedConnectedLoad: 0, diversityFactor: 1.0, futureGrowthFactor: 0, diversifiedConnectedLoad: 0 },
     { category: 'E. Water Pumps for P&D', estimatedConnectedLoad: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
     { category: 'F. Lift & Escalator Installation', estimatedConnectedLoad: 0, diversityFactor: 0.6, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
     { category: 'G. Hot Water Boiler / Calorifier Installation', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },

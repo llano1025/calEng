@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Icons } from '../../components/Icons';
 
 // Define props type for the component
@@ -386,7 +386,7 @@ const SpeakerLayoutVisualizer: React.FC<SpeakerLayoutVisualizerProps> = ({
 const SpeakerCoverageCalculator: React.FC<SpeakerCoverageCalculatorProps> = ({ onShowTutorial }) => {
   // Room dimensions
   const [roomLength, setRoomLength] = useState<number>(10);
-  const [roomWidth, setRoomWidth] = useState<number>(5);
+  const [roomWidth, setRoomWidth] = useState<number>(15);
   
   // Ceiling/room height handling
   const [ceilingHeight, setCeilingHeight] = useState<number | string>(2.4);
@@ -1683,6 +1683,13 @@ const ROOM_ACOUSTIC_TYPES = [
   { value: 'highlyReflective', label: 'Highly Reflective', factor: 1.2 }
 ];
 
+const ROOM_SIZE_TYPES = [
+  { value: 'small', label: 'Small (< 50 m²)', nearFieldDistance: 2 },
+  { value: 'medium', label: 'Medium (50-200 m²)', nearFieldDistance: 3 },
+  { value: 'large', label: 'Large (> 200 m²)', nearFieldDistance: 4 },
+  { value: 'openSpace', label: 'Open Space / Outdoors', nearFieldDistance: 1 }
+];
+
 const SPL_REQUIREMENTS = [
   { application: 'Background Music', minLevel: 65, maxLevel: 75 },
   { application: 'Paging/Announcements', minLevel: 75, maxLevel: 85 },
@@ -1700,6 +1707,7 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
   const [speakerPower, setSpeakerPower] = useState<number>(10);
   const [speakerCount, setSpeakerCount] = useState<number>(4);
   const [roomAcoustics, setRoomAcoustics] = useState<string>('standard');
+  const [roomSize, setRoomSize] = useState<string>('medium');
   
   const [referenceDistance, setReferenceDistance] = useState<number>(1.0);
   const [measurementDistance, setMeasurementDistance] = useState<number>(10);
@@ -1715,6 +1723,10 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
   const [recommendedApplication, setRecommendedApplication] = useState<string[]>([]);
   
   const [distanceTable, setDistanceTable] = useState<{ distance: number; spl: number }[]>([]);
+  const [showClippingWarning, setShowClippingWarning] = useState<boolean>(false);
+  
+  // Ref for export functionality
+  const tableRef = useRef<HTMLTableElement>(null);
   
   useEffect(() => {
     let sensitivityValue: number;
@@ -1731,6 +1743,7 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
     if (!effectiveSensitivity || speakerPower <= 0 || speakerCount <= 0 || referenceDistance <=0 || measurementDistance <=0) {
         setSingleSpeakerSpl(0); setCombinedSpl(0); setSignalToNoiseRatio(0);
         setIntelligibilityRating('N/A'); setRecommendedApplication([]); setDistanceTable([]);
+        setShowClippingWarning(false);
         return;
     }
     
@@ -1741,19 +1754,37 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
     const powerInDb = 10 * Math.log10(speakerPower);
     const splAtReference = effectiveSensitivity + powerInDb;
     
-    const distanceRatio = measurementDistance / referenceDistance;
-    const distanceAttenuation = distanceRatio > 0 ? 20 * Math.log10(distanceRatio) : Infinity;
+    // Get room size config for near-field calculation
+    const roomSizeConfig = ROOM_SIZE_TYPES.find(type => type.value === roomSize);
+    const nearFieldDistance = roomSizeConfig ? roomSizeConfig.nearFieldDistance : 2;
+    
+    // Apply distance attenuation with near-field correction
+    let distanceAttenuation: number;
+    if (measurementDistance <= nearFieldDistance) {
+      // Reduced attenuation in near-field (reduced inverse square law effect in rooms)
+      const reducedDistanceRatio = Math.max(1, measurementDistance / referenceDistance);
+      distanceAttenuation = 15 * Math.log10(reducedDistanceRatio); // 15 instead of 20 for reduced attenuation
+    } else {
+      // Normal inverse square law for distances beyond near-field
+      const normalDistanceRatio = measurementDistance / referenceDistance;
+      distanceAttenuation = nearFieldDistance > referenceDistance 
+        ? 15 * Math.log10(nearFieldDistance / referenceDistance) + 20 * Math.log10(measurementDistance / nearFieldDistance)
+        : 20 * Math.log10(normalDistanceRatio);
+    }
     
     const singleSplAtDistanceFreeField = splAtReference - distanceAttenuation;
     const adjustedSingleSpl = singleSplAtDistanceFreeField + acousticDbAdjustment;
     
-    const combinedSplAtDistance = adjustedSingleSpl + (speakerCount > 0 ? 10 * Math.log10(speakerCount) : -Infinity) ;
+    const combinedSplAtDistance = adjustedSingleSpl + (speakerCount > 0 ? 10 * Math.log10(speakerCount) : -Infinity);
     
     const snr = combinedSplAtDistance - ambientNoiseLevel;
     
     setSingleSpeakerSpl(adjustedSingleSpl);
     setCombinedSpl(combinedSplAtDistance);
     setSignalToNoiseRatio(snr);
+    
+    // Check for clipping/ceiling warnings (SPL > 115dB)
+    setShowClippingWarning(combinedSplAtDistance > 115);
     
     let intelligibility: string;
     if (!isFinite(snr)) intelligibility = 'N/A';
@@ -1772,8 +1803,19 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
     
     const distances = [1, 2, 5, 10, 15, 20, 30, 50];
     const newDistanceTable = distances.map(dist => {
-      const distRatioTable = dist / referenceDistance;
-      const distAttenTable = distRatioTable > 0 ? 20 * Math.log10(distRatioTable) : Infinity;
+      let distAttenTable: number;
+      
+      // Apply same near-field modeling to table calculations
+      if (dist <= nearFieldDistance) {
+        const reducedRatio = Math.max(1, dist / referenceDistance);
+        distAttenTable = 15 * Math.log10(reducedRatio);
+      } else {
+        const normalRatio = dist / referenceDistance;
+        distAttenTable = nearFieldDistance > referenceDistance 
+          ? 15 * Math.log10(nearFieldDistance / referenceDistance) + 20 * Math.log10(dist / nearFieldDistance)
+          : 20 * Math.log10(normalRatio);
+      }
+      
       const singleSplTableFF = splAtReference - distAttenTable;
       const adjustedSingleSplTable = singleSplTableFF + acousticDbAdjustment;
       const combinedSplTable = adjustedSingleSplTable + (speakerCount > 0 ? 10 * Math.log10(speakerCount) : -Infinity);
@@ -1781,13 +1823,449 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
     });
     setDistanceTable(newDistanceTable);
     
-  }, [effectiveSensitivity, speakerPower, speakerCount, referenceDistance, measurementDistance, roomAcoustics, ambientNoiseLevel]);
+  }, [effectiveSensitivity, speakerPower, speakerCount, referenceDistance, measurementDistance, roomAcoustics, roomSize, ambientNoiseLevel]);
+  
+  // Function to export table data to CSV
+  const exportToCSV = () => {
+    if (distanceTable.length === 0) return;
+    
+    // Create CSV content
+    const headers = ['Distance (m)', 'SPL (dB)', 'SNR (dB)', 'Intelligibility'];
+    const csvRows = [headers.join(',')];
+    
+    distanceTable.forEach(entry => {
+      const distanceSnr = isFinite(entry.spl) ? entry.spl - ambientNoiseLevel : -Infinity;
+      let distanceIntelligibility: string;
+      if (!isFinite(entry.spl)) distanceIntelligibility = 'N/A';
+      else if (distanceSnr >= 25) distanceIntelligibility = 'Excellent';
+      else if (distanceSnr >= 20) distanceIntelligibility = 'Very Good';
+      else if (distanceSnr >= 15) distanceIntelligibility = 'Good';
+      else if (distanceSnr >= 10) distanceIntelligibility = 'Fair';
+      else if (distanceSnr >= 5) distanceIntelligibility = 'Poor';
+      else distanceIntelligibility = 'Unintelligible';
+      
+      const row = [
+        entry.distance,
+        isFinite(entry.spl) ? entry.spl.toFixed(1) : 'N/A',
+        isFinite(distanceSnr) ? distanceSnr.toFixed(1) : 'N/A',
+        distanceIntelligibility
+      ];
+      csvRows.push(row.join(','));
+    });
+    
+    // Create and trigger download
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'spl_calculations.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  // Function to print the results
+  const printResults = () => {
+    window.print();
+  };
+  
+  // Custom SPL Chart Component
+  const CustomSplChart = ({ distanceTable, ambientNoiseLevel, measurementDistance }: { 
+    distanceTable: { distance: number; spl: number }[]; 
+    ambientNoiseLevel: number;
+    measurementDistance: number;
+  }) => {
+    const svgRef = useRef<SVGSVGElement>(null);
+    
+    useEffect(() => {
+      if (!svgRef.current || distanceTable.length === 0) return;
+      
+      const svg = svgRef.current;
+      
+      // Clear previous content
+      while (svg.firstChild) {
+        svg.removeChild(svg.firstChild);
+      }
+      
+      // Set dimensions explicitly to ensure proper sizing
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      
+      // Set chart dimensions
+      const width = svg.clientWidth || 800;
+      const height = svg.clientHeight || 280;
+      const margin = { top: 20, right: 60, bottom: 40, left: 60 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+      
+      // Get y-axis min/max values
+      const maxSpl = Math.max(...distanceTable.map(d => isFinite(d.spl) ? d.spl : 0));
+      const minSpl = Math.min(...distanceTable.map(d => isFinite(d.spl) ? d.spl : 999));
+      const yMin = Math.max(20, Math.min(ambientNoiseLevel - 10, minSpl - 10));
+      const yMax = Math.min(140, Math.max(ambientNoiseLevel + 10, maxSpl + 10));
+      
+      // Define logarithmic x-scale
+      const logScale = (value: number, minValue: number, maxValue: number, targetMin: number, targetMax: number) => {
+        // Convert to log space, perform linear mapping, and then convert back
+        const logMin = Math.log(minValue);
+        const logMax = Math.log(maxValue);
+        const scale = (Math.log(value) - logMin) / (logMax - logMin);
+        return targetMin + scale * (targetMax - targetMin);
+      };
+      
+      // Define x-axis ticks
+      const xTicks = [1, 2, 5, 10, 20, 50];
+      const minDistance = 1;
+      const maxDistance = 50;
+      
+      // Create group for the chart
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('transform', `translate(${margin.left},${margin.top})`);
+      svg.appendChild(g);
+      
+      // Add grid lines
+      const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      grid.setAttribute('class', 'grid');
+      
+      // Vertical grid lines (x-axis)
+      xTicks.forEach(tick => {
+        const x = logScale(tick, minDistance, maxDistance, 0, chartWidth);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x.toString());
+        line.setAttribute('y1', '0');
+        line.setAttribute('x2', x.toString());
+        line.setAttribute('y2', chartHeight.toString());
+        line.setAttribute('stroke', '#e5e7eb');
+        line.setAttribute('stroke-dasharray', '3,3');
+        grid.appendChild(line);
+      });
+      
+      // Horizontal grid lines (y-axis)
+      const yStep = Math.ceil((yMax - yMin) / 5);
+      for (let i = Math.ceil(yMin / yStep) * yStep; i <= yMax; i += yStep) {
+        const y = chartHeight - ((i - yMin) / (yMax - yMin)) * chartHeight;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', '0');
+        line.setAttribute('y1', y.toString());
+        line.setAttribute('x2', chartWidth.toString());
+        line.setAttribute('y2', y.toString());
+        line.setAttribute('stroke', '#e5e7eb');
+        line.setAttribute('stroke-dasharray', '3,3');
+        grid.appendChild(line);
+      }
+      
+      g.appendChild(grid);
+      
+      // Draw x-axis
+      const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      xAxis.setAttribute('class', 'x-axis');
+      
+      // X-axis line
+      const xAxisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      xAxisLine.setAttribute('x1', '0');
+      xAxisLine.setAttribute('y1', chartHeight.toString());
+      xAxisLine.setAttribute('x2', chartWidth.toString());
+      xAxisLine.setAttribute('y2', chartHeight.toString());
+      xAxisLine.setAttribute('stroke', '#4b5563');
+      xAxis.appendChild(xAxisLine);
+      
+      // X-axis ticks and labels
+      xTicks.forEach(tick => {
+        const x = logScale(tick, minDistance, maxDistance, 0, chartWidth);
+        
+        // Tick
+        const tickLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tickLine.setAttribute('x1', x.toString());
+        tickLine.setAttribute('y1', chartHeight.toString());
+        tickLine.setAttribute('x2', x.toString());
+        tickLine.setAttribute('y2', (chartHeight + 6).toString());
+        tickLine.setAttribute('stroke', '#4b5563');
+        xAxis.appendChild(tickLine);
+        
+        // Label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', x.toString());
+        text.setAttribute('y', (chartHeight + 20).toString());
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('fill', '#4b5563');
+        text.textContent = tick.toString();
+        xAxis.appendChild(text);
+      });
+      
+      // X-axis label
+      const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      xLabel.setAttribute('x', (chartWidth / 2).toString());
+      xLabel.setAttribute('y', (chartHeight + 35).toString());
+      xLabel.setAttribute('text-anchor', 'middle');
+      xLabel.setAttribute('font-size', '11');
+      xLabel.setAttribute('fill', '#4b5563');
+      xLabel.textContent = 'Distance (m)';
+      xAxis.appendChild(xLabel);
+      
+      g.appendChild(xAxis);
+      
+      // Draw y-axis
+      const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      yAxis.setAttribute('class', 'y-axis');
+      
+      // Y-axis line
+      const yAxisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      yAxisLine.setAttribute('x1', '0');
+      yAxisLine.setAttribute('y1', '0');
+      yAxisLine.setAttribute('x2', '0');
+      yAxisLine.setAttribute('y2', chartHeight.toString());
+      yAxisLine.setAttribute('stroke', '#4b5563');
+      yAxis.appendChild(yAxisLine);
+      
+      // Y-axis ticks and labels
+      for (let i = Math.ceil(yMin / yStep) * yStep; i <= yMax; i += yStep) {
+        const y = chartHeight - ((i - yMin) / (yMax - yMin)) * chartHeight;
+        
+        // Tick
+        const tickLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tickLine.setAttribute('x1', '0');
+        tickLine.setAttribute('y1', y.toString());
+        tickLine.setAttribute('x2', '-6');
+        tickLine.setAttribute('y2', y.toString());
+        tickLine.setAttribute('stroke', '#4b5563');
+        yAxis.appendChild(tickLine);
+        
+        // Label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '-10');
+        text.setAttribute('y', (y + 4).toString());
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('fill', '#4b5563');
+        text.textContent = i.toString();
+        yAxis.appendChild(text);
+      }
+      
+      // Y-axis label
+      const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      yLabel.setAttribute('transform', `translate(-40,${chartHeight / 2}) rotate(-90)`);
+      yLabel.setAttribute('text-anchor', 'middle');
+      yLabel.setAttribute('font-size', '11');
+      yLabel.setAttribute('fill', '#4b5563');
+      yLabel.textContent = 'dB';
+      yAxis.appendChild(yLabel);
+      
+      g.appendChild(yAxis);
+      
+      // Plot ambient noise line
+      const ambientLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      ambientLine.setAttribute('x1', '0');
+      ambientLine.setAttribute('y1', (chartHeight - ((ambientNoiseLevel - yMin) / (yMax - yMin)) * chartHeight).toString());
+      ambientLine.setAttribute('x2', chartWidth.toString());
+      ambientLine.setAttribute('y2', (chartHeight - ((ambientNoiseLevel - yMin) / (yMax - yMin)) * chartHeight).toString());
+      ambientLine.setAttribute('stroke', '#ef4444');
+      ambientLine.setAttribute('stroke-width', '1.5');
+      ambientLine.setAttribute('stroke-dasharray', '4,4');
+      g.appendChild(ambientLine);
+      
+      // Plot SPL line
+      const splLinePoints: [number, number][] = [];
+      distanceTable.forEach(point => {
+        if (isFinite(point.spl)) {
+          const x = logScale(point.distance, minDistance, maxDistance, 0, chartWidth);
+          const y = chartHeight - ((point.spl - yMin) / (yMax - yMin)) * chartHeight;
+          splLinePoints.push([x, y]);
+        }
+      });
+      
+      if (splLinePoints.length > 0) {
+        // Draw SPL line
+        let pathD = `M ${splLinePoints[0][0]} ${splLinePoints[0][1]}`;
+        for (let i = 1; i < splLinePoints.length; i++) {
+          pathD += ` L ${splLinePoints[i][0]} ${splLinePoints[i][1]}`;
+        }
+        
+        const splPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        splPath.setAttribute('d', pathD);
+        splPath.setAttribute('fill', 'none');
+        splPath.setAttribute('stroke', '#3b82f6');
+        splPath.setAttribute('stroke-width', '2');
+        g.appendChild(splPath);
+        
+        // Draw SPL dots
+        splLinePoints.forEach(([x, y], index) => {
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', x.toString());
+          circle.setAttribute('cy', y.toString());
+          circle.setAttribute('r', distanceTable[index].distance === measurementDistance ? '5' : '3');
+          circle.setAttribute('fill', '#3b82f6');
+          
+          // Highlight selected distance
+          if (distanceTable[index].distance === measurementDistance) {
+            const highlight = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            highlight.setAttribute('cx', x.toString());
+            highlight.setAttribute('cy', y.toString());
+            highlight.setAttribute('r', '8');
+            highlight.setAttribute('fill', 'transparent');
+            highlight.setAttribute('stroke', '#3b82f6');
+            highlight.setAttribute('stroke-width', '1');
+            highlight.setAttribute('opacity', '0.5');
+            g.appendChild(highlight);
+          }
+          
+          g.appendChild(circle);
+        });
+      }
+      
+      // Plot SNR line
+      const snrLinePoints: [number, number][] = [];
+      distanceTable.forEach(point => {
+        if (isFinite(point.spl)) {
+          const snr = point.spl - ambientNoiseLevel;
+          const x = logScale(point.distance, minDistance, maxDistance, 0, chartWidth);
+          const y = chartHeight - ((snr - yMin) / (yMax - yMin)) * chartHeight;
+          
+          // Only add if within chart bounds
+          if (y >= 0 && y <= chartHeight) {
+            snrLinePoints.push([x, y]);
+          }
+        }
+      });
+      
+      if (snrLinePoints.length > 0) {
+        // Draw SNR line
+        let pathD = `M ${snrLinePoints[0][0]} ${snrLinePoints[0][1]}`;
+        for (let i = 1; i < snrLinePoints.length; i++) {
+          pathD += ` L ${snrLinePoints[i][0]} ${snrLinePoints[i][1]}`;
+        }
+        
+        const snrPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        snrPath.setAttribute('d', pathD);
+        snrPath.setAttribute('fill', 'none');
+        snrPath.setAttribute('stroke', '#10b981');
+        snrPath.setAttribute('stroke-width', '2');
+        g.appendChild(snrPath);
+        
+        // Draw SNR dots
+        snrLinePoints.forEach(([x, y]) => {
+          // Only draw dots if within chart bounds
+          if (y >= 0 && y <= chartHeight) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', x.toString());
+            circle.setAttribute('cy', y.toString());
+            circle.setAttribute('r', '3');
+            circle.setAttribute('fill', '#10b981');
+            g.appendChild(circle);
+          }
+        });
+      }
+      
+      // Add legend
+      const legend = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      legend.setAttribute('class', 'legend');
+      legend.setAttribute('transform', `translate(${chartWidth - 160}, 10)`);
+      
+      // SPL legend item
+      const splLegend = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      
+      const splLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      splLine.setAttribute('x1', '0');
+      splLine.setAttribute('y1', '6');
+      splLine.setAttribute('x2', '20');
+      splLine.setAttribute('y2', '6');
+      splLine.setAttribute('stroke', '#3b82f6');
+      splLine.setAttribute('stroke-width', '2');
+      splLegend.appendChild(splLine);
+      
+      const splDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      splDot.setAttribute('cx', '10');
+      splDot.setAttribute('cy', '6');
+      splDot.setAttribute('r', '3');
+      splDot.setAttribute('fill', '#3b82f6');
+      splLegend.appendChild(splDot);
+      
+      const splText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      splText.setAttribute('x', '25');
+      splText.setAttribute('y', '10');
+      splText.setAttribute('font-size', '10');
+      splText.setAttribute('fill', '#4b5563');
+      splText.textContent = 'Combined SPL';
+      splLegend.appendChild(splText);
+      
+      legend.appendChild(splLegend);
+      
+      // SNR legend item
+      const snrLegend = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      snrLegend.setAttribute('transform', 'translate(0, 20)');
+      
+      const snrLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      snrLine.setAttribute('x1', '0');
+      snrLine.setAttribute('y1', '6');
+      snrLine.setAttribute('x2', '20');
+      snrLine.setAttribute('y2', '6');
+      snrLine.setAttribute('stroke', '#10b981');
+      snrLine.setAttribute('stroke-width', '2');
+      snrLegend.appendChild(snrLine);
+      
+      const snrDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      snrDot.setAttribute('cx', '10');
+      snrDot.setAttribute('cy', '6');
+      snrDot.setAttribute('r', '3');
+      snrDot.setAttribute('fill', '#10b981');
+      snrLegend.appendChild(snrDot);
+      
+      const snrText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      snrText.setAttribute('x', '25');
+      snrText.setAttribute('y', '10');
+      snrText.setAttribute('font-size', '10');
+      snrText.setAttribute('fill', '#4b5563');
+      snrText.textContent = 'Signal-to-Noise Ratio';
+      snrLegend.appendChild(snrText);
+      
+      legend.appendChild(snrLegend);
+      
+      // Ambient noise legend item
+      const ambientLegend = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      ambientLegend.setAttribute('transform', 'translate(0, 40)');
+      
+      const ambientLegendLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      ambientLegendLine.setAttribute('x1', '0');
+      ambientLegendLine.setAttribute('y1', '6');
+      ambientLegendLine.setAttribute('x2', '20');
+      ambientLegendLine.setAttribute('y2', '6');
+      ambientLegendLine.setAttribute('stroke', '#ef4444');
+      ambientLegendLine.setAttribute('stroke-width', '1.5');
+      ambientLegendLine.setAttribute('stroke-dasharray', '4,4');
+      ambientLegend.appendChild(ambientLegendLine);
+      
+      const ambientText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ambientText.setAttribute('x', '25');
+      ambientText.setAttribute('y', '10');
+      ambientText.setAttribute('font-size', '10');
+      ambientText.setAttribute('fill', '#4b5563');
+      ambientText.textContent = 'Ambient Noise';
+      ambientLegend.appendChild(ambientText);
+      
+      legend.appendChild(ambientLegend);
+      
+      g.appendChild(legend);
+      
+    }, [distanceTable, ambientNoiseLevel, measurementDistance]);
+    
+    return (
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
+        style={{ minHeight: "280px" }}
+      ></svg>
+    );
+  };
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Input Section */}
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Speaker Specifications</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-medium text-lg text-gray-800">Speaker Specifications</h3>
+        </div>
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1857,21 +2335,39 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
           </div>
         </div>
         
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Room Acoustics
-          </label>
-          <select
-            value={roomAcoustics}
-            onChange={(e) => setRoomAcoustics(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
-            {ROOM_ACOUSTIC_TYPES.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room Acoustics
+            </label>
+            <select
+              value={roomAcoustics}
+              onChange={(e) => setRoomAcoustics(e.target.value)}
+              className="w-full p-2 border rounded-md"
+            >
+              {ROOM_ACOUSTIC_TYPES.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room Size
+            </label>
+            <select
+              value={roomSize}
+              onChange={(e) => setRoomSize(e.target.value)}
+              className="w-full p-2 border rounded-md"
+            >
+              {ROOM_SIZE_TYPES.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         
         <div className="border-t border-gray-300 my-6"></div>
@@ -1931,11 +2427,44 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
             <option value="80">80 dB - Factory</option>
           </select>
         </div>
+        
+        {/* <div className="mt-4 flex space-x-2">
+          <button
+            onClick={exportToCSV}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
+            disabled={distanceTable.length === 0}
+          >
+            <Icons.Table/> Export CSV
+          </button>
+          <button
+            onClick={printResults}
+            className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors flex items-center"
+          >
+            <Icons.Droplet/> Print Results
+          </button>
+        </div> */}
       </div>
 
       {/* Results Section */}
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="font-medium text-lg mb-4 text-blue-700">Calculation Results</h3>
+        
+        {/* Clipping Warning */}
+        {showClippingWarning && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4 flex items-start">
+            <Icons.InfoCircle />
+            <div className="ml-2">
+              <p className="font-bold">Warning: Excessive SPL</p>
+              <p className="text-sm">The calculated SPL exceeds 115 dB, which may be:</p>
+              <ul className="list-disc ml-5 text-sm">
+                <li>Beyond the performance limits of typical PA speakers</li>
+                <li>Potentially harmful to human hearing (especially with sustained exposure)</li>
+                <li>Unrealistic in typical applications</li>
+              </ul>
+              <p className="text-sm mt-1">Consider reducing power, speaker count, or increasing distance.</p>
+            </div>
+          </div>
+        )}
         
         <div className="bg-white p-4 rounded-md shadow mb-6 border border-gray-200">
           <h4 className="font-medium text-base text-gray-700 mb-3">Sound Pressure Level (SPL)</h4>
@@ -1964,7 +2493,23 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
               </div>
               <div>
                 <p className="text-gray-600">Distance Attenuation:</p>
-                <p className="font-medium">{(referenceDistance > 0 && measurementDistance > 0 && measurementDistance/referenceDistance > 0) ? (20 * Math.log10(measurementDistance / referenceDistance)).toFixed(1) : "N/A"} dB</p>
+                <p className="font-medium">{(referenceDistance > 0 && measurementDistance > 0 && measurementDistance/referenceDistance > 0) ? 
+                  (() => {
+                    const roomSizeConfig = ROOM_SIZE_TYPES.find(type => type.value === roomSize);
+                    const nearFieldDistance = roomSizeConfig ? roomSizeConfig.nearFieldDistance : 2;
+                    
+                    if (measurementDistance <= nearFieldDistance) {
+                      const reducedRatio = Math.max(1, measurementDistance / referenceDistance);
+                      return (15 * Math.log10(reducedRatio)).toFixed(1) + " dB (near-field)";
+                    } else {
+                      const normalRatio = measurementDistance / referenceDistance;
+                      const atten = nearFieldDistance > referenceDistance 
+                        ? 15 * Math.log10(nearFieldDistance / referenceDistance) + 20 * Math.log10(measurementDistance / nearFieldDistance)
+                        : 20 * Math.log10(normalRatio);
+                      return atten.toFixed(1) + " dB";
+                    }
+                  })() : "N/A"}
+                </p>
               </div>
               <div>
                 <p className="text-gray-600">Multiple Speaker Gain:</p>
@@ -2029,11 +2574,30 @@ const SplCalculator: React.FC<SplCalculatorProps> = ({ onShowTutorial }) => {
           </div>
         </div>
         
+        {/* SPL vs Distance Chart - Custom SVG Implementation */}
+        <div className="bg-white p-4 rounded-md shadow mb-6 border border-gray-200">
+          <h4 className="font-medium text-base text-gray-700 mb-3">SPL vs Distance Chart</h4>
+          
+          <div className="w-full" style={{ height: 320 }}>
+            {distanceTable.length > 0 ? (
+              <CustomSplChart 
+                distanceTable={distanceTable} 
+                ambientNoiseLevel={ambientNoiseLevel} 
+                measurementDistance={measurementDistance} 
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                No data available for chart
+              </div>
+            )}
+          </div>
+        </div>
+        
         <div className="bg-white p-4 rounded-md shadow mb-6 border border-gray-200">
           <h4 className="font-medium text-base text-gray-700 mb-3">SPL at Different Distances</h4>
           
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
+            <table ref={tableRef} className="min-w-full bg-white">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -2608,6 +3172,10 @@ const CableLossCalculator: React.FC<CableLossCalculatorProps> = ({ onShowTutoria
   const [amplifierPowerSetting, setAmplifierPowerSetting] = useState<string | number>(100);
   const [customAmplifierPower, setCustomAmplifierPower] = useState<number>(100);
   
+  // Added user-configurable amplifier output impedance
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
+  const [amplifierOutputImpedance, setAmplifierOutputImpedance] = useState<number>(0.05);
+  
   const [totalCableResistance, setTotalCableResistance] = useState<number>(0);
   const [powerLossWatts, setPowerLossWatts] = useState<number>(0);
   const [powerLossPercent, setPowerLossPercent] = useState<number>(0);
@@ -2693,9 +3261,8 @@ const CableLossCalculator: React.FC<CableLossCalculatorProps> = ({ onShowTutoria
         const I_circuit = R_load_effective > 0 ? Math.sqrt(actualAmpPower / R_load_effective) : 0; // Current through the whole circuit
         V_drop_volts = I_circuit * R_cable_total;
 
-
-        // Damping Factor: Assume amp output Z_amp_out = 0.05 Ohms (typical)
-        const Z_amp_out = 0.05;
+        // Damping Factor: Using user-configurable amplifier output impedance
+        const Z_amp_out = amplifierOutputImpedance > 0 ? amplifierOutputImpedance : 0.001; // Prevent division by zero
         const DF_original = actualSpeakerLoadImpedance / Z_amp_out;
         const DF_new = actualSpeakerLoadImpedance / (Z_amp_out + R_cable_total);
         if (DF_original > 0) {
@@ -2715,11 +3282,8 @@ const CableLossCalculator: React.FC<CableLossCalculatorProps> = ({ onShowTutoria
     const acceptable = P_loss_percent < 10; // General rule of thumb: <10% or <0.5dB loss
     setIsLossAcceptable(acceptable);
 
-    setRecommendedCableTypeLabel('');
-    setMaxSafeLengthForCurrentCable(0);
-
-    if (!acceptable && actualSpeakerLoadImpedance > 0 && cableLength > 0) {
-      // Suggest better cable
+    // Always calculate the recommended cable type and max safe length
+    if (actualSpeakerLoadImpedance > 0 && cableLength > 0) {
       // Target R_cable_total to achieve <10% loss. For low-Z: R_cable / (R_speaker + R_cable) < 0.1 => R_cable < 0.1 * R_speaker / 0.9
       const target_R_cable_total_lowZ = (0.1 * actualSpeakerLoadImpedance) / 0.9;
       // For CV: (I^2 * R_cable) / P_amp < 0.1 => R_cable < 0.1 * P_amp / I^2 = 0.1 * V_nom^2 / P_amp
@@ -2732,10 +3296,14 @@ const CableLossCalculator: React.FC<CableLossCalculatorProps> = ({ onShowTutoria
         .filter(c => c.value !== 'custom' && c.resistance < resPerMeter && c.resistance <= target_res_per_meter)
         .sort((a,b) => a.resistance - b.resistance)[0]; // Get the one just better or best
       
-      if (betterCable) {
-        setRecommendedCableTypeLabel(betterCable.label);
-      } else if (resPerMeter > target_res_per_meter){
-         setRecommendedCableTypeLabel('Thicker custom cable needed or reduce length / use CV.');
+      if (!acceptable) {
+        if (betterCable) {
+          setRecommendedCableTypeLabel(betterCable.label);
+        } else if (resPerMeter > target_res_per_meter){
+           setRecommendedCableTypeLabel('Thicker custom cable needed or reduce length / use CV.');
+        }
+      } else {
+        setRecommendedCableTypeLabel('');
       }
 
       // Max length for current cable for <10% loss
@@ -2747,237 +3315,312 @@ const CableLossCalculator: React.FC<CableLossCalculatorProps> = ({ onShowTutoria
       }
     }
     
-  }, [cableType, customResistancePerMeter, cableLength, speakerImpedanceType, customLowImpedance, amplifierPowerSetting, customAmplifierPower]);
+  }, [cableType, customResistancePerMeter, cableLength, speakerImpedanceType, customLowImpedance, amplifierPowerSetting, customAmplifierPower, amplifierOutputImpedance]);
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Input Section */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Cable & System Specifications</h3>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Cable Type (Wire Gauge)</label>
-          <select value={cableType} onChange={(e) => setCableType(e.target.value)} className="w-full p-2 border rounded-md">
-            {CABLE_LOSS_CABLE_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {cableType === 'custom' && (
-            <div className="mt-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Custom Resistance (Ω per meter, per conductor)</label>
-              <input type="number" min="0.0001" step="0.0001" value={customResistancePerMeter} onChange={(e) => setCustomResistancePerMeter(Number(e.target.value))} className="w-full p-2 border rounded-md"/>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Input Section */}
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <h3 className="font-medium text-lg mb-4 text-gray-700">Cable & System Specifications</h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cable Type (Wire Gauge)</label>
+            <select 
+              value={cableType} 
+              onChange={(e) => setCableType(e.target.value)} 
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              {CABLE_LOSS_CABLE_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {cableType === 'custom' && (
+              <div className="mt-2 pl-4 border-l-4 border-blue-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Custom Resistance (Ω per meter, per conductor)</label>
+                <input 
+                  type="number" 
+                  min="0.0001" 
+                  step="0.0001" 
+                  value={customResistancePerMeter} 
+                  onChange={(e) => setCustomResistancePerMeter(Number(e.target.value))} 
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cable Length (meters, one-way)</label>
+            <input 
+              type="number" 
+              min="1" 
+              value={cableLength} 
+              onChange={(e) => setCableLength(Number(e.target.value) > 0 ? Number(e.target.value) : 1)} 
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
+          <div className="border-t border-gray-300 my-6"></div>
+          
+          <h3 className="font-medium text-lg mb-4 text-gray-700">Load & Amplifier Specifications</h3>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Speaker/System Load Type</label>
+            <select
+              value={speakerImpedanceType}
+              onChange={(e) => setSpeakerImpedanceType(e.target.value === 'custom_Z' || e.target.value.includes('v_load') ? e.target.value : Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              {CABLE_LOSS_SPEAKER_IMPEDANCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {speakerImpedanceType === 'custom_Z' && (
+              <div className="mt-2 pl-4 border-l-4 border-blue-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Custom Low Impedance (Ohms)</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  step="0.1" 
+                  value={customLowImpedance} 
+                  onChange={(e) => setCustomLowImpedance(Number(e.target.value))} 
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
+            {(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && (
+              <p className="text-xs text-gray-500 mt-1">For 70V/100V systems, the load impedance is calculated based on the total power drawn by the speakers on the line.</p>
+            )}
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Amplifier Power / Total Speaker Power (Watts)</label>
+            <select
+              value={amplifierPowerSetting}
+              onChange={(e) => setAmplifierPowerSetting(e.target.value === 'custom_W' ? e.target.value : Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              {CABLE_LOSS_AMPLIFIER_POWER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {amplifierPowerSetting === 'custom_W' && (
+              <div className="mt-2 pl-4 border-l-4 border-blue-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Custom Power (Watts)</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={customAmplifierPower} 
+                  onChange={(e) => setCustomAmplifierPower(Number(e.target.value))} 
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">For 70V/100V, this is the total power of all speaker taps on the line. For Low-Z, it's the amplifier output power for that load.</p>
+          </div>
+          
+          {/* Advanced Settings Toggle */}
+          <div className="mb-4">
+            <button 
+              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center"
+            >
+              {showAdvancedSettings ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
+              <svg 
+                className={`ml-1 h-4 w-4 transform ${showAdvancedSettings ? 'rotate-180' : ''}`} 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showAdvancedSettings && (
+              <div className="mt-2 pl-4 border-l-4 border-blue-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Amplifier Output Impedance (Ohms)
+                </label>
+                <input 
+                  type="number" 
+                  min="0.001" 
+                  step="0.001" 
+                  value={amplifierOutputImpedance} 
+                  onChange={(e) => setAmplifierOutputImpedance(Number(e.target.value))} 
+                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Typical values are 0.01-0.1 Ohms. Used for damping factor calculations.</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-3 bg-gray-100 rounded-md mt-4">
+            <h4 className="font-medium text-sm text-gray-700 mb-2">Cable Gauge Reference (Resistance per meter, per conductor)</h4>
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              {CABLE_LOSS_CABLE_TYPES.filter(c => c.value !== 'custom').map(c => (
+                <div key={c.value} className="flex justify-between">
+                  <span>{c.label}:</span> 
+                  <span>{c.resistance.toFixed(4)} Ω/m</span>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Cable Length (meters, one-way)</label>
-          <input type="number" min="1" value={cableLength} onChange={(e) => setCableLength(Number(e.target.value) > 0 ? Number(e.target.value) : 1)} className="w-full p-2 border rounded-md"/>
-        </div>
-        
-        <div className="border-t border-gray-300 my-6"></div>
-        
-        <h3 className="font-medium text-lg mb-4">Load & Amplifier Specifications</h3>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Speaker/System Load Type</label>
-          <select
-            value={speakerImpedanceType}
-            onChange={(e) => setSpeakerImpedanceType(e.target.value === 'custom_Z' || e.target.value.includes('v_load') ? e.target.value : Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
-          >
-            {CABLE_LOSS_SPEAKER_IMPEDANCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {speakerImpedanceType === 'custom_Z' && (
-            <div className="mt-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Custom Low Impedance (Ohms)</label>
-              <input type="number" min="1" step="0.1" value={customLowImpedance} onChange={(e) => setCustomLowImpedance(Number(e.target.value))} className="w-full p-2 border rounded-md"/>
-            </div>
-          )}
-           {(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && (
-             <p className="text-xs text-gray-500 mt-1">For 70V/100V systems, the load impedance is calculated based on the total power drawn by the speakers on the line.</p>
-           )}
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Amplifier Power / Total Speaker Power (Watts)</label>
-          <select
-            value={amplifierPowerSetting}
-            onChange={(e) => setAmplifierPowerSetting(e.target.value === 'custom_W' ? e.target.value : Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
-          >
-            {CABLE_LOSS_AMPLIFIER_POWER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {amplifierPowerSetting === 'custom_W' && (
-            <div className="mt-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Custom Power (Watts)</label>
-              <input type="number" min="1" value={customAmplifierPower} onChange={(e) => setCustomAmplifierPower(Number(e.target.value))} className="w-full p-2 border rounded-md"/>
-            </div>
-          )}
-          <p className="text-xs text-gray-500 mt-1">For 70V/100V, this is the total power of all speaker taps on the line. For Low-Z, it's the amplifier output power for that load.</p>
-        </div>
-        
-        <div className="p-3 bg-gray-100 rounded-md mt-4">
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Cable Gauge Reference (Resistance per meter, per conductor)</h4>
-          <div className="overflow-x-auto text-xs">
-            {CABLE_LOSS_CABLE_TYPES.filter(c => c.value !== 'custom').map(c => (
-                <div key={c.value} className="grid grid-cols-2 gap-1"><span>{c.label}:</span> <span>{c.resistance.toFixed(4)} Ω/m</span></div>
-            ))}
           </div>
         </div>
-      </div>
 
-      {/* Results Section */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4 text-blue-700">Cable Loss Calculation Results</h3>
-        
-        <div className="bg-white p-4 rounded-md shadow mb-6 border">
-          <h4 className="font-medium text-base text-gray-700 mb-3">Loss Summary</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Total Cable Resistance (Round Trip):</p>
-              <p className="font-semibold text-gray-800">{totalCableResistance.toFixed(3)} Ω</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Power Loss:</p>
-              <p className={`font-semibold ${!isLossAcceptable ? 'text-red-600' : 'text-gray-800'}`}>
-                {powerLossWatts.toFixed(2)} W ({powerLossPercent.toFixed(2)}%)
-              </p>
-               <p className="text-xs text-gray-500">({(10 * Math.log10(1 - powerLossPercent/100)).toFixed(2)} dB loss)</p>
-            </div>
-          </div>
-          <div className="mt-4 bg-blue-100 p-3 rounded-md">
+        {/* Results Section */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-medium text-lg mb-4 text-blue-700">Cable Loss Calculation Results</h3>
+          
+          <div className="bg-white p-4 rounded-md shadow-sm mb-6 border border-gray-200">
+            <h4 className="font-medium text-base text-gray-700 mb-3">Loss Summary</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-700">Initial Power:</p>
-                <p className="font-medium">{typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting} W</p>
+                <p className="text-sm text-gray-600">Total Cable Resistance (Round Trip):</p>
+                <p className="font-semibold text-gray-800">{totalCableResistance.toFixed(3)} Ω</p>
               </div>
               <div>
-                <p className="text-sm text-gray-700">Power Delivered to Load:</p>
-                <p className="font-bold text-blue-700">{actualPowerDeliveredWatts.toFixed(2)} W</p>
+                <p className="text-sm text-gray-600">Power Loss:</p>
+                <p className={`font-semibold ${!isLossAcceptable ? 'text-red-600' : 'text-gray-800'}`}>
+                  {powerLossWatts.toFixed(2)} W ({powerLossPercent.toFixed(2)}%)
+                </p>
+                <p className="text-xs text-gray-500">({(10 * Math.log10(1 - powerLossPercent/100)).toFixed(2)} dB loss)</p>
               </div>
             </div>
-            <div className={`mt-2 p-2 rounded-md ${isLossAcceptable ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
-              <p className={`text-sm font-medium ${isLossAcceptable ? 'text-green-700' : 'text-red-700'}`}>
-                {isLossAcceptable ? 'Power loss is within acceptable range (<10% or <0.5dB).' : 'Power loss exceeds typical acceptable limits.'}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 rounded-md shadow mb-6 border">
-          <h4 className="font-medium text-base text-gray-700 mb-3">Detailed Analysis</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Voltage Drop Across Cable:</p>
-              <p className="font-semibold text-gray-800">{voltageDropVolts.toFixed(2)} V</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Effective Load (Speaker + Cable):</p>
-              <p className="font-semibold text-gray-800">{effectiveLoadImpedanceOhms.toFixed(2)} Ω</p>
+            <div className="mt-4 bg-blue-100 p-3 rounded-md">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-700">Initial Power:</p>
+                  <p className="font-medium">{typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting} W</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-700">Power Delivered to Load:</p>
+                  <p className="font-bold text-blue-700">{actualPowerDeliveredWatts.toFixed(2)} W</p>
+                </div>
+              </div>
+              <div className={`mt-2 p-2 rounded-md ${isLossAcceptable ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
+                <p className={`text-sm font-medium ${isLossAcceptable ? 'text-green-700' : 'text-red-700'}`}>
+                  {isLossAcceptable ? 'Power loss is within acceptable range (<10% or <0.5dB).' : 'Power loss exceeds typical acceptable limits.'}
+                </p>
+              </div>
             </div>
           </div>
           
-          {!(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600">Damping Factor Reduction:</p>
-              <p className={`font-semibold ${dampingFactorReductionPercent > 50 ? 'text-red-600' : 'text-gray-800'}`}>
-                {dampingFactorReductionPercent.toFixed(1)}%
-              </p>
-              <p className="text-xs text-gray-500">Significant reduction can affect bass tightness. Aim for 50%.</p>
+          <div className="bg-white p-4 rounded-md shadow-sm mb-6 border border-gray-200">
+            <h4 className="font-medium text-base text-gray-700 mb-3">Detailed Analysis</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Voltage Drop Across Cable:</p>
+                <p className="font-semibold text-gray-800">{voltageDropVolts.toFixed(2)} V</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Effective Load (Speaker + Cable):</p>
+                <p className="font-semibold text-gray-800">{effectiveLoadImpedanceOhms.toFixed(2)} Ω</p>
+              </div>
             </div>
-          )}
-          
-          {!isLossAcceptable && (
+            
+            {!(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600">Damping Factor Reduction:</p>
+                <p className={`font-semibold ${dampingFactorReductionPercent > 50 ? 'text-orange-600' : 'text-gray-800'}`}>
+                  {dampingFactorReductionPercent.toFixed(1)}%
+                </p>
+                <p className="text-xs text-gray-500">Significant reduction can affect bass tightness. Aim for 50% reduction.</p>
+              </div>
+            )}
+            
             <div className="mt-4 bg-yellow-50 p-3 rounded-md border border-yellow-200">
-              <h5 className="font-medium text-sm text-yellow-800 mb-1">Recommendations to Reduce Loss:</h5>
-              {recommendedCableTypeLabel && <p className="text-sm text-yellow-700">Consider using a thicker cable: <strong>{recommendedCableTypeLabel}</strong></p>}
-              {maxSafeLengthForCurrentCable > 0 && <p className="text-sm text-yellow-700 mt-1">Max length for current cable (for 10% loss): <strong>{maxSafeLengthForCurrentCable.toFixed(1)} m</strong></p>}
-              {!(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && cableLength > 20 && <p className="text-sm text-yellow-700 mt-1">For long runs with low impedance, consider switching to a 70V/100V system.</p>}
-               <p className="text-sm text-yellow-700 mt-1">Alternatively, use multiple parallel cable runs (effectively thicker wire) or a higher impedance speaker load if possible.</p>
+              <h5 className="font-medium text-sm text-yellow-800 mb-1">Cable Length Assessment:</h5>
+              {!isLossAcceptable && (
+                <>
+                  {recommendedCableTypeLabel && <p className="text-sm text-yellow-700">Consider using a thicker cable: <strong>{recommendedCableTypeLabel}</strong></p>}
+                  {maxSafeLengthForCurrentCable > 0 && <p className="text-sm text-yellow-700 mt-1">Max length for current cable (for 10% loss): <strong>{maxSafeLengthForCurrentCable.toFixed(1)} m</strong></p>}
+                  {!(speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') && cableLength > 20 && <p className="text-sm text-yellow-700 mt-1">For long runs with low impedance, consider switching to a 70V/100V system.</p>}
+                  <p className="text-sm text-yellow-700 mt-1">Alternatively, use multiple parallel cable runs (effectively thicker wire) or a higher impedance speaker load if possible.</p>
+                </>
+              )}
+              {isLossAcceptable && (
+                <p className="text-sm text-green-700">
+                  <strong>Current cable length is within acceptable limits.</strong> Maximum recommended length with this cable is <strong>{maxSafeLengthForCurrentCable.toFixed(1)} m</strong> before losses exceed 10%.
+                </p>
+              )}
             </div>
-          )}
-        </div>
-        
-        <div className="bg-white p-4 rounded-md shadow mb-6 border">
-          <h4 className="font-medium text-base text-gray-700 mb-3">Estimated Loss vs. Distance (for current cable & load)</h4>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase">Dist (m)</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase">R_cable (Ω)</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase">Loss (%)</th>
-                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {[10, 20, 30, 50, 75, 100, 150, 200].map(dist => {
-                  let resPerM: number;
-                  if (cableType === 'custom') resPerM = customResistancePerMeter > 0 ? customResistancePerMeter : 0.00001;
-                  else resPerM = CABLE_LOSS_CABLE_TYPES.find(c=>c.value===cableType)?.resistance || 0.01;
-                  
-                  const R_cab = resPerM * dist * 2;
-                  let R_load_eff_dist: number;
-                  let P_loss_pc_dist = 0;
-                  let actualSpkLoadZ: number;
-
-                  if (speakerImpedanceType === '70v_load') actualSpkLoadZ = ( (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) > 0 ? (70*70) / (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) : Infinity);
-                  else if (speakerImpedanceType === '100v_load') actualSpkLoadZ = ( (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) > 0 ? (100*100) / (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) : Infinity);
-                  else if (speakerImpedanceType === 'custom_Z') actualSpkLoadZ = customLowImpedance > 0 ? customLowImpedance : 0.1;
-                  else actualSpkLoadZ = Number(speakerImpedanceType) > 0 ? Number(speakerImpedanceType) : 0.1;
-
-                  R_load_eff_dist = actualSpkLoadZ + R_cab;
-
-                  if(R_load_eff_dist > 0) {
-                    if (speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') {
-                        const nomV = speakerImpedanceType === '70v_load' ? 70:100;
-                        const P_amp = typeof amplifierPowerSetting === 'string' ? customAmplifierPower : Number(amplifierPowerSetting);
-                        const I_line_dist = P_amp > 0 && nomV > 0 ? P_amp / nomV : 0;
-                        const P_loss_W_dist = I_line_dist * I_line_dist * R_cab;
-                        if (P_amp > 0) P_loss_pc_dist = (P_loss_W_dist / P_amp) * 100;
-                    } else {
-                        P_loss_pc_dist = (R_cab / R_load_eff_dist) * 100;
-                    }
-                  }
-                  const isDistOK = P_loss_pc_dist < 10;
-                  
-                  return (
-                    <tr key={dist} className={dist === cableLength ? 'bg-blue-100' : ''}>
-                      <td className="py-2 px-3 text-sm font-medium text-gray-900">{dist}{dist === cableLength && '*'}</td>
-                      <td className="py-2 px-3 text-sm text-gray-900">{R_cab.toFixed(3)}</td>
-                      <td className="py-2 px-3 text-sm text-gray-900">{P_loss_pc_dist.toFixed(2)}</td>
-                      <td className={`py-2 px-3 text-sm font-medium ${isDistOK ? 'text-green-600' : 'text-red-600'}`}>{isDistOK ? 'OK' : 'High'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <p className="text-xs text-gray-500 mt-1">* Selected length.</p>
           </div>
-        </div>
-        
-        <div className="mt-6 bg-blue-100 p-4 rounded-md border border-blue-300">
-          <h4 className="font-medium mb-2 text-blue-700">General Cable Selection Advice</h4>
-          <ul className="list-disc pl-5 mt-2 text-sm space-y-1 text-blue-800">
-            <li>Aim for 10% power loss (approx 0.5dB). For critical listening, aim for 5% (0.25dB).</li>
-            <li>Heavier gauge (lower AWG number) means lower resistance and less loss.</li>
-            <li>For 70V/100V systems, total power on the line and run length are key. Cable resistance is less critical than with low-Z, but still matters for very long runs or high power.</li>
-            <li>For low impedance (4-16Ω) systems, especially with 4Ω loads, cable resistance becomes very significant. Keep runs short or use very thick cables.</li>
-            <li>Doubling cable length doubles cable resistance and roughly doubles percentage power loss (for small losses).</li>
-            <li>Using two identical cables in parallel effectively halves the resistance (like using a cable 3 AWG steps thicker).</li>
-          </ul>
-        </div>
-        
-        <div className="mt-8 bg-gray-100 p-4 rounded-lg border">
-          <h3 className="font-medium text-lg mb-2 text-gray-700">Important Notes</h3>
-          <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-            <li>This calculator focuses on resistive losses (DC resistance). At very high frequencies or with very long cables, skin effect and cable inductance/capacitance can also play a role, but are usually minor for typical audio PA frequencies and lengths.</li>
-            <li>Cable quality (copper purity, stranding, insulation) can affect long-term performance and durability, but resistance is the primary factor for loss calculations.</li>
-            <li>Ensure good quality connectors and terminations, as poor connections can add significant resistance and be a point of failure.</li>
-            <li>Ambient temperature affects copper resistance (increases with higher temp). Calculations usually assume room temperature (20°C).</li>
-            <li>Always comply with local electrical and building codes for cable installation, especially for in-wall, plenum-rated, or fire safety (PAVA) applications.</li>
-          </ul>
+          
+          <div className="bg-white p-4 rounded-md shadow-sm mb-6 border border-gray-200">
+            <h4 className="font-medium text-base text-gray-700 mb-3">Estimated Loss vs. Distance (for current cable & load)</h4>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border-collapse">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase border border-gray-200">Dist (m)</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase border border-gray-200">R_cable (Ω)</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase border border-gray-200">Loss (%)</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-700 uppercase border border-gray-200">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[10, 20, 30, 50, 75, 100, 150, 200].map(dist => {
+                    let resPerM: number;
+                    if (cableType === 'custom') resPerM = customResistancePerMeter > 0 ? customResistancePerMeter : 0.00001;
+                    else resPerM = CABLE_LOSS_CABLE_TYPES.find(c=>c.value===cableType)?.resistance || 0.01;
+                    
+                    const R_cab = resPerM * dist * 2;
+                    let R_load_eff_dist: number;
+                    let P_loss_pc_dist = 0;
+                    let actualSpkLoadZ: number;
+
+                    if (speakerImpedanceType === '70v_load') actualSpkLoadZ = ( (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) > 0 ? (70*70) / (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) : Infinity);
+                    else if (speakerImpedanceType === '100v_load') actualSpkLoadZ = ( (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) > 0 ? (100*100) / (typeof amplifierPowerSetting === 'string' ? customAmplifierPower : amplifierPowerSetting) : Infinity);
+                    else if (speakerImpedanceType === 'custom_Z') actualSpkLoadZ = customLowImpedance > 0 ? customLowImpedance : 0.1;
+                    else actualSpkLoadZ = Number(speakerImpedanceType) > 0 ? Number(speakerImpedanceType) : 0.1;
+
+                    R_load_eff_dist = actualSpkLoadZ + R_cab;
+
+                    if(R_load_eff_dist > 0) {
+                      if (speakerImpedanceType === '70v_load' || speakerImpedanceType === '100v_load') {
+                          const nomV = speakerImpedanceType === '70v_load' ? 70:100;
+                          const P_amp = typeof amplifierPowerSetting === 'string' ? customAmplifierPower : Number(amplifierPowerSetting);
+                          const I_line_dist = P_amp > 0 && nomV > 0 ? P_amp / nomV : 0;
+                          const P_loss_W_dist = I_line_dist * I_line_dist * R_cab;
+                          if (P_amp > 0) P_loss_pc_dist = (P_loss_W_dist / P_amp) * 100;
+                      } else {
+                          P_loss_pc_dist = (R_cab / R_load_eff_dist) * 100;
+                      }
+                    }
+                    const isDistOK = P_loss_pc_dist < 10;
+                    
+                    return (
+                      <tr key={dist} className={dist === cableLength ? 'bg-blue-100' : ''}>
+                        <td className="py-2 px-3 text-sm font-medium text-gray-900 border border-gray-200">{dist}{dist === cableLength && '*'}</td>
+                        <td className="py-2 px-3 text-sm text-gray-900 border border-gray-200">{R_cab.toFixed(3)}</td>
+                        <td className="py-2 px-3 text-sm text-gray-900 border border-gray-200">{P_loss_pc_dist.toFixed(2)}</td>
+                        <td className={`py-2 px-3 text-sm font-medium border border-gray-200 ${isDistOK ? 'text-green-600' : 'text-red-600'}`}>{isDistOK ? 'OK' : 'High'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-500 mt-1">* Selected length.</p>
+            </div>
+          </div>
+          
+          <div className="bg-blue-100 p-4 rounded-md border border-blue-300">
+            <h4 className="font-medium mb-2 text-blue-700">General Cable Selection Advice</h4>
+            <ul className="list-disc pl-5 mt-2 text-sm space-y-1 text-blue-800">
+              <li>Aim for 10% power loss (approx 0.5dB). For critical listening, aim for 5% (0.25dB).</li>
+              <li>Heavier gauge (lower AWG number) means lower resistance and less loss.</li>
+              <li>For 70V/100V systems, total power on the line and run length are key. Cable resistance is less critical than with low-Z, but still matters for very long runs or high power.</li>
+              <li>For low impedance (4-16Ω) systems, especially with 4Ω loads, cable resistance becomes very significant. Keep runs short or use very thick cables.</li>
+              <li>Doubling cable length doubles cable resistance and roughly doubles percentage power loss (for small losses).</li>
+              <li>Using two identical cables in parallel effectively halves the resistance (like using a cable 3 AWG steps thicker).</li>
+            </ul>
+          </div>
+          
+          <div className="mt-6 bg-gray-100 p-4 rounded-lg border border-gray-200">
+            <h3 className="font-medium text-lg mb-2 text-gray-700">Important Notes</h3>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
+              <li>This calculator focuses on resistive losses (DC resistance). At very high frequencies or with very long cables, skin effect and cable inductance/capacitance can also play a role, but are usually minor for typical audio PA frequencies and lengths.</li>
+              <li>Cable quality (copper purity, stranding, insulation) can affect long-term performance and durability, but resistance is the primary factor for loss calculations.</li>
+              <li>Ensure good quality connectors and terminations, as poor connections can add significant resistance and be a point of failure.</li>
+              <li>Ambient temperature affects copper resistance (increases with higher temp). Calculations assume room temperature (20°C).</li>
+              <li>Always comply with local electrical and building codes for cable installation, especially for in-wall, plenum-rated, or fire safety (PAVA) applications.</li>
+            </ul>
+          </div>
         </div>
       </div>
-    </div>
   );
 };
 
@@ -3001,12 +3644,12 @@ const SURFACE_MATERIALS = [
   },
   { 
     value: 'brick', 
-    label: 'Brick (Unglazed)', 
+    label: 'Unglazed Brick', 
     coefficients: [0.03, 0.03, 0.03, 0.04, 0.05, 0.07] 
   },
   { 
     value: 'glass', 
-    label: 'Glass (Standard Windows)', 
+    label: 'Standard Windows', 
     coefficients: [0.35, 0.25, 0.18, 0.12, 0.07, 0.04] 
   },
   { 
@@ -3016,7 +3659,7 @@ const SURFACE_MATERIALS = [
   },
   { 
     value: 'carpet', 
-    label: 'Carpet (Medium Pile)', 
+    label: 'Medium Pile Carpet', 
     coefficients: [0.05, 0.10, 0.25, 0.30, 0.35, 0.40] 
   },
   { 
@@ -3036,7 +3679,7 @@ const SURFACE_MATERIALS = [
   },
   { 
     value: 'audience', 
-    label: 'Audience (Fully Occupied)', 
+    label: 'Fully Occupied Audience', 
     coefficients: [0.39, 0.57, 0.80, 0.94, 0.92, 0.87] 
   },
   { 
@@ -3752,6 +4395,7 @@ const ReverbTimeCalculator: React.FC<ReverbTimeCalculatorProps> = ({ onShowTutor
             </table>
           </div>
           
+          {/* FIXED RT60 vs Target Range Visualization */}
           <div className="mt-4 px-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium text-gray-700">RT60 vs Target Range</span>
@@ -3761,30 +4405,35 @@ const ReverbTimeCalculator: React.FC<ReverbTimeCalculatorProps> = ({ onShowTutor
                   : `${ROOM_TYPES.find(t => t.value === roomType)?.minRT.toFixed(1)} - ${ROOM_TYPES.find(t => t.value === roomType)?.maxRT.toFixed(1)} s`}
               </span>
             </div>
-            <div className="relative w-full h-5 bg-gray-200 rounded-full">
-              {/* Target Range */}
-              <div 
-                className="absolute h-full bg-green-200 rounded-full" 
-                style={{ 
-                  left: `${Math.min(100, (roomType === 'custom' ? customMinRT : (ROOM_TYPES.find(t => t.value === roomType)?.minRT || 0.5)) * 100 / 3)}%`, 
-                  width: `${Math.min(100, ((roomType === 'custom' ? customMaxRT : (ROOM_TYPES.find(t => t.value === roomType)?.maxRT || 1.0)) - (roomType === 'custom' ? customMinRT : (ROOM_TYPES.find(t => t.value === roomType)?.minRT || 0.5))) * 100 / 3)}%` 
-                }}
-              ></div>
-              
-              {/* Current RT60 */}
-              <div 
-                className={`absolute w-4 h-5 rounded-full ${isOptimalRT ? 'bg-green-600' : 'bg-red-600'}`}
-                style={{ 
-                  left: `${Math.min(100, Math.max(0, (reverbTimes['average'] * 100 / 3) - 1))}%` 
-                }}
-              ></div>
-              
-              {/* Scale Values */}
-              <div className="absolute w-full flex justify-between text-xs text-gray-500 bottom-6">
+            
+            {/* Container with proper height to accommodate the scale values */}
+            <div className="relative h-10 mt-5 mb-6">
+              {/* Scale values - positioned properly ABOVE the slider */}
+              <div className="absolute w-full flex justify-between text-xs text-gray-500 top-0">
                 <span>0s</span>
                 <span>1s</span>
                 <span>2s</span>
                 <span>3s+</span>
+              </div>
+              
+              {/* The actual slider - positioned below the scale values */}
+              <div className="absolute top-6 w-full h-5 bg-gray-200 rounded-full">
+                {/* Target Range */}
+                <div 
+                  className="absolute h-full bg-green-200 rounded-full" 
+                  style={{ 
+                    left: `${Math.min(100, (roomType === 'custom' ? customMinRT : (ROOM_TYPES.find(t => t.value === roomType)?.minRT || 0.5)) * 100 / 3)}%`, 
+                    width: `${Math.min(100, ((roomType === 'custom' ? customMaxRT : (ROOM_TYPES.find(t => t.value === roomType)?.maxRT || 1.0)) - (roomType === 'custom' ? customMinRT : (ROOM_TYPES.find(t => t.value === roomType)?.minRT || 0.5))) * 100 / 3)}%` 
+                  }}
+                ></div>
+                
+                {/* Current RT60 */}
+                <div 
+                  className={`absolute w-4 h-5 rounded-full ${isOptimalRT ? 'bg-green-600' : 'bg-red-600'}`}
+                  style={{ 
+                    left: `${Math.min(100, Math.max(0, (reverbTimes['average'] * 100 / 3) - 1))}%` 
+                  }}
+                ></div>
               </div>
             </div>
           </div>
