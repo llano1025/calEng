@@ -7,6 +7,7 @@ import RFParameterConverter from './elv/RFParameterConverter';
 import MicrostripCalculator from './elv/MicrostripCalculator';
 import CCTVSystemCalculator from './elv/CCTVSystemCalculator';
 import PublicAddressCalculator from './elv/PublicAddressCalculator';
+import AccessControlCalculator from './elv/AccessControlCalculator';
 // Import additional calculators as they are developed
 
 // Define props type for the component
@@ -43,6 +44,8 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <CCTVSystemCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'pa':
         return <PublicAddressCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'acs':
+        return <AccessControlCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -205,6 +208,26 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <h3 className="font-semibold text-sm sm:text-base">Public Address Calculator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'pa' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate PA coverage, SPL, power, cable loss, reverbation time
+              </p>
+            </div>
+          </button>
+
+          {/* ACS */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'acs'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('acs')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'acs' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Access Control Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'acs' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate power budget of access control system
               </p>
             </div>
           </button>

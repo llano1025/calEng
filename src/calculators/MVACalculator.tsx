@@ -12,7 +12,7 @@ import AHUSizingCalculator from './mvac/AHUSizingCalculator';
 // import RefrigerantCalculator from './mvac/RefrigerantCalculator';
 // import HeatRecoveryCalculator from './mvac/HeatRecoveryCalculator';
 // import PumpHeadCalculator from './mvac/PumpHeadCalculator';
-// import TutorialContent from './mvac/TutorialContent';
+import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
 interface MVACalculatorProps {
@@ -44,20 +44,20 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
         return <SteamPipeSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'ahu':
         return <AHUSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'coolingLoad':
-        return <CoolingLoadCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'fanPower':
-        return <FanPowerCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'airDiffusion':
-        return <AirDiffusionCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'chillerEfficiency':
-        return <ChillerEfficiencyCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'refrigerant':
-        return <RefrigerantCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'heatRecovery':
-        return <HeatRecoveryCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'pumpHead':
-        return <PumpHeadCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'coolingLoad':
+      //   return <CoolingLoadCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'fanPower':
+      //   return <FanPowerCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'airDiffusion':
+      //   return <AirDiffusionCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'chillerEfficiency':
+      //   return <ChillerEfficiencyCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'refrigerant':
+      //   return <RefrigerantCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'heatRecovery':
+      //   return <HeatRecoveryCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      // case 'pumpHead':
+      //   return <PumpHeadCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }

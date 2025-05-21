@@ -494,7 +494,7 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
       
       // Calculate friction factor using Colebrook-White equation approximation (Swamee-Jain)
       const relativeRoughness = (segment.roughness / 1000) / actualDiameterM;
-      let frictionFactor;
+      let frictionFactor: number;
       
       if (reynoldsNumber < 2000) { // Laminar flow
         frictionFactor = 64 / reynoldsNumber;
