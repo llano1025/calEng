@@ -13,7 +13,7 @@ const DisciplineSelection: React.FC<DisciplineSelectionProps> = ({ systems, onSe
   return (
     <section className="mb-10 animate-fade-in">
       <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">
-        1. Select Engineering Discipline
+        Select Engineering Discipline
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Map over the systems data to create buttons */}
