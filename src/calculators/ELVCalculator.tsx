@@ -9,6 +9,7 @@ import CCTVSystemCalculator from './elv/CCTVSystemCalculator';
 import PublicAddressCalculator from './elv/PublicAddressCalculator';
 import AccessControlCalculator from './elv/AccessControlCalculator';
 import AudioVisualCalculator from './elv/AudioVisualCalculator';
+import RadiationCalculator from './elv/RadiationCalculator';
 // Import additional calculators as they are developed
 
 // Define props type for the component
@@ -49,6 +50,8 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <AccessControlCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'av':
         return <AudioVisualCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'radio':
+        return <RadiationCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -251,6 +254,27 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <h3 className="font-semibold text-sm sm:text-base">Audio Visual Calculator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'av' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate projector sizing and throw length
+              </p>
+            </div>
+          </button>
+
+          
+          {/* Radioactive */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'radio'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('radio')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'radio' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Radioation Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'radio' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate dosage of radioactive source
               </p>
             </div>
           </button>

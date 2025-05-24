@@ -50,81 +50,130 @@ const ProjectorSideView: React.FC<ProjectorVisualizationProps> = ({
 }) => {
   const svgWidth = 400;
   const svgHeight = 200;
-  const scale = Math.min(svgWidth / (roomLength * 1.2), svgHeight / (ceilingHeight * 1.5));
   
-  // Calculate positions
+  // Add padding for labels and elements
+  const padding = 40;
+  const drawWidth = svgWidth - (2 * padding);
+  const drawHeight = svgHeight - (2 * padding);
+  
+  // Scale based on room dimensions
+  const scaleX = drawWidth / roomLength;
+  const scaleY = drawHeight / ceilingHeight;
+  const scale = Math.min(scaleX, scaleY);
+  
+  // Calculate actual drawing dimensions
+  const roomDrawWidth = roomLength * scale;
+  const roomDrawHeight = ceilingHeight * scale;
+  
+  // Room positioning (centered in available space)
+  const roomX = padding + (drawWidth - roomDrawWidth) / 2;
+  const roomY = padding + (drawHeight - roomDrawHeight) / 2;
+  
+  // Calculate positions within the room
   const projectorHeight = ceilingHeight - projectorOffset;
-  const projectorX = svgWidth - throwDistance * scale - 50;
-  const projectorY = svgHeight - projectorHeight * scale - 20;
-  const screenX = svgWidth - 50;
-  const screenY = svgHeight - screenCenterHeight * scale - 20;
-  const screenBottom = screenY + (screenHeight * scale) / 2;
-  const screenTop = screenY - (screenHeight * scale) / 2;
+  
+  // Position screen at the front wall of the room
+  const screenX = roomX + roomDrawWidth - 5; // 5px from wall
+  const screenCenterY = roomY + roomDrawHeight - (screenCenterHeight * scale);
+  const screenTop = screenCenterY - (screenHeight * scale) / 2;
+  const screenBottom = screenCenterY + (screenHeight * scale) / 2;
+  
+  // Position projector at calculated throw distance from screen
+  const projectorX = screenX - (throwDistance * scale);
+  const projectorY = roomY + roomDrawHeight - (projectorHeight * scale);
   
   return (
     <div className="bg-white p-4 rounded-lg border">
       <h5 className="font-medium mb-2 text-gray-700">Side View - Projection Geometry</h5>
       <svg width={svgWidth} height={svgHeight} className="border border-gray-200">
         {/* Room outline */}
-        <rect x="20" y={svgHeight - ceilingHeight * scale - 20} 
-              width={roomLength * scale} height={ceilingHeight * scale} 
-              fill="none" stroke="#e5e7eb" strokeWidth="2" />
+        <rect x={roomX} y={roomY} 
+              width={roomDrawWidth} height={roomDrawHeight} 
+              fill="#f9fafb" stroke="#d1d5db" strokeWidth="2" />
         
         {/* Floor line */}
-        <line x1="20" y1={svgHeight - 20} 
-              x2={20 + roomLength * scale} y2={svgHeight - 20} 
-              stroke="#374151" strokeWidth="2" />
+        <line x1={roomX} y1={roomY + roomDrawHeight} 
+              x2={roomX + roomDrawWidth} y2={roomY + roomDrawHeight} 
+              stroke="#374151" strokeWidth="3" />
         
         {/* Ceiling line */}
-        <line x1="20" y1={svgHeight - ceilingHeight * scale - 20} 
-              x2={20 + roomLength * scale} y2={svgHeight - ceilingHeight * scale - 20} 
+        <line x1={roomX} y1={roomY} 
+              x2={roomX + roomDrawWidth} y2={roomY} 
               stroke="#374151" strokeWidth="2" />
         
         {/* Screen */}
         <line x1={screenX} y1={screenTop} 
               x2={screenX} y2={screenBottom} 
-              stroke="#3b82f6" strokeWidth="4" />
+              stroke="#3b82f6" strokeWidth="6" />
         
-        {/* Screen label */}
-        <text x={screenX + 5} y={screenY} fontSize="10" fill="#3b82f6">Screen</text>
+        {/* Screen center line (for reference) */}
+        <line x1={screenX - 10} y1={screenCenterY} 
+              x2={screenX + 10} y2={screenCenterY} 
+              stroke="#3b82f6" strokeWidth="1" strokeDasharray="2,2" />
         
         {/* Projector */}
-        <rect x={projectorX - 5} y={projectorY - 3} 
-              width="10" height="6" 
-              fill="#ef4444" stroke="#dc2626" />
-        
-        {/* Projector label */}
-        <text x={projectorX - 20} y={projectorY - 5} fontSize="10" fill="#ef4444">Projector</text>
+        <rect x={projectorX - 8} y={projectorY - 4} 
+              width="16" height="8" 
+              fill="#ef4444" stroke="#dc2626" strokeWidth="2" rx="2" />
         
         {/* Projection beam lines */}
-        <line x1={projectorX + 5} y1={projectorY} 
+        <line x1={projectorX + 8} y1={projectorY} 
               x2={screenX} y2={screenTop} 
-              stroke="#fbbf24" strokeWidth="1" strokeDasharray="3,3" />
-        <line x1={projectorX + 5} y1={projectorY} 
+              stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="4,2" opacity="0.8" />
+        <line x1={projectorX + 8} y1={projectorY} 
               x2={screenX} y2={screenBottom} 
-              stroke="#fbbf24" strokeWidth="1" strokeDasharray="3,3" />
+              stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="4,2" opacity="0.8" />
+        <line x1={projectorX + 8} y1={projectorY} 
+              x2={screenX} y2={screenCenterY} 
+              stroke="#fbbf24" strokeWidth="2" opacity="0.6" />
         
-        {/* Throw distance line */}
-        <line x1={projectorX} y1={projectorY + 15} 
-              x2={screenX} y2={projectorY + 15} 
-              stroke="#6b7280" strokeWidth="1" />
-        <text x={(projectorX + screenX) / 2 - 20} y={projectorY + 25} 
-              fontSize="10" fill="#6b7280">{throwDistance.toFixed(1)}m</text>
+        {/* Throw distance measurement line */}
+        <line x1={projectorX} y1={projectorY + 20} 
+              x2={screenX} y2={projectorY + 20} 
+              stroke="#6b7280" strokeWidth="1.5" />
+        
+        {/* Throw distance arrows */}
+        <polygon points={`${projectorX},${projectorY + 18} ${projectorX + 5},${projectorY + 20} ${projectorX},${projectorY + 22}`}
+                 fill="#6b7280" />
+        <polygon points={`${screenX},${projectorY + 18} ${screenX - 5},${projectorY + 20} ${screenX},${projectorY + 22}`}
+                 fill="#6b7280" />
+        
+        {/* Labels */}
+        <text x={projectorX - 25} y={projectorY - 8} fontSize="11" fill="#ef4444" fontWeight="bold">
+          Projector
+        </text>
+        <text x={screenX + 8} y={screenCenterY} fontSize="11" fill="#3b82f6" fontWeight="bold">
+          Screen
+        </text>
+        <text x={(projectorX + screenX) / 2 - 15} y={projectorY + 35} 
+              fontSize="11" fill="#6b7280" fontWeight="bold">
+          {throwDistance.toFixed(1)}m
+        </text>
         
         {/* Keystone angle indicator */}
         {keystoneAngle > 5 && (
           <g>
-            <path d={`M ${projectorX + 5} ${projectorY} L ${projectorX + 20} ${projectorY} A 15 15 0 0 ${projectorY > screenY ? 1 : 0} ${projectorX + 20} ${projectorY + (projectorY > screenY ? 15 : -15)}`}
-                  fill="none" stroke="#f59e0b" strokeWidth="1" />
-            <text x={projectorX + 25} y={projectorY + 5} fontSize="9" fill="#f59e0b">
+            <path d={`M ${projectorX + 8} ${projectorY} L ${projectorX + 25} ${projectorY} A 15 15 0 0 ${projectorY > screenCenterY ? 1 : 0} ${projectorX + 25} ${projectorY + (projectorY > screenCenterY ? 15 : -15)}`}
+                  fill="none" stroke="#f59e0b" strokeWidth="1.5" />
+            <text x={projectorX + 30} y={projectorY + 5} fontSize="10" fill="#f59e0b" fontWeight="bold">
               {keystoneAngle.toFixed(1)}°
             </text>
           </g>
         )}
         
-        {/* Dimensions */}
-        <text x="25" y={svgHeight - 10} fontSize="10" fill="#6b7280">
+        {/* Room dimensions */}
+        <text x={roomX} y={svgHeight - 10} fontSize="11" fill="#6b7280">
           Room: {roomLength.toFixed(1)}m × {ceilingHeight.toFixed(1)}m
+        </text>
+        
+        {/* Height indicators */}
+        <text x={roomX - 35} y={roomY + roomDrawHeight - (screenCenterHeight * scale) + 5} 
+              fontSize="10" fill="#3b82f6">
+          {screenCenterHeight.toFixed(1)}m
+        </text>
+        <text x={roomX - 35} y={roomY + roomDrawHeight - (projectorHeight * scale) + 5} 
+              fontSize="10" fill="#ef4444">
+          {projectorHeight.toFixed(1)}m
         </text>
       </svg>
     </div>
@@ -140,46 +189,102 @@ const ProjectorTopView: React.FC<ProjectorVisualizationProps> = ({
 }) => {
   const svgWidth = 400;
   const svgHeight = 300;
-  const scale = Math.min(svgWidth / (roomLength * 1.2), svgHeight / (roomWidth * 1.2));
   
-  const projectorX = svgWidth - throwDistance * scale - 50;
-  const projectorY = svgHeight / 2;
-  const screenX = svgWidth - 50;
-  const screenY1 = svgHeight / 2 - (screenWidth * scale) / 2;
-  const screenY2 = svgHeight / 2 + (screenWidth * scale) / 2;
+  // Add padding for labels and elements
+  const padding = 40;
+  const drawWidth = svgWidth - (2 * padding);
+  const drawHeight = svgHeight - (2 * padding);
+  
+  // Scale based on room dimensions
+  const scaleX = drawWidth / roomLength;
+  const scaleY = drawHeight / roomWidth;
+  const scale = Math.min(scaleX, scaleY);
+  
+  // Calculate actual drawing dimensions
+  const roomDrawWidth = roomLength * scale;
+  const roomDrawHeight = roomWidth * scale;
+  
+  // Room positioning (centered in available space)
+  const roomX = padding + (drawWidth - roomDrawWidth) / 2;
+  const roomY = padding + (drawHeight - roomDrawHeight) / 2;
+  
+  // Position screen at the front wall (right side)
+  const screenX = roomX + roomDrawWidth - 5;
+  const screenCenterY = roomY + roomDrawHeight / 2;
+  const screenTop = screenCenterY - (screenWidth * scale) / 2;
+  const screenBottom = screenCenterY + (screenWidth * scale) / 2;
+  
+  // Position projector at calculated throw distance from screen
+  const projectorX = screenX - (throwDistance * scale);
+  const projectorY = screenCenterY;
   
   return (
     <div className="bg-white p-4 rounded-lg border">
       <h5 className="font-medium mb-2 text-gray-700">Top View - Room Layout</h5>
       <svg width={svgWidth} height={svgHeight} className="border border-gray-200">
         {/* Room outline */}
-        <rect x="20" y={(svgHeight - roomWidth * scale) / 2} 
-              width={roomLength * scale} height={roomWidth * scale} 
-              fill="#f9fafb" stroke="#e5e7eb" strokeWidth="2" />
+        <rect x={roomX} y={roomY} 
+              width={roomDrawWidth} height={roomDrawHeight} 
+              fill="#f9fafb" stroke="#d1d5db" strokeWidth="2" />
+        
+        {/* Room walls (thicker lines) */}
+        <rect x={roomX} y={roomY} 
+              width={roomDrawWidth} height={roomDrawHeight} 
+              fill="none" stroke="#374151" strokeWidth="3" />
         
         {/* Screen */}
-        <line x1={screenX} y1={screenY1} 
-              x2={screenX} y2={screenY2} 
-              stroke="#3b82f6" strokeWidth="6" />
+        <line x1={screenX} y1={screenTop} 
+              x2={screenX} y2={screenBottom} 
+              stroke="#3b82f6" strokeWidth="8" />
         
         {/* Projector */}
-        <circle cx={projectorX} cy={projectorY} r="4" 
+        <circle cx={projectorX} cy={projectorY} r="8" 
                 fill="#ef4444" stroke="#dc2626" strokeWidth="2" />
         
-        {/* Projection coverage area */}
-        <polygon points={`${projectorX},${projectorY} ${screenX},${screenY1} ${screenX},${screenY2}`}
-                 fill="#fbbf24" fillOpacity="0.2" stroke="#fbbf24" strokeWidth="1" />
+        {/* Projection coverage area (simple triangle) */}
+        <polygon points={`${projectorX + 8},${projectorY} ${screenX},${screenTop} ${screenX},${screenBottom}`}
+                 fill="#fbbf24" fillOpacity="0.15" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,3" />
+        
+        {/* Center projection line */}
+        <line x1={projectorX + 8} y1={projectorY} 
+              x2={screenX} y2={screenCenterY} 
+              stroke="#fbbf24" strokeWidth="2" strokeDasharray="4,2" />
+        
+        {/* Throw distance measurement */}
+        <line x1={projectorX} y1={projectorY - 25} 
+              x2={screenX} y2={projectorY - 25} 
+              stroke="#6b7280" strokeWidth="1.5" />
+        
+        {/* Distance arrows */}
+        <polygon points={`${projectorX},${projectorY - 27} ${projectorX + 5},${projectorY - 25} ${projectorX},${projectorY - 23}`}
+                 fill="#6b7280" />
+        <polygon points={`${screenX},${projectorY - 27} ${screenX - 5},${projectorY - 25} ${screenX},${projectorY - 23}`}
+                 fill="#6b7280" />
         
         {/* Labels */}
-        <text x={screenX + 10} y={projectorY} fontSize="10" fill="#3b82f6">Screen</text>
-        <text x={projectorX - 25} y={projectorY - 10} fontSize="10" fill="#ef4444">Projector</text>
+        <text x={screenX + 15} y={screenCenterY + 5} fontSize="12" fill="#3b82f6" fontWeight="bold">
+          Screen
+        </text>
+        <text x={projectorX - 30} y={projectorY - 15} fontSize="12" fill="#ef4444" fontWeight="bold">
+          Projector
+        </text>
+        <text x={(projectorX + screenX) / 2 - 15} y={projectorY - 30} 
+              fontSize="11" fill="#6b7280" fontWeight="bold">
+          {throwDistance.toFixed(1)}m
+        </text>
         
-        {/* Dimensions */}
-        <text x="25" y="20" fontSize="10" fill="#6b7280">
+        {/* Room dimensions */}
+        <text x={roomX} y={svgHeight - 10} fontSize="11" fill="#6b7280">
           Room: {roomLength.toFixed(1)}m × {roomWidth.toFixed(1)}m
         </text>
-        <text x="25" y="35" fontSize="10" fill="#6b7280">
+        <text x={roomX} y={svgHeight - 25} fontSize="11" fill="#6b7280">
           Screen: {screenWidth.toFixed(1)}m wide
+        </text>
+        
+        {/* Direction indicator */}
+        <text x={roomX + roomDrawWidth / 2 - 20} y={roomY - 10} 
+              fontSize="10" fill="#6b7280" fontStyle="italic">
+          Front of Room
         </text>
       </svg>
     </div>
@@ -449,23 +554,27 @@ const AudioVisualCalculator: React.FC<AudioVisualCalculatorProps> = ({ onShowTut
 // ======================== PROJECTOR CALCULATOR ========================
 
 const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutorial }) => {
+  // State for room dimensions
+  const [roomLength, setRoomLength] = useState<number>(8.0); // meters
+  const [roomWidth, setRoomWidth] = useState<number>(6.0); // meters
+  const [ceilingHeight, setCeilingHeight] = useState<number>(3.0); // meters
+  
   // State for projector specifications
   const [projectorLumens, setProjectorLumens] = useState<number>(3000);
   const [lensType, setLensType] = useState<string>('standard');
   const [customThrowRatio, setCustomThrowRatio] = useState<number>(1.5);
   
-  // State for screen and room parameters
+  // State for screen parameters
   const [screenWidth, setScreenWidth] = useState<number>(3.0); // meters
   const [screenHeight, setScreenHeight] = useState<number>(1.69); // meters (16:9 aspect)
   const [aspectRatio, setAspectRatio] = useState<string>('16:9');
-  const [lightingCondition, setLightingCondition] = useState<string>('dim');
   const [screenGain, setScreenGain] = useState<number>(1.0);
+  const [screenCenterHeight, setScreenCenterHeight] = useState<number>(1.5); // meters from floor
   const [viewingDistance, setViewingDistance] = useState<number>(6.0); // meters
   
   // State for installation parameters
-  const [ceilingHeight, setCeilingHeight] = useState<number>(3.0); // meters
+  const [lightingCondition, setLightingCondition] = useState<string>('dim');
   const [projectorOffset, setProjectorOffset] = useState<number>(0.5); // meters from ceiling
-  const [screenCenterHeight, setScreenCenterHeight] = useState<number>(1.5); // meters from floor
   
   // State for calculated results
   const [calculationPerformed, setCalculationPerformed] = useState<boolean>(false);
@@ -478,6 +587,8 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
   const [keystoneAngle, setKeystoneAngle] = useState<number>(0);
   const [recommendedViewingDistance, setRecommendedViewingDistance] = useState<{min: number, max: number}>({min: 0, max: 0});
   const [isViewingDistanceOptimal, setIsViewingDistanceOptimal] = useState<boolean>(false);
+  const [hasSpaceConstraint, setHasSpaceConstraint] = useState<boolean>(false);
+  const [availableThrowSpace, setAvailableThrowSpace] = useState<number>(0);
 
   // Update screen dimensions when aspect ratio changes
   useEffect(() => {
@@ -506,6 +617,13 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
     setThrowDistance(actualThrow);
     setMinThrowDistance(minThrow);
     setMaxThrowDistance(maxThrow);
+
+    // Check room space constraints
+    const availableSpace = roomLength - 1; // Leave 1m clearance from wall
+    const spaceConstraint = actualThrow > availableSpace;
+    
+    setAvailableThrowSpace(availableSpace);
+    setHasSpaceConstraint(spaceConstraint);
 
     // Calculate screen area and required lumens
     const screenArea = screenWidth * screenHeight; // m²
@@ -536,64 +654,60 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
 
     setCalculationPerformed(true);
   }, [projectorLumens, lensType, customThrowRatio, screenWidth, screenHeight, lightingCondition, screenGain, 
-      viewingDistance, ceilingHeight, projectorOffset, screenCenterHeight]);
+      viewingDistance, ceilingHeight, projectorOffset, screenCenterHeight, roomLength, roomWidth]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Input Section */}
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Projector Specifications</h3>
+        <h3 className="font-medium text-lg mb-4 text-blue-600">Step 1: Room Dimensions</h3>
         
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room Length (m)
+            </label>
+            <input
+              type="number"
+              min="2"
+              step="0.1"
+              value={roomLength}
+              onChange={(e) => setRoomLength(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room Width (m)
+            </label>
+            <input
+              type="number"
+              min="2"
+              step="0.1"
+              value={roomWidth}
+              onChange={(e) => setRoomWidth(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+        </div>
+
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Projector Brightness (ANSI Lumens)
+            Ceiling Height (m)
           </label>
           <input
             type="number"
-            min="100"
-            value={projectorLumens}
-            onChange={(e) => setProjectorLumens(Number(e.target.value))}
+            min="2"
+            step="0.1"
+            value={ceilingHeight}
+            onChange={(e) => setCeilingHeight(Number(e.target.value))}
             className="w-full p-2 border rounded-md"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Lens Type
-          </label>
-          <select
-            value={lensType}
-            onChange={(e) => setLensType(e.target.value)}
-            className="w-full p-2 border rounded-md"
-          >
-            {PROJECTOR_LENS_TYPES.map(lens => (
-              <option key={lens.value} value={lens.value}>
-                {lens.label} ({lens.minRatio} - {lens.maxRatio}:1)
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {lensType === 'custom' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Custom Throw Ratio (Distance:Width)
-            </label>
-            <input
-              type="number"
-              min="0.1"
-              max="10"
-              step="0.1"
-              value={customThrowRatio}
-              onChange={(e) => setCustomThrowRatio(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-        )}
-
         <div className="border-t border-gray-300 my-4"></div>
         
-        <h3 className="font-medium text-lg mb-4">Screen Parameters</h3>
+        <h3 className="font-medium text-lg mb-4 text-blue-600">Step 2: Screen Configuration</h3>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
@@ -625,21 +739,36 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Screen Height (m) - Auto calculated
-          </label>
-          <input
-            type="number"
-            value={screenHeight.toFixed(2)}
-            disabled
-            className="w-full p-2 border rounded-md bg-gray-100"
-          />
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Screen Height (m) - Auto calculated
+            </label>
+            <input
+              type="number"
+              value={screenHeight.toFixed(2)}
+              disabled
+              className="w-full p-2 border rounded-md bg-gray-100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Screen Center Height from Floor (m)
+            </label>
+            <input
+              type="number"
+              min="0.5"
+              step="0.1"
+              value={screenCenterHeight}
+              onChange={(e) => setScreenCenterHeight(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
         </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Screen Gain
+            Screen Type & Gain
           </label>
           <select
             value={screenGain}
@@ -654,9 +783,97 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
           </select>
         </div>
 
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Primary Viewing Distance (m)
+          </label>
+          <input
+            type="number"
+            min="1"
+            step="0.1"
+            value={viewingDistance}
+            onChange={(e) => setViewingDistance(Number(e.target.value))}
+            className="w-full p-2 border rounded-md"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Recommended: {(screenHeight * 3).toFixed(1)}m - {(screenHeight * 6).toFixed(1)}m (SMPTE standards)
+          </p>
+        </div>
+
         <div className="border-t border-gray-300 my-4"></div>
         
-        <h3 className="font-medium text-lg mb-4">Environment Parameters</h3>
+        <h3 className="font-medium text-lg mb-4 text-blue-600">Step 3: Projector Installation</h3>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Lens Type / Throw Ratio
+          </label>
+          <select
+            value={lensType}
+            onChange={(e) => setLensType(e.target.value)}
+            className="w-full p-2 border rounded-md"
+          >
+            {PROJECTOR_LENS_TYPES.map(lens => (
+              <option key={lens.value} value={lens.value}>
+                {lens.label} ({lens.minRatio} - {lens.maxRatio}:1)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {lensType === 'custom' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Custom Throw Ratio (Distance:Width)
+            </label>
+            <input
+              type="number"
+              min="0.1"
+              max="10"
+              step="0.1"
+              value={customThrowRatio}
+              onChange={(e) => setCustomThrowRatio(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Projector Mount Height (m)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={ceilingHeight - projectorOffset}
+              onChange={(e) => setProjectorOffset(ceilingHeight - Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Drop from ceiling: {projectorOffset.toFixed(1)}m
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Calculated Throw Distance (m)
+            </label>
+            <input
+              type="number"
+              value={throwDistance.toFixed(2)}
+              disabled
+              className="w-full p-2 border rounded-md bg-blue-50 font-medium"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Range: {minThrowDistance.toFixed(1)} - {maxThrowDistance.toFixed(1)}m
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-300 my-4"></div>
+        
+        <h3 className="font-medium text-lg mb-4 text-blue-600">Step 4: Environment & Requirements</h3>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -678,65 +895,58 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
           </p>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Viewing Distance (m)
-          </label>
-          <input
-            type="number"
-            min="1"
-            step="0.1"
-            value={viewingDistance}
-            onChange={(e) => setViewingDistance(Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
-          />
-        </div>
-
-        <div className="border-t border-gray-300 my-4"></div>
-        
-        <h3 className="font-medium text-lg mb-4">Installation Parameters</h3>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ceiling Height (m)
-            </label>
-            <input
-              type="number"
-              min="2"
-              step="0.1"
-              value={ceilingHeight}
-              onChange={(e) => setCeilingHeight(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Projector Drop (m)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={projectorOffset}
-              onChange={(e) => setProjectorOffset(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
+        {/* Projector Requirements Section */}
+        <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <h4 className="font-medium text-blue-700 mb-2">📋 Recommended Projector Specifications</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-gray-700">Minimum Brightness Required:</p>
+              <p className="font-bold text-blue-800 text-lg">{Math.round(requiredLumens)} ANSI Lumens</p>
+            </div>
+            <div>
+              <p className="text-gray-700">Recommended Brightness:</p>
+              <p className="font-bold text-green-700 text-lg">{Math.round(requiredLumens * 1.2)} ANSI Lumens</p>
+              <p className="text-xs text-gray-600">(20% safety margin)</p>
+            </div>
+            <div>
+              <p className="text-gray-700">Required Throw Ratio:</p>
+              <p className="font-bold text-blue-800">{lensType === 'custom' ? customThrowRatio.toFixed(2) : ((PROJECTOR_LENS_TYPES.find(l => l.value === lensType)?.minRatio || 0) + (PROJECTOR_LENS_TYPES.find(l => l.value === lensType)?.maxRatio || 0) / 2).toFixed(2)}:1</p>
+            </div>
+            <div>
+              <p className="text-gray-700">Installation Distance:</p>
+              <p className="font-bold text-blue-800">{throwDistance.toFixed(1)} meters</p>
+            </div>
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Screen Center Height (m)
-          </label>
-          <input
-            type="number"
-            min="0.5"
-            step="0.1"
-            value={screenCenterHeight}
-            onChange={(e) => setScreenCenterHeight(Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
-          />
+        {/* Current Projector Testing Section */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-300">
+          <h4 className="font-medium text-gray-700 mb-2">🔍 Test Specific Projector (Optional)</h4>
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Projector Brightness (ANSI Lumens)
+            </label>
+            <input
+              type="number"
+              min="100"
+              value={projectorLumens}
+              onChange={(e) => setProjectorLumens(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+              placeholder="Enter projector lumens to test compatibility"
+            />
+          </div>
+          {projectorLumens > 0 && (
+            <div className={`p-2 rounded-md text-sm ${isLumensAdequate ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              <p className="font-medium">
+                {isLumensAdequate ? '✅ This projector meets requirements' : '❌ This projector is insufficient'}
+              </p>
+              <p>
+                {isLumensAdequate 
+                  ? `Excess capacity: ${Math.round(projectorLumens - requiredLumens)} lumens`
+                  : `Shortfall: ${Math.round(requiredLumens - projectorLumens)} lumens needed`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -746,134 +956,57 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
         
         {!calculationPerformed ? (
           <div className="text-center py-8 text-gray-500">
-            <p>Results will appear automatically as you adjust the parameters</p>
+            <p>Configure your room and screen parameters to get projector recommendations</p>
           </div>
         ) : (
           <>
             <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Throw Distance Analysis</h4>
-              <div className="bg-white p-4 rounded-md mb-4">
+              <h4 className="font-medium text-blue-800 mb-2">📋 Projector Requirements Summary</h4>
+              <div className="bg-white p-4 rounded-md mb-4 border-l-4 border-blue-500">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">Calculated Throw Distance</p>
-                    <p className="text-lg font-bold text-blue-600">{throwDistance.toFixed(2)} m</p>
+                    <p className="text-sm text-gray-600">Minimum Brightness Needed</p>
+                    <p className="text-2xl font-bold text-blue-600">{Math.round(requiredLumens)} ANSI</p>
+                    <p className="text-xs text-gray-500">Based on {(screenWidth * screenHeight).toFixed(1)}m² screen in {LIGHTING_CONDITIONS.find(l => l.value === lightingCondition)?.label.toLowerCase()}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Throw Range</p>
-                    <p className="font-medium">{minThrowDistance.toFixed(2)} - {maxThrowDistance.toFixed(2)} m</p>
+                    <p className="text-sm text-gray-600">Recommended Brightness</p>
+                    <p className="text-2xl font-bold text-green-600">{Math.round(requiredLumens * 1.2)} ANSI</p>
+                    <p className="text-xs text-gray-500">With 20% safety margin</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Keystone Angle</p>
-                    <p className={`font-medium ${keystoneAngle > 30 ? 'text-red-600' : keystoneAngle > 15 ? 'text-orange-600' : 'text-green-600'}`}>
-                      {keystoneAngle.toFixed(1)}° {keystoneAngle > 30 ? '(Excessive)' : keystoneAngle > 15 ? '(High)' : '(Good)'}
-                    </p>
+                    <p className="text-sm text-gray-600">Required Throw Distance</p>
+                    <p className="text-lg font-bold text-gray-800">{throwDistance.toFixed(2)} m</p>
+                    <p className="text-xs text-gray-500">Range: {minThrowDistance.toFixed(1)} - {maxThrowDistance.toFixed(1)}m</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Projector Height</p>
-                    <p className="font-medium">{(ceilingHeight - projectorOffset).toFixed(2)} m</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Brightness Analysis</h4>
-              <div className="bg-white p-4 rounded-md mb-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Required Lumens</p>
-                    <p className="text-lg font-bold text-gray-800">{Math.round(requiredLumens)} ANSI</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Available Lumens</p>
-                    <p className={`text-lg font-bold ${isLumensAdequate ? 'text-green-600' : 'text-red-600'}`}>
-                      {projectorLumens} ANSI {isLumensAdequate ? '✓' : '✗'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Screen Brightness</p>
-                    <p className="font-medium">{actualBrightness.toFixed(1)} ft-L</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Screen Area</p>
-                    <p className="font-medium">{(screenWidth * screenHeight).toFixed(1)} m²</p>
+                    <p className="text-sm text-gray-600">Lens Type Needed</p>
+                    <p className="text-lg font-bold text-gray-800">{PROJECTOR_LENS_TYPES.find(l => l.value === lensType)?.label}</p>
+                    <p className="text-xs text-gray-500">Throw ratio: {lensType === 'custom' ? customThrowRatio.toFixed(2) : `${PROJECTOR_LENS_TYPES.find(l => l.value === lensType)?.minRatio} - ${PROJECTOR_LENS_TYPES.find(l => l.value === lensType)?.maxRatio}`}:1</p>
                   </div>
                 </div>
               </div>
               
-              <div className={`p-3 rounded-md ${isLumensAdequate ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
-                <p className={`font-medium ${isLumensAdequate ? 'text-green-700' : 'text-red-700'}`}>
-                  {isLumensAdequate 
-                    ? 'ADEQUATE ✓ Projector brightness is sufficient'
-                    : 'INSUFFICIENT ✗ Projector brightness is inadequate'}
-                </p>
-                <p className="text-sm mt-1">
-                  {isLumensAdequate 
-                    ? `Excess capacity: ${Math.round(projectorLumens - requiredLumens)} lumens`
-                    : `Shortfall: ${Math.round(requiredLumens - projectorLumens)} lumens needed`}
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Viewing Distance Analysis</h4>
-              <div className="bg-white p-4 rounded-md mb-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Current Distance</p>
-                    <p className={`text-lg font-bold ${isViewingDistanceOptimal ? 'text-green-600' : 'text-orange-600'}`}>
-                      {viewingDistance.toFixed(1)} m {isViewingDistanceOptimal ? '✓' : '⚠'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Recommended Range</p>
-                    <p className="font-medium">
-                      {recommendedViewingDistance.min.toFixed(1)} - {recommendedViewingDistance.max.toFixed(1)} m
-                    </p>
-                  </div>
+              {projectorLumens > 0 && (
+                <div className={`p-3 rounded-md ${isLumensAdequate ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
+                  <p className={`font-medium ${isLumensAdequate ? 'text-green-700' : 'text-red-700'}`}>
+                    {isLumensAdequate 
+                      ? '✅ COMPATIBLE: Your selected projector meets the requirements'
+                      : '❌ INSUFFICIENT: Your selected projector is too dim for this application'}
+                  </p>
+                  <p className="text-sm mt-1">
+                    Selected projector: {projectorLumens} ANSI lumens | 
+                    {isLumensAdequate 
+                      ? ` Excess capacity: ${Math.round(projectorLumens - requiredLumens)} lumens`
+                      : ` Shortfall: ${Math.round(requiredLumens - projectorLumens)} lumens`}
+                  </p>
                 </div>
-              </div>
-              
-              <div className={`p-3 rounded-md ${isViewingDistanceOptimal ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'} border`}>
-                <p className={`font-medium ${isViewingDistanceOptimal ? 'text-green-700' : 'text-orange-700'}`}>
-                  {isViewingDistanceOptimal 
-                    ? 'OPTIMAL ✓ Viewing distance follows SMPTE standards'
-                    : 'SUBOPTIMAL ⚠ Viewing distance outside recommended range'}
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Installation Summary</h4>
-              <table className="min-w-full bg-white border border-gray-200 text-sm">
-                <tbody>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-2 font-medium">Screen Size</td>
-                    <td className="px-3 py-2">{screenWidth.toFixed(1)}m × {screenHeight.toFixed(1)}m ({aspectRatio})</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-2 font-medium">Throw Distance</td>
-                    <td className="px-3 py-2">{throwDistance.toFixed(2)}m (Range: {minThrowDistance.toFixed(1)}-{maxThrowDistance.toFixed(1)}m)</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-2 font-medium">Projector Position</td>
-                    <td className="px-3 py-2">{(ceilingHeight - projectorOffset).toFixed(1)}m height, {keystoneAngle.toFixed(1)}° keystone</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-2 font-medium">Brightness</td>
-                    <td className="px-3 py-2">{actualBrightness.toFixed(1)} ft-L on screen</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-3 py-2 font-medium">Viewing</td>
-                    <td className="px-3 py-2">{viewingDistance.toFixed(1)}m distance (Rec: {recommendedViewingDistance.min.toFixed(1)}-{recommendedViewingDistance.max.toFixed(1)}m)</td>
-                  </tr>
-                </tbody>
-              </table>
+              )}
             </div>
 
             {/* Graphical Previews */}
             <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-4">Installation Visualization</h4>
+              <h4 className="font-medium text-blue-800 mb-4">📐 Installation Visualization</h4>
               
               <div className="grid grid-cols-1 gap-4 mb-4">
                 <ProjectorSideView
@@ -884,8 +1017,8 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
                   projectorOffset={projectorOffset}
                   screenCenterHeight={screenCenterHeight}
                   keystoneAngle={keystoneAngle}
-                  roomLength={throwDistance + 2} // Estimated room length
-                  roomWidth={screenWidth + 2} // Not used in side view
+                  roomLength={roomLength}
+                  roomWidth={roomWidth}
                 />
                 
                 <ProjectorTopView
@@ -896,20 +1029,94 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
                   projectorOffset={projectorOffset}
                   screenCenterHeight={screenCenterHeight}
                   keystoneAngle={keystoneAngle}
-                  roomLength={throwDistance + 2}
-                  roomWidth={screenWidth + 2}
+                  roomLength={roomLength}
+                  roomWidth={roomWidth}
                 />
               </div>
             </div>
 
+            <div className="mb-6">
+              <h4 className="font-medium text-blue-800 mb-2">🔧 Installation Specifications</h4>
+              <table className="min-w-full bg-white border border-gray-200 text-sm">
+                <tbody>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Room Dimensions</td>
+                    <td className="px-3 py-2">{roomLength.toFixed(1)}m × {roomWidth.toFixed(1)}m × {ceilingHeight.toFixed(1)}m</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Screen Size</td>
+                    <td className="px-3 py-2">{screenWidth.toFixed(1)}m × {screenHeight.toFixed(1)}m ({aspectRatio})</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Screen Position</td>
+                    <td className="px-3 py-2">Center at {screenCenterHeight.toFixed(1)}m height</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Throw Distance Required</td>
+                    <td className={`px-3 py-2 ${hasSpaceConstraint ? 'text-red-600 font-medium' : 'text-gray-800'}`}>
+                      {throwDistance.toFixed(2)}m {hasSpaceConstraint ? '(Exceeds room space!)' : ''}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Available Throw Space</td>
+                    <td className={`px-3 py-2 ${hasSpaceConstraint ? 'text-red-600' : 'text-green-600'}`}>
+                      {availableThrowSpace.toFixed(1)}m (with 1m clearance)
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Projector Position</td>
+                    <td className="px-3 py-2">{(ceilingHeight - projectorOffset).toFixed(1)}m height, {throwDistance.toFixed(2)}m from screen</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Keystone Correction</td>
+                    <td className={`px-3 py-2 font-medium ${keystoneAngle > 30 ? 'text-red-600' : keystoneAngle > 15 ? 'text-orange-600' : 'text-green-600'}`}>
+                      {keystoneAngle.toFixed(1)}° {keystoneAngle > 30 ? '(Excessive - Reposition needed)' : keystoneAngle > 15 ? '(High - Consider adjustment)' : '(Acceptable)'}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Viewing Distance</td>
+                    <td className={`px-3 py-2 ${isViewingDistanceOptimal ? 'text-green-600' : 'text-orange-600'}`}>
+                      {viewingDistance.toFixed(1)}m {isViewingDistanceOptimal ? '(Optimal)' : '(Consider adjustment)'}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="px-3 py-2 font-medium">Expected Brightness</td>
+                    <td className="px-3 py-2">{actualBrightness.toFixed(1)} ft-L on screen</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Warning Messages */}
+            {(keystoneAngle > 15 || !isViewingDistanceOptimal || hasSpaceConstraint) && (
+              <div className="mb-6 bg-yellow-50 p-3 rounded-md border border-yellow-300">
+                <h4 className="font-medium text-yellow-800 mb-2">⚠️ Installation Recommendations</h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-yellow-800">
+                  {hasSpaceConstraint && (
+                    <li><strong>Space Constraint:</strong> Required throw distance ({throwDistance.toFixed(1)}m) exceeds available room space ({availableThrowSpace.toFixed(1)}m). Consider a shorter throw lens or smaller screen.</li>
+                  )}
+                  {keystoneAngle > 30 && (
+                    <li><strong>Critical:</strong> Keystone angle of {keystoneAngle.toFixed(1)}° is excessive. Reposition projector to reduce image distortion.</li>
+                  )}
+                  {keystoneAngle > 15 && keystoneAngle <= 30 && (
+                    <li><strong>Warning:</strong> Keystone angle of {keystoneAngle.toFixed(1)}° is high. Consider adjusting projector height for better image quality.</li>
+                  )}
+                  {!isViewingDistanceOptimal && (
+                    <li><strong>Viewing:</strong> Current viewing distance ({viewingDistance.toFixed(1)}m) is outside SMPTE recommendations ({recommendedViewingDistance.min.toFixed(1)}-{recommendedViewingDistance.max.toFixed(1)}m).</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
             <div className="mt-6 bg-gray-100 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Installation Guidelines</h4>
+              <h4 className="font-medium mb-2">💡 Design Guidelines</h4>
               <ul className="list-disc pl-5 space-y-1 text-sm">
-                <li>Keystone correction should be minimized (&lt;15°) for best image quality</li>
-                <li>SMPTE recommends viewing distance between 3H and 6H (H = screen height)</li>
-                <li>Screen brightness should be 12-16 foot-lamberts for optimal viewing</li>
-                <li>Consider ambient light control for better contrast ratios</li>
-                <li>Allow adequate ventilation clearance around projector</li>
+                <li><strong>Brightness:</strong> Target 12-16 foot-lamberts on screen for optimal viewing</li>
+                <li><strong>Keystone:</strong> Keep correction under 15° to maintain image quality</li>
+                <li><strong>Viewing:</strong> SMPTE recommends 3H to 6H distance (H = screen height)</li>
+                <li><strong>Installation:</strong> Allow 0.5m clearance around projector for ventilation</li>
+                <li><strong>Ambient Light:</strong> Control room lighting for better contrast ratios</li>
+                <li><strong>Screen Placement:</strong> Bottom edge should be 1.2m above floor in typical rooms</li>
               </ul>
             </div>
           </>
