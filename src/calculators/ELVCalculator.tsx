@@ -10,6 +10,9 @@ import PublicAddressCalculator from './elv/PublicAddressCalculator';
 import AccessControlCalculator from './elv/AccessControlCalculator';
 import AudioVisualCalculator from './elv/AudioVisualCalculator';
 import RadiationCalculator from './elv/RadiationCalculator';
+import IPSubnetCalculator from './elv/IPSubnetCalculator';
+import HeatLoadRackCalculator from './elv/HeatLoadRackCalculator';
+import WirelessCoverageCalculator from './elv/WirelessCoverageCalculator';
 // Import additional calculators as they are developed
 
 // Define props type for the component
@@ -52,6 +55,12 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <AudioVisualCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'radio':
         return <RadiationCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'ip':
+        return <IPSubnetCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'rack':
+        return <HeatLoadRackCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'wireless':
+        return <WirelessCoverageCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -257,7 +266,6 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               </p>
             </div>
           </button>
-
           
           {/* Radioactive */}
           <button
@@ -275,6 +283,66 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <h3 className="font-semibold text-sm sm:text-base">Radioation Calculator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'radio' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate dosage of radioactive source
+              </p>
+            </div>
+          </button>
+
+          {/* IP subnet */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'ip'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('ip')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'ip' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Network Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'ip' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate variable length subnet masking
+              </p>
+            </div>
+          </button>
+
+          {/* IP subnet */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'rack'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('rack')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'rack' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Rack Load Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'rack' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate the power and cooling load of rack
+              </p>
+            </div>
+          </button>
+
+          {/* Wireless */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'wireless'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('wireless')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'wireless' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Wireless Coverage Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'wireless' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate wireless coverage
               </p>
             </div>
           </button>
