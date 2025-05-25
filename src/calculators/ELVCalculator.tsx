@@ -140,49 +140,9 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <Icons.Calculator className={`${calculatorType === 'impedance' ? 'text-white' : 'text-indigo-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Impedance Matching</h3>
+              <h3 className="font-semibold text-sm sm:text-base">RF Calculator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'impedance' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Network analysis and matching
-              </p>
-            </div>
-          </button>
-          
-          {/* RF Parameter Converter */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'rfPara'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('rfPara')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'rfPara' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">RF Parameter Converter</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'rfPara' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Convert between RF units and parameters
-              </p>
-            </div>
-          </button>
-
-          {/* Microstrip Line */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'microStrip'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('microStrip')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'microStrip' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Microstrip Line</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'microStrip' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate microstrip impedance and dimensions
+                <Icons.InfoInline /> Network analysis and matching, parameter conversion
               </p>
             </div>
           </button>
