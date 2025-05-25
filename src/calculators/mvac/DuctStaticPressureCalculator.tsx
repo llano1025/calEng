@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Icons } from '../../components/Icons';
 
 interface DuctStaticPressureCalculatorProps {
@@ -44,16 +44,45 @@ interface EditableFitting {
   newMethod?: 'kValue' | 'direct';
 }
 
-// Constants for velocity limits
-const MAIN_DUCT_VELOCITY_LIMIT = 7.5; // m/s
-const BRANCH_DUCT_VELOCITY_LIMIT = 6.0; // m/s
+// Velocity limits based on CIBSE Guide B Table 5.2
+const VELOCITY_LIMITS = {
+  riserOrAbovePlasterboard: {
+    rectangular: { critical: 5, normal: 7.5, nonCritical: 10 },
+    circular: { critical: 7, normal: 10, nonCritical: 15 }
+  },
+  aboveSuspendedCeiling: {
+    rectangular: { critical: 3, normal: 5, nonCritical: 6 },
+    circular: { critical: 5, normal: 7, nonCritical: 10 }
+  }
+};
+
+// Main duct multiplier (50% increase as per table note)
+const MAIN_DUCT_MULTIPLIER = 1.5;
+
+// Input validation constants
+const MIN_TEMPERATURE = -50; // °C
+const MAX_TEMPERATURE = 150; // °C
+const MIN_ELEVATION = -500; // meters
+const MAX_ELEVATION = 5000; // meters
+const MIN_FLOW_RATE = 1; // m³/h
+const MAX_FLOW_RATE = 100000; // m³/h
+const MIN_DIMENSION = 50; // mm
+const MAX_DIMENSION = 3000; // mm
+const MIN_LENGTH = 0.1; // meters
+const MAX_LENGTH = 1000; // meters
+const MIN_ROUGHNESS = 0.001; // mm
+const MAX_ROUGHNESS = 50; // mm
 
 const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> = ({ onShowTutorial }) => {
   // State for input system parameters
   const [systemFlowRate, setSystemFlowRate] = useState<number>(1000); // m³/h
-  const [airTemperature, setAirTemperature] = useState<number>(20); // °C
+  const [airTemperature, setAirTemperature] = useState<number>(13); // °C
   const [elevation, setElevation] = useState<number>(0); // meters above sea level
   const [safetyFactor, setSafetyFactor] = useState<number>(1.3); // 30% safety factor
+  
+  // State for velocity limit parameters
+  const [ductLocation, setDuctLocation] = useState<'riserOrAbovePlasterboard' | 'aboveSuspendedCeiling'>('riserOrAbovePlasterboard');
+  const [spaceCriticality, setSpaceCriticality] = useState<'critical' | 'normal' | 'nonCritical'>('normal');
   
   // State for duct sections
   const [ductSections, setDuctSections] = useState<DuctSection[]>([
@@ -109,8 +138,50 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   const [isSystemCompliant, setIsSystemCompliant] = useState<boolean>(true); // Renamed for clarity
   const [maxOverallVelocity, setMaxOverallVelocity] = useState<number>(0); // Renamed for clarity
   
-  // Calculate air density and kinematic viscosity based on temperature and elevation
-  useEffect(() => {
+  // Input validation functions
+  const validateTemperature = (temp: number): boolean => {
+    return temp >= MIN_TEMPERATURE && temp <= MAX_TEMPERATURE;
+  };
+  
+  const validateElevation = (elev: number): boolean => {
+    return elev >= MIN_ELEVATION && elev <= MAX_ELEVATION;
+  };
+  
+  const validateFlowRate = (flow: number): boolean => {
+    return flow >= MIN_FLOW_RATE && flow <= MAX_FLOW_RATE;
+  };
+  
+  const validateDimension = (dim: number): boolean => {
+    return dim >= MIN_DIMENSION && dim <= MAX_DIMENSION;
+  };
+  
+  const validateLength = (length: number): boolean => {
+    return length >= MIN_LENGTH && length <= MAX_LENGTH;
+  };
+  
+  const validateRoughness = (roughness: number): boolean => {
+    return roughness >= MIN_ROUGHNESS && roughness <= MAX_ROUGHNESS;
+  };
+  
+  const safeNumber = (value: number): number => {
+    return isNaN(value) || !isFinite(value) ? 0 : value;
+  };
+  
+  // Function to get velocity limit based on duct properties and system settings
+  const getVelocityLimit = (ductType: DuctType, isCircular: boolean): number => {
+    const ductShape = isCircular ? 'circular' : 'rectangular';
+    const baseLimit = VELOCITY_LIMITS[ductLocation][ductShape][spaceCriticality];
+    
+    // Apply main duct multiplier if it's a main duct
+    return ductType === 'main' ? baseLimit * MAIN_DUCT_MULTIPLIER : baseLimit;
+  };
+  
+  // Memoize air properties calculation to prevent unnecessary recalculations
+  const airProperties = useMemo(() => {
+    if (!validateTemperature(airTemperature) || !validateElevation(elevation)) {
+      return { density: 1.225, kinematicViscosity: 1.5e-5 }; // Standard air properties
+    }
+    
     // Standard atmospheric pressure at sea level (101.325 kPa)
     const standardPressureAtSeaLevel = 101.325; // kPa
     const molarMassAir = 0.0289644; // kg/mol
@@ -122,27 +193,29 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
     const atmosphericPressureKPa = standardPressureAtSeaLevel * Math.exp(- (gravity * molarMassAir * elevation) / (gasConstantR * temperatureKelvin));
     const atmosphericPressurePa = atmosphericPressureKPa * 1000; // Convert kPa to Pa
     const density = (atmosphericPressurePa * molarMassAir) / (gasConstantR * temperatureKelvin);
-    setAirDensity(density);
 
     // Calculate Kinematic Viscosity using Sutherland's formula for dynamic viscosity first
-    // mu = mu_0 * (T0 + C) / (T + C) * (T / T0)^(3/2)
-    // mu_0: reference viscosity at T0 (1.716e-5 Pa.s at 273.15 K for air)
-    // C: Sutherland's constant for air (110.4 K)
     const mu_0 = 1.716e-5; // Pa·s
     const T0_sutherland = 273.15; // K
     const C_sutherland = 110.4; // K
 
     const dynamicViscosity = mu_0 * ((T0_sutherland + C_sutherland) / (temperatureKelvin + C_sutherland)) * Math.pow(temperatureKelvin / T0_sutherland, 1.5);
     
-    if (density > 0) {
-      setKinematicViscosity(dynamicViscosity / density);
-    } else {
-      setKinematicViscosity(0); // Avoid division by zero if density is not yet calculated or invalid
-    }
-
+    const kinematicVisc = density > 0 ? dynamicViscosity / density : 1.5e-5;
+    
+    return {
+      density: safeNumber(density),
+      kinematicViscosity: safeNumber(kinematicVisc)
+    };
   }, [airTemperature, elevation]);
+
+  // Update air properties when calculated values change
+  useEffect(() => {
+    setAirDensity(airProperties.density);
+    setKinematicViscosity(airProperties.kinematicViscosity);
+  }, [airProperties]);
   
-  // Calculate pressure drops when inputs change
+  // Calculate pressure drops when inputs change - optimized with proper dependencies
   useEffect(() => {
     if (!airDensity || airDensity === 0 || !kinematicViscosity || kinematicViscosity === 0) return; 
     
@@ -157,69 +230,127 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       let velocity: number;
       let aspectRatio: number | null = null;
       
+      // Validate section inputs
+      if (!validateFlowRate(section.flowRate) || !validateLength(section.length)) {
+        results.push({ 
+          sectionId: section.id, 
+          error: "Invalid section parameters. Check flow rate and length values." 
+        });
+        systemIsCompliant = false;
+        return;
+      }
+      
       if (section.isCircular) {
+        if (!validateDimension(section.diameter)) {
+          results.push({ 
+            sectionId: section.id, 
+            error: `Invalid diameter: ${section.diameter}mm. Must be between ${MIN_DIMENSION}-${MAX_DIMENSION}mm.` 
+          });
+          systemIsCompliant = false;
+          return;
+        }
         const radius = section.diameter / 2000; 
         flowArea = Math.PI * radius * radius; 
         hydraulicDiameter = section.diameter / 1000;
       } else {
-        const width = (section.width || 0) / 1000; 
-        const height = (section.height || 0) / 1000; 
-        if (width === 0 || height === 0) { 
-            results.push({ sectionId: section.id, error: "Invalid dimensions for rectangular duct." });
-            systemIsCompliant = false; // Mark system as non-compliant due to error
-            return; 
+        const width = section.width || 0;
+        const height = section.height || 0;
+        
+        if (!validateDimension(width) || !validateDimension(height)) {
+          results.push({ 
+            sectionId: section.id, 
+            error: `Invalid dimensions: ${width}×${height}mm. Must be between ${MIN_DIMENSION}-${MAX_DIMENSION}mm.` 
+          });
+          systemIsCompliant = false;
+          return;
         }
-        flowArea = width * height; 
-        hydraulicDiameter = (2 * width * height) / (width + height);
+        
+        const widthM = width / 1000; 
+        const heightM = height / 1000; 
+        flowArea = widthM * heightM; 
+        hydraulicDiameter = (2 * widthM * heightM) / (widthM + heightM);
         
         // Calculate aspect ratio (height/width)
-        aspectRatio = height / width;
+        aspectRatio = heightM / widthM;
       }
 
-      if (flowArea === 0) { 
-        results.push({ sectionId: section.id, error: "Flow area is zero, cannot calculate velocity." });
+      if (flowArea <= 0) { 
+        results.push({ sectionId: section.id, error: "Flow area is zero or negative, cannot calculate velocity." });
         systemIsCompliant = false;
         return; 
       }
       
       velocity = (section.flowRate / 3600) / flowArea; 
+      velocity = safeNumber(velocity);
       
       if (velocity > highestOverallVelocity) {
         highestOverallVelocity = velocity;
       }
       
-      const velocityLimit = section.type === 'main' ? MAIN_DUCT_VELOCITY_LIMIT : BRANCH_DUCT_VELOCITY_LIMIT;
+      const velocityLimit = getVelocityLimit(section.type, section.isCircular);
       const isSectionCompliant = velocity <= velocityLimit;
       if (!isSectionCompliant) {
         systemIsCompliant = false; // If any section is non-compliant, the system is
       }
 
-      if (hydraulicDiameter === 0) { 
-        results.push({ sectionId: section.id, error: "Hydraulic diameter is zero." });
+      if (hydraulicDiameter <= 0) { 
+        results.push({ sectionId: section.id, error: "Hydraulic diameter is zero or negative." });
         systemIsCompliant = false;
         return; 
+      }
+      
+      // Validate material roughness
+      if (!validateRoughness(section.materialRoughness)) {
+        results.push({ 
+          sectionId: section.id, 
+          error: `Invalid material roughness: ${section.materialRoughness}mm. Must be between ${MIN_ROUGHNESS}-${MAX_ROUGHNESS}mm.` 
+        });
+        systemIsCompliant = false;
+        return;
       }
       
       const reynoldsNumber = (velocity * hydraulicDiameter) / kinematicViscosity;
       const relativeRoughness = (section.materialRoughness / 1000) / hydraulicDiameter; 
       let frictionFactor: number;
       
+      // Enhanced friction factor calculation with better error handling
       if (reynoldsNumber < 2000) {
-        frictionFactor = 64 / reynoldsNumber;
+        frictionFactor = reynoldsNumber > 0 ? 64 / reynoldsNumber : 0.02;
       } else {
-        const term1 = Math.pow(relativeRoughness / 3.7, 1.11);
-        const term2 = 6.9 / reynoldsNumber;
-        if (term1 + term2 <= 0) { // Prevent log of non-positive number
-            frictionFactor = 0.02; // Fallback, or handle error appropriately
-             results.push({ sectionId: section.id, error: "Invalid input for friction factor calculation (log argument)." });
-             systemIsCompliant = false; // An error in calculation makes it non-compliant
-        } else {
-            frictionFactor = Math.pow(-1.8 * Math.log10(term1 + term2), -2);
+        try {
+          const term1 = Math.pow(relativeRoughness / 3.7, 1.11);
+          const term2 = 6.9 / reynoldsNumber;
+          const logArgument = term1 + term2;
+          
+          if (logArgument <= 0 || !isFinite(logArgument)) {
+            frictionFactor = 0.02; // Fallback value
+            results.push({ 
+              sectionId: section.id, 
+              error: "Warning: Using fallback friction factor due to extreme flow conditions." 
+            });
+          } else {
+            const logValue = Math.log10(logArgument);
+            if (!isFinite(logValue)) {
+              frictionFactor = 0.02;
+            } else {
+              frictionFactor = Math.pow(-1.8 * logValue, -2);
+              frictionFactor = safeNumber(frictionFactor);
+              
+              // Sanity check for friction factor
+              if (frictionFactor < 0.008 || frictionFactor > 0.1) {
+                frictionFactor = Math.max(0.008, Math.min(0.1, frictionFactor));
+              }
+            }
+          }
+        } catch (error) {
+          frictionFactor = 0.02; // Safe fallback
         }
       }
       
-      const straightDuctPressureDrop = frictionFactor * (section.length / hydraulicDiameter) * (airDensity * Math.pow(velocity, 2) / 2);
-      const dynamicPressure = 0.5 * airDensity * Math.pow(velocity, 2);
+      const straightDuctPressureDrop = safeNumber(
+        frictionFactor * (section.length / hydraulicDiameter) * (airDensity * Math.pow(velocity, 2) / 2)
+      );
+      const dynamicPressure = safeNumber(0.5 * airDensity * Math.pow(velocity, 2));
       
       let fittingsPressureDrop = 0;
       const fittingDetails: any[] = [];
@@ -228,10 +359,10 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
         
         if (fitting.pressureDropMethod === 'kValue' && fitting.lossCoefficient !== undefined) {
           // Calculate pressure drop using K-value method
-          fittingPressureDrop = fitting.lossCoefficient * dynamicPressure * fitting.quantity;
+          fittingPressureDrop = safeNumber(fitting.lossCoefficient * dynamicPressure * fitting.quantity);
         } else if (fitting.pressureDropMethod === 'direct' && fitting.directPressureDrop !== undefined) {
           // Use direct pressure drop value
-          fittingPressureDrop = fitting.directPressureDrop * fitting.quantity;
+          fittingPressureDrop = safeNumber(fitting.directPressureDrop * fitting.quantity);
         }
         
         fittingsPressureDrop += fittingPressureDrop;
@@ -239,7 +370,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
           type: fitting.type,
           quantity: fitting.quantity,
           dropPerUnit: fitting.pressureDropMethod === 'kValue' 
-            ? (fitting.lossCoefficient !== undefined ? fitting.lossCoefficient * dynamicPressure : 0) 
+            ? (fitting.lossCoefficient !== undefined ? safeNumber(fitting.lossCoefficient * dynamicPressure) : 0) 
             : (fitting.directPressureDrop || 0),
           totalDrop: fittingPressureDrop,
           lossCoefficient: fitting.lossCoefficient,
@@ -249,7 +380,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
         });
       });
       
-      const sectionTotalDrop = straightDuctPressureDrop + fittingsPressureDrop;
+      const sectionTotalDrop = safeNumber(straightDuctPressureDrop + fittingsPressureDrop);
       currentTotalPressureDrop += sectionTotalDrop;
       
       results.push({
@@ -260,10 +391,10 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
         velocity,
         velocityLimit,
         isSectionCompliant,
-        reynoldsNumber,
-        frictionFactor,
+        reynoldsNumber: safeNumber(reynoldsNumber),
+        frictionFactor: safeNumber(frictionFactor),
         straightDuctPressureDrop,
-        fittingsPressureDrop,
+        fittingsPressureDrop: safeNumber(fittingsPressureDrop),
         dynamicPressure,
         sectionTotalDrop,
         fittingDetails,
@@ -274,14 +405,14 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       });
     });
     
-    const adjustedTotalDrop = currentTotalPressureDrop * safetyFactor;
+    const adjustedTotalDrop = safeNumber(currentTotalPressureDrop * safetyFactor);
     
     setSectionResults(results);
     setTotalPressureDrop(adjustedTotalDrop);
-    setMaxOverallVelocity(highestOverallVelocity);
+    setMaxOverallVelocity(safeNumber(highestOverallVelocity));
     setIsSystemCompliant(systemIsCompliant);
     
-  }, [ductSections, airDensity, kinematicViscosity, safetyFactor]);
+  }, [ductSections, airDensity, kinematicViscosity, safetyFactor, ductLocation, spaceCriticality]);
   
   const addDuctSection = () => {
     const newSection: DuctSection = {
@@ -291,7 +422,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       isCircular: true,
       materialRoughness: 0.15, 
       customMaterial: false,
-      flowRate: systemFlowRate, 
+      flowRate: Math.max(MIN_FLOW_RATE, systemFlowRate), 
       fittings: [],
       type: 'main', // Default new sections to 'main'
     };
@@ -299,7 +430,9 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   };
   
   const removeDuctSection = (id: string) => {
-    setDuctSections(ductSections.filter(section => section.id !== id));
+    if (ductSections.length > 1) {
+      setDuctSections(ductSections.filter(section => section.id !== id));
+    }
   };
   
   const updateDuctSection = (id: string, updates: Partial<DuctSection>) => {
@@ -312,14 +445,18 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   
   const addFitting = (sectionId: string, fittingType: string) => {
     if (fittingType === 'custom') {
-      // Add a custom fitting with default values and user-provided name
+      // Validate custom fitting inputs
+      const name = customFittingName.trim() || 'Custom Fitting';
+      const coefficient = Math.max(0, Math.min(50, customFittingCoefficient)); // Clamp between 0-50
+      const pressureDrop = Math.max(0, Math.min(10000, customFittingPressureDrop)); // Clamp between 0-10000 Pa
+      
       const newFitting: DuctFitting = {
         id: Date.now().toString(),
-        type: customFittingName || 'Custom Fitting',
+        type: name,
         // Set the appropriate property based on the method
         ...(customFittingMethod === 'kValue' 
-          ? { lossCoefficient: customFittingCoefficient }
-          : { directPressureDrop: customFittingPressureDrop }),
+          ? { lossCoefficient: coefficient }
+          : { directPressureDrop: pressureDrop }),
         quantity: 1,
         isCustom: true,
         pressureDropMethod: customFittingMethod
@@ -340,7 +477,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       // Reset custom fitting values
       setCustomFittingName('');
       setCustomFittingCoefficient(0.5);
-      // Don't reset customFittingPressureDrop to keep last value
+      setCustomFittingPressureDrop(10);
     } else {
       // Add a standard fitting
       const fitting = fittingOptions.find(f => f.id === fittingType);
@@ -436,18 +573,18 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       updates.pressureDropMethod = editingFitting.newMethod;
     }
     
-    // Update the appropriate value based on the method
+    // Update the appropriate value based on the method with validation
     if (editingFitting.newMethod === 'kValue' && editingFitting.newCoefficient !== undefined) {
-      updates.lossCoefficient = editingFitting.newCoefficient;
+      updates.lossCoefficient = Math.max(0, Math.min(50, editingFitting.newCoefficient));
       updates.directPressureDrop = undefined; // Clear direct pressure drop if changing to K-value method
     } else if (editingFitting.newMethod === 'direct' && editingFitting.newDirectPressureDrop !== undefined) {
-      updates.directPressureDrop = editingFitting.newDirectPressureDrop;
+      updates.directPressureDrop = Math.max(0, Math.min(10000, editingFitting.newDirectPressureDrop));
       updates.lossCoefficient = undefined; // Clear loss coefficient if changing to direct method
     }
     
     // Only update name for custom fittings
     if (fitting.isCustom && editingFitting.newName) {
-      updates.type = editingFitting.newName;
+      updates.type = editingFitting.newName.trim() || fitting.type;
     }
     
     updateFitting(
@@ -465,11 +602,11 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   };
   
   const convertPressure = (pascals: number, unit: 'pa' | 'mmwg' | 'inwg') => {
-    if (isNaN(pascals) || pascals === undefined) return 0;
+    const safePascals = safeNumber(pascals);
     switch (unit) {
-      case 'mmwg': return pascals / 9.80665; 
-      case 'inwg': return pascals / 249.0889; 
-      default: return pascals;
+      case 'mmwg': return safePascals / 9.80665; 
+      case 'inwg': return safePascals / 249.0889; 
+      default: return safePascals;
     }
   };
 
@@ -490,7 +627,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
       updateDuctSection(sectionId, { 
         customMaterial: true,
         // Keep current roughness value as starting point for custom
-        materialRoughness: section?.materialRoughness || 0.1
+        materialRoughness: Math.max(MIN_ROUGHNESS, Math.min(MAX_ROUGHNESS, section?.materialRoughness || 0.1))
       });
     } else {
       // Use predefined material
@@ -506,7 +643,9 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
 
   // Format aspect ratio for display
   const formatAspectRatio = (ratio: number): string => {
-    if (ratio === 1) return "1:1 (Square)";
+    if (!isFinite(ratio) || ratio <= 0) return "Invalid ratio";
+    
+    if (Math.abs(ratio - 1) < 0.01) return "1:1 (Square)";
     
     // Round to 2 decimal places
     const roundedRatio = Math.round(ratio * 100) / 100;
@@ -523,6 +662,10 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   
   // Suggest optimal H:W ratio for rectangular ducts (typically 1:1.5)
   const suggestOptimalRatio = (width: number, height: number): string => {
+    if (!width || !height || width <= 0 || height <= 0) {
+      return "Invalid dimensions for ratio calculation";
+    }
+    
     const currentRatio = height / width;
     
     // If already close to optimal (within 10% of 1:1.5 ratio), don't suggest change
@@ -536,6 +679,27 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
     const optimalHeight = area / optimalWidth;
     
     return `Consider adjusting to ${Math.round(optimalWidth)}mm × ${Math.round(optimalHeight)}mm for better efficiency`;
+  };
+
+  // Enhanced input handlers with validation
+  const handleSystemFlowRateChange = (value: number) => {
+    const clampedValue = Math.max(MIN_FLOW_RATE, Math.min(MAX_FLOW_RATE, value));
+    setSystemFlowRate(clampedValue);
+  };
+
+  const handleTemperatureChange = (value: number) => {
+    const clampedValue = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, value));
+    setAirTemperature(clampedValue);
+  };
+
+  const handleElevationChange = (value: number) => {
+    const clampedValue = Math.max(MIN_ELEVATION, Math.min(MAX_ELEVATION, value));
+    setElevation(clampedValue);
+  };
+
+  const handleSafetyFactorChange = (value: number) => {
+    const clampedValue = Math.max(1.0, Math.min(3.0, value));
+    setSafetyFactor(clampedValue);
   };
 
   return (
@@ -559,20 +723,113 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
           <h3 className="font-medium text-lg mb-4 text-gray-700">System Parameters</h3>
           
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">System Flow Rate (m³/h)</label>
-            <input type="number" value={systemFlowRate} onChange={(e) => setSystemFlowRate(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              System Flow Rate (m³/h)
+              <span className="text-xs text-gray-500 ml-1">({MIN_FLOW_RATE}-{MAX_FLOW_RATE})</span>
+            </label>
+            <input 
+              type="number" 
+              value={systemFlowRate} 
+              onChange={(e) => setSystemFlowRate(Number(e.target.value) || 0)} 
+              onBlur={(e) => handleSystemFlowRateChange(Number(e.target.value) || MIN_FLOW_RATE)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+              min={MIN_FLOW_RATE}
+              max={MAX_FLOW_RATE}
+            />
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Air Temperature (°C)</label>
-            <input type="number" value={airTemperature} onChange={(e) => setAirTemperature(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Air Temperature (°C)
+              <span className="text-xs text-gray-500 ml-1">({MIN_TEMPERATURE} to {MAX_TEMPERATURE})</span>
+            </label>
+            <input 
+              type="number" 
+              value={airTemperature} 
+              onChange={(e) => setAirTemperature(Number(e.target.value) || 0)} 
+              onBlur={(e) => handleTemperatureChange(Number(e.target.value) || 20)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+              min={MIN_TEMPERATURE}
+              max={MAX_TEMPERATURE}
+            />
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Elevation (m)</label>
-            <input type="number" value={elevation} onChange={(e) => setElevation(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Elevation (m)
+              <span className="text-xs text-gray-500 ml-1">({MIN_ELEVATION} to {MAX_ELEVATION})</span>
+            </label>
+            <input 
+              type="number" 
+              value={elevation} 
+              onChange={(e) => setElevation(Number(e.target.value) || 0)} 
+              onBlur={(e) => handleElevationChange(Number(e.target.value) || 0)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+              min={MIN_ELEVATION}
+              max={MAX_ELEVATION}
+            />
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Safety Factor (e.g., 1.1 for 10%)</label>
-            <input type="number" value={safetyFactor} onChange={(e) => setSafetyFactor(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" step="0.05" min="1"/>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Safety Factor (1.0-3.0)
+            </label>
+            <input 
+              type="number" 
+              value={safetyFactor} 
+              onChange={(e) => setSafetyFactor(Number(e.target.value) || 1.0)} 
+              onBlur={(e) => handleSafetyFactorChange(Number(e.target.value) || 1.3)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+              step="0.05" 
+              min="1.0"
+              max="3.0"
+            />
+          </div>
+          
+          <div className="border-t border-gray-300 my-4"></div>
+          
+          <h4 className="font-medium text-gray-700 mb-3">Velocity Limit Parameters</h4>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Duct Location</label>
+            <select
+              value={ductLocation}
+              onChange={(e) => setDuctLocation(e.target.value as 'riserOrAbovePlasterboard' | 'aboveSuspendedCeiling')}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="riserOrAbovePlasterboard">Riser or Above Plasterboard Ceiling</option>
+              <option value="aboveSuspendedCeiling">Above Suspended Ceiling</option>
+            </select>
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Space Criticality</label>
+            <select
+              value={spaceCriticality}
+              onChange={(e) => setSpaceCriticality(e.target.value as 'critical' | 'normal' | 'nonCritical')}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="critical">Critical (e.g., Recording Studio, Hospital OR)</option>
+              <option value="normal">Normal (e.g., Office, Classroom)</option>
+              <option value="nonCritical">Non-Critical (e.g., Warehouse, Plant Room)</option>
+            </select>
+          </div>
+          
+          {/* Velocity Limits Summary */}
+          <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+            <h5 className="text-sm font-medium text-blue-700 mb-2">Current Velocity Limits (m/s)</h5>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <p className="text-blue-600 font-medium">Rectangular Ducts:</p>
+                <p>Branch: {getVelocityLimit('branch', false).toFixed(1)} m/s</p>
+                <p>Main: {getVelocityLimit('main', false).toFixed(1)} m/s</p>
+              </div>
+              <div>
+                <p className="text-blue-600 font-medium">Circular Ducts:</p>
+                <p>Branch: {getVelocityLimit('branch', true).toFixed(1)} m/s</p>
+                <p>Main: {getVelocityLimit('main', true).toFixed(1)} m/s</p>
+              </div>
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              Based on CIBSE Guide B Table 5.2
+            </p>
           </div>
           
           <div className="border-t border-gray-300 my-6"></div>
@@ -597,19 +854,56 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                   onChange={(e) => updateDuctSection(section.id, { type: e.target.value as DuctType })}
                   className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="main">Main Duct (Limit: {MAIN_DUCT_VELOCITY_LIMIT} m/s)</option>
-                  <option value="branch">Branch Duct (Limit: {BRANCH_DUCT_VELOCITY_LIMIT} m/s)</option>
+                  <option value="main">
+                    Main Duct (Limit: {getVelocityLimit('main', section.isCircular).toFixed(1)} m/s)
+                  </option>
+                  <option value="branch">
+                    Branch Duct (Limit: {getVelocityLimit('branch', section.isCircular).toFixed(1)} m/s)
+                  </option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {section.isCircular ? 'Circular' : 'Rectangular'} duct in {ductLocation === 'riserOrAbovePlasterboard' ? 'riser/above plasterboard' : 'above suspended ceiling'} 
+                  {' '}({spaceCriticality} space)
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Length (m)</label>
-                  <input type="number" value={section.length} onChange={(e) => updateDuctSection(section.id, { length: Number(e.target.value) })} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" step="0.1" min="0"/>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Length (m)
+                    <span className="text-xs text-gray-500 ml-1">({MIN_LENGTH}-{MAX_LENGTH})</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    value={section.length} 
+                    onChange={(e) => updateDuctSection(section.id, { length: Number(e.target.value) || 0 })} 
+                    onBlur={(e) => {
+                      const value = Math.max(MIN_LENGTH, Math.min(MAX_LENGTH, Number(e.target.value) || MIN_LENGTH));
+                      updateDuctSection(section.id, { length: value });
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    step="0.1" 
+                    min={MIN_LENGTH}
+                    max={MAX_LENGTH}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (m³/h)</label>
-                  <input type="number" value={section.flowRate} onChange={(e) => updateDuctSection(section.id, { flowRate: Number(e.target.value) })} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Flow Rate (m³/h)
+                    <span className="text-xs text-gray-500 ml-1">({MIN_FLOW_RATE}-{MAX_FLOW_RATE})</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    value={section.flowRate} 
+                    onChange={(e) => updateDuctSection(section.id, { flowRate: Number(e.target.value) || 0 })} 
+                    onBlur={(e) => {
+                      const value = Math.max(MIN_FLOW_RATE, Math.min(MAX_FLOW_RATE, Number(e.target.value) || MIN_FLOW_RATE));
+                      updateDuctSection(section.id, { flowRate: value });
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min={MIN_FLOW_RATE}
+                    max={MAX_FLOW_RATE}
+                  />
                 </div>
               </div>
               
@@ -629,18 +923,60 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
               
               {section.isCircular ? (
                 <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Diameter (mm)</label>
-                  <input type="number" value={section.diameter} onChange={(e) => updateDuctSection(section.id, { diameter: Number(e.target.value) })} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Diameter (mm)
+                    <span className="text-xs text-gray-500 ml-1">({MIN_DIMENSION}-{MAX_DIMENSION})</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    value={section.diameter} 
+                    onChange={(e) => updateDuctSection(section.id, { diameter: Number(e.target.value) || 0 })} 
+                    onBlur={(e) => {
+                      const value = Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Number(e.target.value) || MIN_DIMENSION));
+                      updateDuctSection(section.id, { diameter: value });
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min={MIN_DIMENSION}
+                    max={MAX_DIMENSION}
+                  />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Width (mm)</label>
-                    <input type="number" value={section.width || ''} onChange={(e) => updateDuctSection(section.id, { width: Number(e.target.value) })} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Width (mm)
+                      <span className="text-xs text-gray-500 ml-1">({MIN_DIMENSION}-{MAX_DIMENSION})</span>
+                    </label>
+                    <input 
+                      type="number" 
+                      value={section.width || ''} 
+                      onChange={(e) => updateDuctSection(section.id, { width: Number(e.target.value) || 0 })} 
+                      onBlur={(e) => {
+                        const value = Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Number(e.target.value) || MIN_DIMENSION));
+                        updateDuctSection(section.id, { width: value });
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min={MIN_DIMENSION}
+                      max={MAX_DIMENSION}
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Height (mm)</label>
-                    <input type="number" value={section.height || ''} onChange={(e) => updateDuctSection(section.id, { height: Number(e.target.value) })} className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Height (mm)
+                      <span className="text-xs text-gray-500 ml-1">({MIN_DIMENSION}-{MAX_DIMENSION})</span>
+                    </label>
+                    <input 
+                      type="number" 
+                      value={section.height || ''} 
+                      onChange={(e) => updateDuctSection(section.id, { height: Number(e.target.value) || 0 })} 
+                      onBlur={(e) => {
+                        const value = Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Number(e.target.value) || MIN_DIMENSION));
+                        updateDuctSection(section.id, { height: value });
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min={MIN_DIMENSION}
+                      max={MAX_DIMENSION}
+                    />
                   </div>
                 </div>
               )}
@@ -667,14 +1003,20 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                 <div className="mb-4 pl-4 border-l-4 border-blue-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Custom Material Roughness (mm)
+                    <span className="text-xs text-gray-500 ml-1">({MIN_ROUGHNESS}-{MAX_ROUGHNESS})</span>
                   </label>
                   <input 
                     type="number" 
                     value={section.materialRoughness} 
-                    onChange={(e) => updateDuctSection(section.id, { materialRoughness: Number(e.target.value) })} 
+                    onChange={(e) => updateDuctSection(section.id, { materialRoughness: Number(e.target.value) || 0 })} 
+                    onBlur={(e) => {
+                      const value = Math.max(MIN_ROUGHNESS, Math.min(MAX_ROUGHNESS, Number(e.target.value) || MIN_ROUGHNESS));
+                      updateDuctSection(section.id, { materialRoughness: value });
+                    }}
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
                     step="0.01"
-                    min="0"
+                    min={MIN_ROUGHNESS}
+                    max={MAX_ROUGHNESS}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Enter absolute roughness in millimeters. Typical values range from 0.03 mm (very smooth) to 3.0 mm (very rough).
@@ -744,31 +1086,36 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                         onChange={(e) => setCustomFittingName(e.target.value)}
                         placeholder="Enter name"
                         className="w-full p-2 text-sm border border-gray-300 rounded-md"
+                        maxLength={50}
                       />
                     </div>
                     
                     {customFittingMethod === 'kValue' ? (
                       <div className="col-span-5">
-                        <label className="block text-xs text-gray-600 mb-1">K-Value</label>
+                        <label className="block text-xs text-gray-600 mb-1">K-Value (0-50)</label>
                         <input
                           type="number"
                           value={customFittingCoefficient}
-                          onChange={(e) => setCustomFittingCoefficient(Number(e.target.value))}
+                          onChange={(e) => setCustomFittingCoefficient(Number(e.target.value) || 0)}
+                          onBlur={(e) => setCustomFittingCoefficient(Math.max(0, Math.min(50, Number(e.target.value) || 0.5)))}
                           className="w-full p-2 text-sm border border-gray-300 rounded-md"
                           step="0.1"
                           min="0"
+                          max="50"
                         />
                       </div>
                     ) : (
                       <div className="col-span-5">
-                        <label className="block text-xs text-gray-600 mb-1">Pressure Drop (Pa)</label>
+                        <label className="block text-xs text-gray-600 mb-1">Pressure Drop (Pa, 0-10000)</label>
                         <input
                           type="number"
                           value={customFittingPressureDrop}
-                          onChange={(e) => setCustomFittingPressureDrop(Number(e.target.value))}
+                          onChange={(e) => setCustomFittingPressureDrop(Number(e.target.value) || 0)}
+                          onBlur={(e) => setCustomFittingPressureDrop(Math.max(0, Math.min(10000, Number(e.target.value) || 10)))}
                           className="w-full p-2 text-sm border border-gray-300 rounded-md"
                           step="1"
                           min="0"
+                          max="10000"
                         />
                       </div>
                     )}
@@ -849,6 +1196,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                                           newName: e.target.value
                                         })}
                                         className="flex-grow p-1 text-sm border border-gray-300 rounded-md"
+                                        maxLength={50}
                                       />
                                     </div>
                                   )}
@@ -863,11 +1211,16 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                                           value={editingFitting.newCoefficient || 0}
                                           onChange={(e) => setEditingFitting({
                                             ...editingFitting,
-                                            newCoefficient: Number(e.target.value)
+                                            newCoefficient: Number(e.target.value) || 0
+                                          })}
+                                          onBlur={(e) => setEditingFitting({
+                                            ...editingFitting,
+                                            newCoefficient: Math.max(0, Math.min(50, Number(e.target.value) || 0))
                                           })}
                                           className="flex-grow p-1 text-sm border border-gray-300 rounded-md"
                                           step="0.1"
                                           min="0"
+                                          max="50"
                                         />
                                       </>
                                     ) : (
@@ -878,11 +1231,16 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                                           value={editingFitting.newDirectPressureDrop || 0}
                                           onChange={(e) => setEditingFitting({
                                             ...editingFitting,
-                                            newDirectPressureDrop: Number(e.target.value)
+                                            newDirectPressureDrop: Number(e.target.value) || 0
+                                          })}
+                                          onBlur={(e) => setEditingFitting({
+                                            ...editingFitting,
+                                            newDirectPressureDrop: Math.max(0, Math.min(10000, Number(e.target.value) || 0))
                                           })}
                                           className="flex-grow p-1 text-sm border border-gray-300 rounded-md"
                                           step="1"
                                           min="0"
+                                          max="10000"
                                         />
                                       </>
                                     )}
@@ -920,9 +1278,11 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                                 <input
                                   type="number"
                                   value={fitting.quantity}
-                                  onChange={(e) => updateFitting(section.id, fitting.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                                  onChange={(e) => updateFitting(section.id, fitting.id, { quantity: Number(e.target.value) || 1 })}
+                                  onBlur={(e) => updateFitting(section.id, fitting.id, { quantity: Math.max(1, Math.min(99, Number(e.target.value) || 1)) })}
                                   className="w-14 p-1 text-sm border border-gray-300 rounded-md"
                                   min="1"
+                                  max="99"
                                 />
                               </div>
                               
@@ -954,7 +1314,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                 <h4 className="font-medium text-base text-gray-700">System Summary</h4>
                 <div className="mt-2"><p className="text-sm text-gray-600">Air Density:</p><p className="font-semibold text-gray-800">{airDensity.toFixed(3)} kg/m³</p></div>
                 <div className="mt-2"><p className="text-sm text-gray-600">Kinematic Viscosity:</p><p className="font-semibold text-gray-800">{kinematicViscosity.toExponential(3)} m²/s</p></div>
-                <div className="mt-2"><p className="text-sm text-gray-600">Highest Overall Velocity:</p><p className={`font-semibold ${maxOverallVelocity > MAIN_DUCT_VELOCITY_LIMIT ? 'text-orange-600' : 'text-gray-800'}`}>{maxOverallVelocity.toFixed(2)} m/s</p></div>
+                <div className="mt-2"><p className="text-sm text-gray-600">Highest Overall Velocity:</p><p className={`font-semibold ${maxOverallVelocity > Math.max(...ductSections.map(s => getVelocityLimit(s.type, s.isCircular))) ? 'text-orange-600' : 'text-gray-800'}`}>{maxOverallVelocity.toFixed(2)} m/s</p></div>
                 <div className="mt-2"><p className="text-sm text-gray-600">Total System Flow Rate:</p><p className="font-semibold text-gray-800">{systemFlowRate.toFixed(0)} m³/h</p></div>
               </div>
               <div>
@@ -968,7 +1328,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
               <div className={`rounded-md p-3 ${isSystemCompliant ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border`}>
                 <p className={`text-sm font-medium ${isSystemCompliant ? 'text-green-800' : 'text-red-800'}`}>
                   {isSystemCompliant 
-                    ? 'System Velocity Compliance: All duct sections are within their respective ASHRAE recommended velocity limits.'
+                    ? 'System Velocity Compliance: All duct sections are within their respective CIBSE recommended velocity limits.'
                     : 'System Velocity Compliance: Warning! One or more duct sections exceed recommended velocity limits. Review section details.'}
                 </p>
               </div>
@@ -980,7 +1340,7 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
           {sectionResults.map((result, index) => (
             result.error ? (
                  <div key={`error-${index}`} className="bg-red-100 p-3 rounded-md mb-3 border border-red-300">
-                    <h5 className="font-medium text-red-700">Section {ductSections.find(s => s.id === result.sectionId)?.id || index + 1} - Error</h5>
+                    <h5 className="font-medium text-red-700">Section {index + 1} - Error</h5>
                     <p className="text-sm text-red-600">{result.error}</p>
                  </div>
             ) : (
@@ -991,27 +1351,29 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
               <div className="mb-2 bg-gray-50 p-2 rounded border border-gray-200">
                 <p className="text-sm font-medium text-gray-700">Duct Dimensions:</p>
                 {result.isCircular ? (
-                  <p className="text-sm text-gray-600">Circular: {ductSections[index].diameter} mm diameter</p>
+                  <p className="text-sm text-gray-600">Circular: {ductSections[index]?.diameter || 'N/A'} mm diameter</p>
                 ) : (
                   <>
                     <p className="text-sm text-gray-600">Rectangular: {result.width} mm × {result.height} mm</p>
                     <p className="text-sm text-gray-600">
-                      Aspect Ratio: {formatAspectRatio(result.aspectRatio)}
+                      Aspect Ratio: {result.aspectRatio ? formatAspectRatio(result.aspectRatio) : 'N/A'}
                     </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      {suggestOptimalRatio(result.width, result.height)}
-                    </p>
+                    {result.width && result.height && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        {suggestOptimalRatio(result.width, result.height)}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-gray-600">Velocity (Limit: {result.velocityLimit.toFixed(1)} m/s):</p><p className={`font-semibold ${!result.isSectionCompliant ? 'text-red-600' : 'text-green-600'}`}>{result.velocity.toFixed(2)} m/s {result.isSectionCompliant ? '(Compliant)' : '(Exceeded)'}</p></div>
-                <div><p className="text-gray-600">Reynolds No.:</p><p className="font-semibold text-gray-800">{result.reynoldsNumber.toExponential(2)}</p></div>
-                <div><p className="text-gray-600">Friction Factor:</p><p className="font-semibold text-gray-800">{result.frictionFactor ? result.frictionFactor.toFixed(4) : 'N/A'}</p></div>
-                <div><p className="text-gray-600">Straight Loss:</p><p className="font-semibold text-gray-800">{result.straightDuctPressureDrop.toFixed(2)} Pa</p></div>
-                <div><p className="text-gray-600">Fittings Loss:</p><p className="font-semibold text-gray-800">{result.fittingsPressureDrop.toFixed(2)} Pa</p></div>
-                <div><p className="text-gray-600">Section Total:</p><p className="font-bold text-gray-800">{result.sectionTotalDrop.toFixed(2)} Pa</p></div>
+                <div><p className="text-gray-600">Velocity (Limit: {result.velocityLimit?.toFixed(1) || 'N/A'} m/s):</p><p className={`font-semibold ${!result.isSectionCompliant ? 'text-red-600' : 'text-green-600'}`}>{result.velocity?.toFixed(2) || 'N/A'} m/s {result.isSectionCompliant ? '(Compliant)' : '(Exceeded)'}</p></div>
+                <div><p className="text-gray-600">Reynolds No.:</p><p className="font-semibold text-gray-800">{result.reynoldsNumber?.toExponential(2) || 'N/A'}</p></div>
+                <div><p className="text-gray-600">Friction Factor:</p><p className="font-semibold text-gray-800">{result.frictionFactor?.toFixed(4) || 'N/A'}</p></div>
+                <div><p className="text-gray-600">Straight Loss:</p><p className="font-semibold text-gray-800">{result.straightDuctPressureDrop?.toFixed(2) || 'N/A'} Pa</p></div>
+                <div><p className="text-gray-600">Fittings Loss:</p><p className="font-semibold text-gray-800">{result.fittingsPressureDrop?.toFixed(2) || 'N/A'} Pa</p></div>
+                <div><p className="text-gray-600">Section Total:</p><p className="font-bold text-gray-800">{result.sectionTotalDrop?.toFixed(2) || 'N/A'} Pa</p></div>
               </div>
               
               {/* Enhanced Fitting Breakdown Table showing K-values */}
@@ -1046,10 +1408,10 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
                               {fitting.quantity}
                             </td>
                             <td className="p-2 text-right text-gray-700 border border-gray-300">
-                              {fitting.dropPerUnit.toFixed(2)}
+                              {fitting.dropPerUnit?.toFixed(2) || 'N/A'}
                             </td>
                             <td className="p-2 text-right font-medium text-gray-700 border border-gray-300">
-                              {fitting.totalDrop.toFixed(2)}
+                              {fitting.totalDrop?.toFixed(2) || 'N/A'}
                             </td>
                           </tr>
                         ))}
@@ -1079,12 +1441,13 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
         <h3 className="font-medium text-lg mb-2 text-gray-700">Important Considerations</h3>
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
           <li>Calculations use Sutherland's formula for temperature-dependent air viscosity and the Haaland equation for friction factor.</li>
-          <li>Velocity limits: Main Ducts ({MAIN_DUCT_VELOCITY_LIMIT} m/s), Branch Ducts ({BRANCH_DUCT_VELOCITY_LIMIT} m/s) based on typical ASHRAE guidelines for noise.</li>
+          <li>Velocity limits are based on CIBSE Guide B Table 5.2, varying by duct location, shape, and space criticality. Main ducts allow 50% higher velocities.</li>
           <li>For rectangular ducts, an aspect ratio (H:W) between 1:1 and 1:1.5 is generally optimal for efficient air flow.</li>
           <li>Rectangular ducts with extreme aspect ratios (e.g., 1:8) can increase pressure drops by up to 50% versus square ducts.</li>
           <li>Material roughness values significantly impact friction factor. For custom materials, consult manufacturer specifications.</li>
           <li>Fitting loss coefficients (K-values) can vary based on specific designs and flow conditions.</li>
           <li>The safety factor helps account for uncertainties. Common range is 10-30%.</li>
+          <li>All input values are validated and clamped to reasonable engineering ranges to prevent calculation errors.</li>
         </ul>
       </div>
     </div>
