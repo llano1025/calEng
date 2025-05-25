@@ -5,7 +5,8 @@ import DuctStaticPressureCalculator from './mvac/DuctStaticPressureCalculator';
 import ChilledWaterPipeSizingCalculator from './mvac/ChilledWaterPipeSizingCalculator';
 import SteamPipeSizingCalculator from './mvac/SteamPipeSizingCalculator';
 import AHUSizingCalculator from './mvac/AHUSizingCalculator';
-import SprinklerCalculator from './mvac/RefrigerantPipeCalculator';
+import RefrigerantPipeCalculator from './mvac/RefrigerantPipeCalculator';
+import VibrationIsolatorCalculator from './mvac/VibrationIsolatorCalculator';
 // import CoolingLoadCalculator from './mvac/CoolingLoadCalculator';
 // import FanPowerCalculator from './mvac/FanPowerCalculator';
 // import AirDiffusionCalculator from './mvac/AirDiffusionCalculator';
@@ -46,7 +47,9 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
       case 'ahu':
         return <AHUSizingCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'refrigerant':
-        return <SprinklerCalculator onShowTutorial={() => setShowTutorial(true)} />;
+        return <RefrigerantPipeCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'vibrationIsolator':
+        return <VibrationIsolatorCalculator onShowTutorial={() => setShowTutorial(true)} />;
       // case 'coolingLoad':
       //   return <CoolingLoadCalculator onShowTutorial={() => setShowTutorial(true)} />;
       // case 'fanPower':
@@ -203,6 +206,26 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
               <h3 className="font-semibold text-sm sm:text-base">Refrigerant Pipe Sizing</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'refrigerant' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Refrigerant Pipe Sizing
+              </p>
+            </div>
+          </button>
+
+          {/* Vibration */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'vibrationIsolator'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('vibrationIsolator')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'vibrationIsolator' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Vibration Isolator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'vibrationIsolator' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Vibration Isolator Sizing
               </p>
             </div>
           </button>
