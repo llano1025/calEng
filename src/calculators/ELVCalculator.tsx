@@ -41,8 +41,6 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <OpticalFiberCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'impedance':
         return <ImpedanceMatchingCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'rfPara':
-        return <RFParameterConverter onShowTutorial={() => setShowTutorial(true)} />;
       case 'microStrip':
         return <MicrostripCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'cctv':
