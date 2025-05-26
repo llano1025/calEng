@@ -2590,7 +2590,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       {/* Header */}
       <div className="mb-6 flex flex-wrap justify-between items-center gap-y-4">
         <div className="flex items-center">
-          <h1 className="text-xl font-semibold">Enhanced Electrical Load Estimation Calculator</h1>
+          <h1 className="text-xl font-semibold">Electrical Load Estimation</h1>
         </div>
         <div className="flex items-center space-x-2">
             <button

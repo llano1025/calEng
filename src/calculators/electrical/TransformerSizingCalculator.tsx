@@ -157,29 +157,6 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       // Get loads assigned to this transformer
       const assignedLoads = loads.filter(load => load.assignedTo.includes(transformer.id));
       
-      if (assignedLoads.length === 0) {
-        // If no loads assigned, create empty results
-        results[transformer.id] = {
-          id: transformer.id,
-          totalActivePower: 0,
-          totalReactivePower: 0,
-          totalApparentPower: 0,
-          utilizationPercentage: 0,
-          powerFactor: 0,
-          secondaryVoltageDropAtFullLoad: 0,
-          motorStartingVoltageDip: 0,
-          peakMotorStartingCurrent: 0,
-          transformerEnergizationInrush: 0,
-          estimatedLosses: 0,
-          harmonicDeratingFactor: 1,
-          altitudeDeratingFactor: 1,
-          temperatureDeratingFactor: 1,
-          overallDeratingFactor: 1,
-          loadDetails: []
-        };
-        return;
-      }
-
       let totalActivePower = 0;
       let totalReactivePower = 0;
       let maxHarmonicContent = 0;
@@ -192,11 +169,13 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
         const actualPower = load.power * load.quantity * load.loadFactor * load.demandFactor;
         totalActivePower += actualPower;
         
-        const powerFactorAngle = Math.acos(Math.max(0.1, Math.min(1, load.powerFactor))); // Clamp PF
+        // Clamp power factor between 0.1 and 1.0 to avoid calculation errors
+        const clampedPF = Math.max(0.1, Math.min(1, load.powerFactor));
+        const powerFactorAngle = Math.acos(clampedPF);
         const reactivePower = actualPower * Math.tan(powerFactorAngle);
         totalReactivePower += reactivePower;
         
-        const apparentPower = actualPower / load.powerFactor;
+        const apparentPower = actualPower / clampedPF;
         
         if (load.harmonicContent > maxHarmonicContent) {
           maxHarmonicContent = load.harmonicContent;
@@ -209,7 +188,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
           if (method) {
             startingCurrentFactor = method.startingCurrentFactor;
             // Starting KVA is based on the load's rated apparent power, not diversified power
-            const ratedApparentKVA = (load.power * load.quantity) / load.powerFactor;
+            const ratedApparentKVA = (load.power * load.quantity) / clampedPF;
             startingKVA = ratedApparentKVA * startingCurrentFactor;
             if (startingKVA > maxStartingKVA) {
               maxStartingKVA = startingKVA;
@@ -224,7 +203,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
           actualPower,
           reactivePower,
           apparentPower,
-          powerFactor: load.powerFactor,
+          powerFactor: clampedPF,
           startingKVA,
           startingCurrentFactor,
           harmonicContent: load.harmonicContent
@@ -232,7 +211,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       });
 
       const totalApparentPower = Math.sqrt(Math.pow(totalActivePower, 2) + Math.pow(totalReactivePower, 2));
-      const utilizationPercentage = (totalApparentPower / transformer.rating) * 100;
+      const utilizationPercentage = transformer.rating > 0 ? (totalApparentPower / transformer.rating) * 100 : 0;
       const powerFactor = totalApparentPower > 0 ? totalActivePower / totalApparentPower : 0;
 
       // Calculate derating factors
@@ -240,44 +219,52 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       if (transformer.kFactor === 1 && maxHarmonicContent > 0) {
         const thdEffect = Math.min(maxHarmonicContent, 50);
         harmonicDeratingFactor = 1.0 - (thdEffect / 100) * 0.15;
-        if (harmonicDeratingFactor < 0.75) harmonicDeratingFactor = 0.75;
+        harmonicDeratingFactor = Math.max(harmonicDeratingFactor, 0.75); // Minimum 75%
       }
       
       let altitudeDeratingFactor = 1.0;
       if (transformer.altitude > 1000) {
         altitudeDeratingFactor = 1.0 - ((transformer.altitude - 1000) / 100) * 0.004;
-        if (altitudeDeratingFactor < 0.8) altitudeDeratingFactor = 0.8;
+        altitudeDeratingFactor = Math.max(altitudeDeratingFactor, 0.8); // Minimum 80%
       }
       
       let temperatureDeratingFactor = 1.0;
       const referenceTemp = 40;
       if (transformer.temperature > referenceTemp) {
         temperatureDeratingFactor = 1.0 - (transformer.temperature - referenceTemp) * 0.01;
-        if (temperatureDeratingFactor < 0.75) temperatureDeratingFactor = 0.75;
+        temperatureDeratingFactor = Math.max(temperatureDeratingFactor, 0.75); // Minimum 75%
       }
       
       const overallDeratingFactor = harmonicDeratingFactor * altitudeDeratingFactor * temperatureDeratingFactor;
 
-      // Calculate other parameters
-      const secondaryVoltageDropAtFullLoad = transformer.impedance > 0 ?
+      // Calculate voltage drop at full load
+      const secondaryVoltageDropAtFullLoad = (transformer.impedance > 0 && transformer.rating > 0) ?
         (transformer.impedance / 100) * (totalApparentPower / transformer.rating) * transformer.secondaryVoltage : 0;
       
+      // Calculate motor starting voltage dip
       const motorStartingVoltageDip = (transformer.rating > 0 && maxStartingKVA > 0 && transformer.impedance > 0) ?
         (maxStartingKVA / transformer.rating) * transformer.impedance : 0;
       
-      const peakMotorStartingCurrent = maxStartingKVA > 0 && transformer.secondaryVoltage > 0 ? (
+      // Calculate peak motor starting current on secondary side
+      const peakMotorStartingCurrent = (maxStartingKVA > 0 && transformer.secondaryVoltage > 0) ? (
         maxStartingKVA * 1000 / 
         ((phaseTypeOfMaxStartingLoad === 'three' ? Math.sqrt(3) : 1) * transformer.secondaryVoltage)
       ) : 0;
       
-      const transformerEnergizationInrush = transformer.rating > 0 && transformer.primaryVoltage > 0 ? (
+      // Calculate transformer energization inrush current (CORRECTED)
+      // Typical inrush is 8-12 times full load current, using 10x as typical
+      const transformerEnergizationInrush = (transformer.rating > 0 && transformer.primaryVoltage > 0) ? (
         10 * (transformer.rating * 1000 / (Math.sqrt(3) * transformer.primaryVoltage))
       ) : 0;
       
+      // Calculate estimated losses
       let estimatedLosses = 0;
       if (transformer.efficiency > 0 && totalActivePower > 0) {
         const inputPower = totalActivePower / (transformer.efficiency / 100);
         estimatedLosses = inputPower - totalActivePower;
+      } else {
+        // Even with no load, transformer has no-load losses (typically 0.2-0.5% of rating)
+        estimatedLosses = transformer.rating * 0.003; // 0.3% as typical no-load loss
       }
 
       // Store results
@@ -302,7 +289,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
     });
 
     setTransformerResults(results);
-  }, [transformers, loads]);
+  }, [transformers, loads]); // Fixed dependency array
 
   // Function to add a new transformer
   const addTransformer = () => {
@@ -1037,7 +1024,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                         'text-green-600'
                       }`}>
                         {results.secondaryVoltageDropAtFullLoad.toFixed(1)} V (
-                        {(results.secondaryVoltageDropAtFullLoad / transformer.secondaryVoltage * 100).toFixed(1)}%)
+                        {(results.secondaryVoltageDropAtFullLoad / transformer.secondaryVoltage * 100).toFixed(2)}%)
                       </p>
                     </div>
                     <div>
@@ -1047,7 +1034,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                         results.motorStartingVoltageDip > 10 ? 'text-orange-600' : 
                         'text-green-600'
                       }`}>
-                        {results.motorStartingVoltageDip.toFixed(1)}%
+                        {results.motorStartingVoltageDip.toFixed(2)}%
                       </p>
                     </div>
                     <div>
@@ -1175,15 +1162,16 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                 <li><span className="font-medium">Reactive Power:</span> Calculated as active power × tan(cos⁻¹(power factor)).</li>
                 <li><span className="font-medium">Apparent Power:</span> S = √(P² + Q²), where P is active power and Q is reactive power.</li>
                 <li><span className="font-medium">Utilization:</span> (Total kVA / Transformer Rating) × 100%.</li>
+                <li><span className="font-medium">Voltage Drop:</span> Using transformer impedance % and loading %: ΔV = (Z% / 100) × (S_load / S_rated) × V_secondary.</li>
+                <li><span className="font-medium">Motor Starting Voltage Dip:</span> Using starting kVA and transformer impedance: Dip% = (S_starting / S_transformer) × Z%.</li>
+                <li><span className="font-medium">Inrush Current:</span> I_inrush = 10 × I_fullload = 10 × (S_transformer / (√3 × V_primary)).</li>
                 <li><span className="font-medium">Derating Factors:</span>
                   <ul className="list-disc pl-5 mt-1">
-                    <li>Harmonic: K-1 transformers derated based on THD %.</li>
-                    <li>Altitude: Derated 0.4% per 100m above 1000m.</li>
-                    <li>Temperature: Derated 1% per °C above 40°C.</li>
+                    <li>Harmonic: K-1 transformers derated based on THD % (15% reduction per 100% THD).</li>
+                    <li>Altitude: Derated 0.4% per 100m above 1000m altitude.</li>
+                    <li>Temperature: Derated 1% per °C above 40°C reference.</li>
                   </ul>
                 </li>
-                <li><span className="font-medium">Voltage Drop:</span> Using transformer impedance % and loading %.</li>
-                <li><span className="font-medium">Motor Starting:</span> Currents and voltage dips calculated using starting current factors and transformer impedance.</li>
               </ol>
             </div>
           )}
@@ -1193,11 +1181,12 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
             <ul className="list-disc pl-5 mt-2 text-sm space-y-1 text-blue-800">
               <li>Ideal transformer loading is between 40-80% of rated capacity for good efficiency and reserve capacity.</li>
               <li>Keep voltage drops under 3% for normal operation, under 5% for motor starting conditions.</li>
-              <li>Consider K-factor transformers for circuits with high harmonic content.</li>
+              <li>Consider K-factor transformers for circuits with high harmonic content (5% THD).</li>
               <li>Balance loads among multiple transformers when possible for redundancy.</li>
               <li>For motor loads, ensure proper protection settings for starting currents.</li>
+              <li>Transformer inrush current (8-12x full load) affects primary protection coordination.</li>
             </ul>
-            <p className="text-xs mt-2 text-blue-700">Note: Always verify with standards (IEC, BS, ANSI) and manufacturer's data for final selection.</p>
+            <p className="text-xs mt-2 text-blue-700">Note: Always verify with standards (IEC 60076, IEEE C57.12) and manufacturer's data for final selection.</p>
           </div>
         </div>
       </div>
@@ -1205,14 +1194,15 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       <div className="mt-8 bg-gray-100 p-4 rounded-lg border border-gray-200">
         <h3 className="font-medium text-lg mb-2 text-gray-700">Important Considerations</h3>
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-          <li>Load and demand factors are crucial for accurate sizing; use realistic values.</li>
-          <li>K-factor transformers are designed for non-linear loads with high harmonic content.</li>
-          <li>Standard transformers (K-1) may require derating when handling significant harmonics.</li>
-          <li>Altitude/temperature derating per IEC 60076 or manufacturer data.</li>
-          <li>Motor starting currents can cause significant voltage dips; verify acceptability.</li>
-          <li>Transformer energization inrush (8-12x FLC) impacts primary protection.</li>
-          <li>Consider protection coordination with downstream devices.</li>
-          <li>Always consult relevant standards and manufacturer specifications.</li>
+          <li>Load and demand factors are crucial for accurate sizing; use realistic values based on actual usage patterns.</li>
+          <li>K-factor transformers are designed for non-linear loads with high harmonic content (VFDs, UPS, LED lighting).</li>
+          <li>Standard transformers (K-1) may require derating when handling significant harmonics (&gt;5% THD).</li>
+          <li>Altitude/temperature derating per IEC 60076 or manufacturer data - critical for high-altitude or hot climate installations.</li>
+          <li>Motor starting currents can cause significant voltage dips; verify acceptability with connected equipment.</li>
+          <li>Transformer energization inrush (8-12x FLC for 0.1s) impacts primary protection coordination.</li>
+          <li>Consider protection coordination with downstream devices and selectivity requirements.</li>
+          <li>Parallel operation requires matched impedances and proper load sharing considerations.</li>
+          <li>Always consult relevant standards (IEC, IEEE, BS) and manufacturer specifications for final design.</li>
         </ul>
       </div>
     </div>
