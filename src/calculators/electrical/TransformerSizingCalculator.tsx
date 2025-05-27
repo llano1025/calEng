@@ -6,7 +6,7 @@ interface TransformerSizingCalculatorProps {
 }
 
 // Define standard transformer ratings
-const STANDARD_TRANSFORMER_SIZES = [1000, 1500, 2000]; // kVA
+const STANDARD_TRANSFORMER_SIZES = [1000, 1500, 2000, 2500, 3000]; // kVA
 
 // Define transformer type
 type TransformerType = 'dry' | 'oil';
@@ -29,6 +29,7 @@ interface Transformer {
   kFactor: number;          // For harmonic considerations
   efficiency: number;       // %
   assignedLoads: string[];  // Array of load IDs assigned to this transformer
+  riserNumber: number;      // From electrical load estimation
 }
 
 // Define load type
@@ -48,6 +49,11 @@ interface Load {
   startingMethod: string; // For motor loads
   voltageRating: number;  // V
   assignedTo: string[];  // Array of transformer IDs this load is assigned to (max 2)
+  category: string;      // Load category from electrical estimation
+  floorNumber: number;   // From electrical load estimation
+  riserNumber: number;   // From electrical load estimation
+  emergencyPower: boolean; // From electrical load estimation
+  originalConnectedLoad: number; // kVA from electrical estimation
 }
 
 // Connection type options
@@ -98,6 +104,9 @@ interface LoadDetail {
   startingKVA: number;
   startingCurrentFactor: number;
   harmonicContent: number;
+  category: string;
+  floorNumber: number;
+  emergencyPower: boolean;
 }
 
 const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = ({ onShowTutorial }) => {
@@ -118,7 +127,8 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       installation: 'indoor',
       kFactor: 1,
       efficiency: 98.5,
-      assignedLoads: []
+      assignedLoads: [],
+      riserNumber: 1
     }
   ]);
 
@@ -136,7 +146,12 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       phaseType: 'three',
       startingMethod: 'none',
       voltageRating: 380,
-      assignedTo: []
+      assignedTo: [],
+      category: 'Lighting',
+      floorNumber: 1,
+      riserNumber: 1,
+      emergencyPower: false,
+      originalConnectedLoad: 23.5
     }
   ]);
 
@@ -147,6 +162,171 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
   // State for calculation results
   const [transformerResults, setTransformerResults] = useState<Record<string, TransformerResults>>({});
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
+  
+  // State for load details expansion
+  const [expandedTransformers, setExpandedTransformers] = useState<Set<string>>(new Set());
+  
+  // State for imported project info
+  const [projectInfo, setProjectInfo] = useState<any>(null);
+
+  // Toggle transformer load details expansion
+  const toggleTransformerExpansion = (transformerId: string) => {
+    setExpandedTransformers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(transformerId)) {
+        newSet.delete(transformerId);
+      } else {
+        newSet.add(transformerId);
+      }
+      return newSet;
+    });
+  };
+
+  // Function to import data from Electrical Load Estimation
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target?.result as string) as any;
+          if (importedData && importedData.projectInfo) {
+            setProjectInfo(importedData.projectInfo);
+            
+            // Create transformers based on number of risers
+            const numberOfRisers = importedData.projectInfo.numberOfRisers || 1;
+            const newTransformers: Transformer[] = [];
+            
+            for (let i = 1; i <= numberOfRisers; i++) {
+              newTransformers.push({
+                id: `riser-${i}`,
+                name: `Riser ${i} Transformer`,
+                rating: 1000, // Default, can be adjusted based on load
+                primaryVoltage: 11000,
+                secondaryVoltage: 380,
+                frequency: 50,
+                connectionType: 'delta-wye',
+                impedance: 5,
+                temperature: 40,
+                altitude: 0,
+                type: 'oil',
+                installation: 'indoor',
+                kFactor: 1,
+                efficiency: 98.5,
+                assignedLoads: [],
+                riserNumber: i
+              });
+            }
+            
+            // Convert electrical loads to transformer loads
+            const newLoads: Load[] = [];
+            let loadIdCounter = 1;
+            
+            // Helper function to map starting method
+            const mapStartingMethod = (startingMethod?: string): string => {
+              if (!startingMethod) return 'none';
+              switch (startingMethod) {
+                case 'dol': return 'direct';
+                case 'sd': return 'star-delta';
+                case 'vsd': return 'vfd';
+                case 'softstart': return 'softStarter';
+                case 'none': return 'none';
+                default: return 'none';
+              }
+            };
+            
+            // Helper function to estimate harmonic content based on load type
+            const estimateHarmonicContent = (category: string, startingMethod?: string): number => {
+              if (startingMethod === 'vsd' || startingMethod === 'vfd') return 15; // VFDs produce harmonics
+              switch (category) {
+                case 'Lighting': return 8; // LED lighting
+                case 'General Power': return 5; // Mixed loads
+                case 'HVAC': return startingMethod === 'vsd' ? 15 : 3;
+                case 'Fire Service': return 2;
+                case 'Lift & Escalator': return 12; // VFD-driven
+                default: return 3;
+              }
+            };
+            
+            // Process each load category
+            const processLoadCategory = (loads: any[], categoryName: string) => {
+              loads.forEach((load: any) => {
+                if (load.connectedLoad > 0.1) { // Only include loads > 0.1 kVA
+                  const powerKW = load.connectedLoad * (load.powerFactor || 0.9); // Convert kVA to kW
+                  
+                  newLoads.push({
+                    id: `load-${loadIdCounter++}`,
+                    name: `${load.name || load.type || load.description || 'Unnamed'} (${categoryName})`,
+                    power: powerKW,
+                    powerFactor: load.powerFactor || 0.9,
+                    quantity: load.quantity || 1,
+                    loadFactor: 1.0,
+                    demandFactor: 1.0,
+                    harmonicContent: estimateHarmonicContent(categoryName, load.startingMethod),
+                    phaseType: 'three',
+                    startingMethod: mapStartingMethod(load.startingMethod),
+                    voltageRating: 380,
+                    assignedTo: [`riser-${load.riserNumber || 1}`],
+                    category: categoryName,
+                    floorNumber: load.floorNumber || 1,
+                    riserNumber: load.riserNumber || 1,
+                    emergencyPower: load.emergencyPower || false,
+                    originalConnectedLoad: load.connectedLoad
+                  });
+                }
+              });
+            };
+            
+            // Process all load categories
+            if (importedData.lightingSpaces) processLoadCategory(importedData.lightingSpaces, 'Lighting');
+            if (importedData.generalPowerSpaces) processLoadCategory(importedData.generalPowerSpaces, 'General Power');
+            if (importedData.hvacPlants) processLoadCategory(importedData.hvacPlants, 'HVAC Plant');
+            if (importedData.hvacWaterDistributions) processLoadCategory(importedData.hvacWaterDistributions, 'HVAC Water');
+            if (importedData.hvacAirDistributions) processLoadCategory(importedData.hvacAirDistributions, 'HVAC Air');
+            if (importedData.hvacVentilations) processLoadCategory(importedData.hvacVentilations, 'HVAC Ventilation');
+            if (importedData.fireServices) processLoadCategory(importedData.fireServices, 'Fire Service');
+            if (importedData.waterPumps) processLoadCategory(importedData.waterPumps, 'Water Pumps');
+            if (importedData.liftEscalators) processLoadCategory(importedData.liftEscalators, 'Lift & Escalator');
+            if (importedData.hotWaterSystems) processLoadCategory(importedData.hotWaterSystems, 'Hot Water');
+            if (importedData.miscInstallations) processLoadCategory(importedData.miscInstallations, 'Miscellaneous');
+            
+            // Update transformer assignments
+            newTransformers.forEach(transformer => {
+              const assignedLoadIds = newLoads
+                .filter(load => load.riserNumber === transformer.riserNumber)
+                .map(load => load.id);
+              transformer.assignedLoads = assignedLoadIds;
+            });
+            
+            // Calculate recommended transformer sizes based on total load
+            newTransformers.forEach(transformer => {
+              const totalLoad = newLoads
+                .filter(load => load.riserNumber === transformer.riserNumber)
+                .reduce((sum, load) => sum + (load.power / load.powerFactor), 0); // Total kVA
+              
+              // Size transformer at ~75% utilization
+              const recommendedSize = Math.ceil(totalLoad / 0.75 / 100) * 100;
+              const availableSize = STANDARD_TRANSFORMER_SIZES.find(size => size >= recommendedSize) || STANDARD_TRANSFORMER_SIZES[STANDARD_TRANSFORMER_SIZES.length - 1];
+              transformer.rating = availableSize;
+            });
+            
+            setTransformers(newTransformers);
+            setLoads(newLoads);
+            setExpandedTransformers(new Set(newTransformers.map(t => t.id))); // Expand all by default
+            
+            event.target.value = '';
+            alert(`Data imported successfully! Created ${newTransformers.length} transformers and ${newLoads.length} loads.`);
+          } else {
+            alert('Invalid file format. Please import a valid Electrical Load Estimation export file.');
+          }
+        } catch (error) {
+          console.error('Error importing data:', error);
+          alert('Error importing data. Make sure the file is a valid JSON export from Electrical Load Estimation Calculator.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   // Calculate results whenever transformers or loads change
   useEffect(() => {
@@ -206,7 +386,10 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
           powerFactor: clampedPF,
           startingKVA,
           startingCurrentFactor,
-          harmonicContent: load.harmonicContent
+          harmonicContent: load.harmonicContent,
+          category: load.category,
+          floorNumber: load.floorNumber,
+          emergencyPower: load.emergencyPower
         });
       });
 
@@ -289,10 +472,11 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
     });
 
     setTransformerResults(results);
-  }, [transformers, loads]); // Fixed dependency array
+  }, [transformers, loads]);
 
   // Function to add a new transformer
   const addTransformer = () => {
+    const maxRiserNumber = Math.max(...transformers.map(t => t.riserNumber || 1), 0);
     const newTransformer: Transformer = {
       id: Date.now().toString(),
       name: `Transformer ${transformers.length + 1}`,
@@ -308,7 +492,8 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       installation: 'indoor',
       kFactor: 1,
       efficiency: 98.5,
-      assignedLoads: []
+      assignedLoads: [],
+      riserNumber: maxRiserNumber + 1
     };
     setTransformers([...transformers, newTransformer]);
   };
@@ -353,7 +538,12 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       phaseType: 'three',
       startingMethod: 'none',
       voltageRating: transformers[0]?.secondaryVoltage || 380,
-      assignedTo: []
+      assignedTo: [],
+      category: 'General',
+      floorNumber: 1,
+      riserNumber: 1,
+      emergencyPower: false,
+      originalConnectedLoad: 0
     };
     setLoads([...loads, newLoad]);
   };
@@ -440,16 +630,56 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Transformer Sizing Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+        <div className="flex items-center space-x-2">
+          <label
+            htmlFor="import-electrical-data"
+            className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 shadow-sm cursor-pointer"
           >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
+            Import Electrical Data
+          </label>
+          <input
+            type="file"
+            id="import-electrical-data"
+            accept=".json"
+            onChange={handleImportData}
+            className="hidden"
+          />
+          {onShowTutorial && (
+            <button 
+              onClick={onShowTutorial} 
+              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+            >
+              <span className="mr-1">Tutorial</span>
+              <Icons.InfoInline />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Project Information Display */}
+      {projectInfo && (
+        <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-medium text-blue-700 mb-2">Imported Project Information</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-blue-600">Project:</p>
+              <p className="font-semibold text-blue-800">{projectInfo.projectName || 'Unnamed'}</p>
+            </div>
+            <div>
+              <p className="text-blue-600">Building Type:</p>
+              <p className="font-semibold text-blue-800">{projectInfo.buildingType || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-blue-600">Total Area:</p>
+              <p className="font-semibold text-blue-800">{projectInfo.totalArea || 0} m²</p>
+            </div>
+            <div>
+              <p className="text-blue-600">Risers:</p>
+              <p className="font-semibold text-blue-800">{projectInfo.numberOfRisers || 1}</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -469,7 +699,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
             {transformers.map((transformer) => (
               <div key={transformer.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{transformer.name}</h4>
+                  <h4 className="font-medium text-gray-700">{transformer.name} (Riser {transformer.riserNumber})</h4>
                   {transformers.length > 1 && (
                     <button 
                       onClick={() => removeTransformer(transformer.id)} 
@@ -654,7 +884,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                         onClick={() => setEditingTransformerId(null)} 
                         className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700"
                       >
-                        Done
+                        <Icons.Check />
                       </button>
                     </div>
                   </div>
@@ -717,7 +947,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
           
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">Loads</h3>
+              <h3 className="font-medium text-lg text-gray-700">Loads ({loads.length} total)</h3>
               <button 
                 onClick={addLoad} 
                 className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
@@ -726,236 +956,175 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
               </button>
             </div>
             
-            {loads.map((load) => (
-              <div key={load.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{load.name}</h4>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => duplicateLoad(load.id)} 
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      Duplicate
-                    </button>
-                    {loads.length > 1 && (
+            <div className="max-h-96 overflow-y-auto">
+              {loads.map((load) => (
+                <div key={load.id} className="mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-medium text-sm text-gray-700 truncate">{load.name}</h4>
+                    <div className="flex space-x-1">
                       <button 
-                        onClick={() => removeLoad(load.id)} 
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        onClick={() => duplicateLoad(load.id)} 
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium"
                       >
-                        Remove
+                        Duplicate
                       </button>
-                    )}
-                  </div>
-                </div>
-                
-                {editingLoadId === load.id ? (
-                  <div className="pl-3 border-l-4 border-blue-400">
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Load Name</label>
-                      <input 
-                        type="text" 
-                        value={load.name} 
-                        onChange={(e) => updateLoad(load.id, { name: e.target.value })} 
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Power (kW)</label>
-                        <input 
-                          type="number" 
-                          value={load.power} 
-                          onChange={(e) => updateLoad(load.id, { power: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="0.1" min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                        <input 
-                          type="number" 
-                          value={load.powerFactor} 
-                          onChange={(e) => updateLoad(load.id, { powerFactor: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="0.01" min="0.1" max="1"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                        <input 
-                          type="number" 
-                          value={load.quantity} 
-                          onChange={(e) => updateLoad(load.id, { quantity: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="1" min="1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Voltage Rating (V)</label>
-                        <input 
-                          type="number" 
-                          value={load.voltageRating} 
-                          onChange={(e) => updateLoad(load.id, { voltageRating: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="1"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Load Factor</label>
-                        <input 
-                          type="number" 
-                          value={load.loadFactor} 
-                          onChange={(e) => updateLoad(load.id, { loadFactor: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="0.05" min="0" max="1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Demand Factor</label>
-                        <input 
-                          type="number" 
-                          value={load.demandFactor} 
-                          onChange={(e) => updateLoad(load.id, { demandFactor: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="0.05" min="0" max="1"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Harmonic Content (THD %)</label>
-                        <input 
-                          type="number" 
-                          value={load.harmonicContent} 
-                          onChange={(e) => updateLoad(load.id, { harmonicContent: Number(e.target.value) })} 
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          step="1" min="0" max="100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phase Type</label>
-                        <select 
-                          value={load.phaseType} 
-                          onChange={(e) => updateLoad(load.id, { phaseType: e.target.value as 'single' | 'three' })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      {loads.length > 1 && (
+                        <button 
+                          onClick={() => removeLoad(load.id)} 
+                          className="text-red-600 hover:text-red-800 text-xs font-medium"
                         >
-                          <option value="single">Single-phase</option>
-                          <option value="three">Three-phase</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Starting Method (for motors)</label>
-                      <select 
-                        value={load.startingMethod} 
-                        onChange={(e) => updateLoad(load.id, { startingMethod: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {STARTING_METHODS.map(method => (
-                          <option key={method.id} value={method.id}>
-                            {method.name} (Factor: {method.startingCurrentFactor}x)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="flex justify-end mt-3">
-                      <button 
-                        onClick={() => setEditingLoadId(null)} 
-                        className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mb-3 text-sm">
-                      <div>
-                        <p className="text-gray-600">Power:</p>
-                        <p className="font-semibold text-gray-800">{load.power} kW</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">PF:</p>
-                        <p className="font-semibold text-gray-800">{load.powerFactor}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Qty:</p>
-                        <p className="font-semibold text-gray-800">{load.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Voltage:</p>
-                        <p className="font-semibold text-gray-800">{load.voltageRating}V</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Load Factor:</p>
-                        <p className="font-semibold text-gray-800">{load.loadFactor}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Demand Factor:</p>
-                        <p className="font-semibold text-gray-800">{load.demandFactor}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">THD:</p>
-                        <p className="font-semibold text-gray-800">{load.harmonicContent}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Phase:</p>
-                        <p className="font-semibold text-gray-800">{load.phaseType === 'single' ? 'Single' : 'Three'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 text-sm mb-3">
-                      <p className="text-gray-600">Starting Method:</p>
-                      <p className="font-semibold text-gray-800">
-                        {STARTING_METHODS.find(method => method.id === load.startingMethod)?.name || 'None'}
-                      </p>
-                    </div>
-                    
-                    {/* Transformer Assignment */}
-                    <div className="mt-3 border-t border-gray-200 pt-3">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Assign to Transformer(s):</p>
-                      <div className="flex flex-wrap gap-2">
-                        {transformers.map(transformer => (
-                          <label key={transformer.id} className="inline-flex items-center bg-gray-100 p-2 rounded">
-                            <input 
-                              type="checkbox" 
-                              checked={load.assignedTo.includes(transformer.id)} 
-                              onChange={() => toggleLoadAssignment(load.id, transformer.id)} 
-                              disabled={!load.assignedTo.includes(transformer.id) && load.assignedTo.length >= 2}
-                              className="mr-2 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">{transformer.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                      {load.assignedTo.length >= 2 && (
-                        <p className="text-xs text-orange-600 mt-1">Maximum 2 transformers can be assigned</p>
+                          Remove
+                        </button>
                       )}
                     </div>
-                    
-                    <div className="flex justify-end mt-3">
-                      <button 
-                        onClick={() => setEditingLoadId(load.id)} 
-                        className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded-md text-sm hover:bg-blue-50 flex items-center"
-                      >
-                        <Icons.Edit />
-                        <span className="ml-1">Edit</span>
-                      </button>
+                  </div>
+                  
+                  {editingLoadId === load.id ? (
+                    <div className="pl-2 border-l-4 border-blue-400">
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Load Name</label>
+                        <input 
+                          type="text" 
+                          value={load.name} 
+                          onChange={(e) => updateLoad(load.id, { name: e.target.value })} 
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Power (kW)</label>
+                          <input 
+                            type="number" 
+                            value={load.power} 
+                            onChange={(e) => updateLoad(load.id, { power: Number(e.target.value) })} 
+                            className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            step="0.1" min="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Power Factor</label>
+                          <input 
+                            type="number" 
+                            value={load.powerFactor} 
+                            onChange={(e) => updateLoad(load.id, { powerFactor: Number(e.target.value) })} 
+                            className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            step="0.01" min="0.1" max="1"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                          <input 
+                            type="number" 
+                            value={load.quantity} 
+                            onChange={(e) => updateLoad(load.id, { quantity: Number(e.target.value) })} 
+                            className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            step="1" min="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Harmonic Content (%)</label>
+                          <input 
+                            type="number" 
+                            value={load.harmonicContent} 
+                            onChange={(e) => updateLoad(load.id, { harmonicContent: Number(e.target.value) })} 
+                            className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            step="1" min="0" max="100"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Starting Method</label>
+                        <select 
+                          value={load.startingMethod} 
+                          onChange={(e) => updateLoad(load.id, { startingMethod: e.target.value })}
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {STARTING_METHODS.map(method => (
+                            <option key={method.id} value={method.id}>
+                              {method.name} ({method.startingCurrentFactor}x)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="flex justify-end mt-2">
+                        <button 
+                          onClick={() => setEditingLoadId(null)} 
+                          className="bg-blue-600 text-white px-2 py-1 rounded-md text-xs hover:bg-blue-700"
+                        >
+                          <Icons.Check />
+                        </button>
+                      </div>
                     </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                        <div>
+                          <p className="text-gray-600">Power:</p>
+                          <p className="font-semibold text-gray-800">{load.power.toFixed(1)} kW</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">PF:</p>
+                          <p className="font-semibold text-gray-800">{load.powerFactor}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Floor:</p>
+                          <p className="font-semibold text-gray-800">{load.floorNumber}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            load.emergencyPower ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {load.category}
+                          </span>
+                          {load.emergencyPower && (
+                            <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                              Emergency
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Transformer Assignment */}
+                      <div className="mt-2 border-t border-gray-200 pt-2">
+                        <p className="text-xs font-medium text-gray-700 mb-1">Assigned to:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {transformers.map(transformer => (
+                            <label key={transformer.id} className="inline-flex items-center bg-gray-100 p-1 rounded text-xs">
+                              <input 
+                                type="checkbox" 
+                                checked={load.assignedTo.includes(transformer.id)} 
+                                onChange={() => toggleLoadAssignment(load.id, transformer.id)} 
+                                disabled={!load.assignedTo.includes(transformer.id) && load.assignedTo.length >= 2}
+                                className="mr-1 h-3 w-3 text-blue-600 border-gray-300 focus:ring-blue-500"
+                              />
+                              <span className="text-gray-700">R{transformer.riserNumber}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-end mt-2">
+                        <button 
+                          onClick={() => setEditingLoadId(load.id)} 
+                          className="text-blue-600 hover:text-blue-800 px-2 py-1 rounded-md text-xs hover:bg-blue-50 flex items-center"
+                        >
+                          <Icons.Edit />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         
@@ -968,25 +1137,33 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
             const results = transformerResults[transformer.id];
             if (!results) return null;
             
+            const isExpanded = expandedTransformers.has(transformer.id);
+            
             return (
               <div key={transformer.id} className="mb-6">
-                <h4 className="font-medium text-base text-blue-800 mb-3 pb-2 border-b border-blue-200">
-                  {transformer.name} ({transformer.rating} kVA)
-                </h4>
+                <div 
+                  className="flex justify-between items-center mb-3 pb-2 border-b border-blue-200 cursor-pointer"
+                  onClick={() => toggleTransformerExpansion(transformer.id)}
+                >
+                  <h4 className="font-medium text-base text-blue-800">
+                    {transformer.name} ({transformer.rating} kVA) - Riser {transformer.riserNumber}
+                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      results.utilizationPercentage > 90 ? 'bg-red-100 text-red-700' :
+                      results.utilizationPercentage > 80 ? 'bg-orange-100 text-orange-700' :
+                      results.utilizationPercentage > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {results.utilizationPercentage.toFixed(1)}%
+                    </span>
+                    <span className="text-blue-600">
+                      {isExpanded ? '▲' : '▼'}
+                    </span>
+                  </div>
+                </div>
                 
                 <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
-                  <h5 className="font-medium text-gray-800 mb-3">Loading Summary</h5>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Utilization:</p>
-                      <p className={`font-bold text-xl ${
-                        results.utilizationPercentage > 90 ? 'text-red-600' : 
-                        results.utilizationPercentage > 80 ? 'text-orange-600' : 
-                        results.utilizationPercentage > 0 ? 'text-green-600' : 'text-gray-400'
-                      }`}>
-                        {results.utilizationPercentage.toFixed(1)}%
-                      </p>
-                    </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Total Load:</p>
                       <p className="font-semibold text-gray-800">{results.totalApparentPower.toFixed(1)} kVA</p>
@@ -995,131 +1172,122 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                       <p className="text-sm text-gray-600">Power Factor:</p>
                       <p className="font-semibold text-gray-800">{results.powerFactor.toFixed(2)}</p>
                     </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Active Power:</p>
-                      <p className="font-semibold text-gray-800">{results.totalActivePower.toFixed(1)} kW</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Reactive Power:</p>
-                      <p className="font-semibold text-gray-800">{results.totalReactivePower.toFixed(1)} kVAR</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Losses:</p>
-                      <p className="font-semibold text-gray-800">{results.estimatedLosses.toFixed(2)} kW</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
-                  <h5 className="font-medium text-gray-800 mb-3">Voltage & Current</h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Secondary Voltage Drop:</p>
+                      <p className="text-sm text-gray-600">Voltage Drop:</p>
                       <p className={`font-semibold ${
                         results.secondaryVoltageDropAtFullLoad > transformer.secondaryVoltage * 0.05 ? 'text-red-600' : 
                         results.secondaryVoltageDropAtFullLoad > transformer.secondaryVoltage * 0.03 ? 'text-orange-600' : 
                         'text-green-600'
                       }`}>
-                        {results.secondaryVoltageDropAtFullLoad.toFixed(1)} V (
-                        {(results.secondaryVoltageDropAtFullLoad / transformer.secondaryVoltage * 100).toFixed(2)}%)
+                        {(results.secondaryVoltageDropAtFullLoad / transformer.secondaryVoltage * 100).toFixed(1)}%
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Motor Starting Voltage Dip:</p>
-                      <p className={`font-semibold ${
-                        results.motorStartingVoltageDip > 15 ? 'text-red-600' : 
-                        results.motorStartingVoltageDip > 10 ? 'text-orange-600' : 
-                        'text-green-600'
-                      }`}>
-                        {results.motorStartingVoltageDip.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Peak Starting Current (Sec.):</p>
-                      <p className="font-semibold text-gray-800">{results.peakMotorStartingCurrent.toFixed(0)} A</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Inrush Current (Pri.):</p>
-                      <p className="font-semibold text-gray-800">{results.transformerEnergizationInrush.toFixed(0)} A</p>
+                      <p className="text-sm text-gray-600">Assigned Loads:</p>
+                      <p className="font-semibold text-gray-800">{results.loadDetails.length}</p>
                     </div>
                   </div>
                 </div>
                 
-                {/* Derating Factors */}
-                <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
-                  <h5 className="font-medium text-gray-800 mb-3">Derating Analysis</h5>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Harmonic:</p>
-                      <p className="font-semibold text-gray-800">{(results.harmonicDeratingFactor * 100).toFixed(1)}%</p>
+                {isExpanded && (
+                  <>
+                    <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
+                      <h5 className="font-medium text-gray-800 mb-3">Detailed Performance</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Active Power:</p>
+                          <p className="font-semibold text-gray-800">{results.totalActivePower.toFixed(1)} kW</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Reactive Power:</p>
+                          <p className="font-semibold text-gray-800">{results.totalReactivePower.toFixed(1)} kVAR</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Motor Starting Voltage Dip:</p>
+                          <p className={`font-semibold ${
+                            results.motorStartingVoltageDip > 15 ? 'text-red-600' : 
+                            results.motorStartingVoltageDip > 10 ? 'text-orange-600' : 
+                            'text-green-600'
+                          }`}>
+                            {results.motorStartingVoltageDip.toFixed(2)}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Estimated Losses:</p>
+                          <p className="font-semibold text-gray-800">{results.estimatedLosses.toFixed(2)} kW</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Altitude:</p>
-                      <p className="font-semibold text-gray-800">{(results.altitudeDeratingFactor * 100).toFixed(1)}%</p>
+
+                    {/* Derating Factors */}
+                    <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
+                      <h5 className="font-medium text-gray-800 mb-3">Derating Analysis</h5>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Harmonic:</p>
+                          <p className="font-semibold text-gray-800">{(results.harmonicDeratingFactor * 100).toFixed(1)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Altitude:</p>
+                          <p className="font-semibold text-gray-800">{(results.altitudeDeratingFactor * 100).toFixed(1)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Temperature:</p>
+                          <p className="font-semibold text-gray-800">{(results.temperatureDeratingFactor * 100).toFixed(1)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Overall:</p>
+                          <p className="font-semibold text-gray-800">{(results.overallDeratingFactor * 100).toFixed(1)}%</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Temperature:</p>
-                      <p className="font-semibold text-gray-800">{(results.temperatureDeratingFactor * 100).toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Overall:</p>
-                      <p className="font-semibold text-gray-800">{(results.overallDeratingFactor * 100).toFixed(1)}%</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Assigned Loads */}
-                {results.loadDetails.length > 0 && (
-                  <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200 overflow-x-auto">
-                    <h5 className="font-medium text-gray-800 mb-3">Assigned Loads</h5>
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Load</th>
-                          <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P (kW)</th>
-                          <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Q (kVAR)</th>
-                          <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">S (kVA)</th>
-                          <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">PF</th>
-                          <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Start (kVA)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {results.loadDetails.map((load) => (
-                          <tr key={load.id}>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">
-                              {load.name}
-                              {load.harmonicContent > 0 && (
-                                <span className="ml-1 text-xs text-orange-600">(THD: {load.harmonicContent}%)</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">{load.actualPower.toFixed(1)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">{load.reactivePower.toFixed(1)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">{load.apparentPower.toFixed(1)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">{load.powerFactor.toFixed(2)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">
-                              {load.startingKVA > 0 ? load.startingKVA.toFixed(1) : '-'}
-                              {load.startingKVA > 0 && (
-                                <span className="ml-1 text-xs text-blue-600">({load.startingCurrentFactor}x)</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        <tr>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Total</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-right text-gray-700">{results.totalActivePower.toFixed(1)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-right text-gray-700">{results.totalReactivePower.toFixed(1)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-right text-gray-700">{results.totalApparentPower.toFixed(1)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-right text-gray-700">{results.powerFactor.toFixed(2)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-right text-gray-700">-</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                    
+                    {/* Assigned Loads Table */}
+                    {results.loadDetails.length > 0 && (
+                      <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200 overflow-x-auto">
+                        <h5 className="font-medium text-gray-800 mb-3">Assigned Loads ({results.loadDetails.length})</h5>
+                        <table className="min-w-full divide-y divide-gray-200 text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Load</th>
+                              <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">kW</th>
+                              <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">kVA</th>
+                              <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">PF</th>
+                              <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
+                              <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {results.loadDetails.map((load) => (
+                              <tr key={load.id} className={load.emergencyPower ? 'bg-red-50' : ''}>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700">
+                                  {load.name}
+                                  {load.emergencyPower && (
+                                    <span className="ml-1 text-xs text-red-600">(Emergency)</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.actualPower.toFixed(1)}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.apparentPower.toFixed(1)}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.powerFactor.toFixed(2)}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.floorNumber}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.category}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-700">Total</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">{results.totalActivePower.toFixed(1)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">{results.totalApparentPower.toFixed(1)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">{results.powerFactor.toFixed(2)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
                 
                 <div className="mt-3 bg-blue-100 p-3 rounded-md border border-blue-300">
@@ -1127,17 +1295,17 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
                   {results.loadDetails.length === 0 ? (
                     <p className="text-sm text-blue-800">No loads assigned to this transformer.</p>
                   ) : results.utilizationPercentage > 90 ? (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-red-700">
                       <strong>Warning:</strong> Transformer is heavily loaded ({results.utilizationPercentage.toFixed(1)}%). 
                       Consider upgrading to the next size or redistributing loads.
                     </p>
                   ) : results.utilizationPercentage < 40 ? (
-                    <p className="text-sm text-orange-600">
+                    <p className="text-sm text-orange-700">
                       <strong>Note:</strong> Transformer is lightly loaded ({results.utilizationPercentage.toFixed(1)}%).
                       Consider using a smaller transformer for better efficiency.
                     </p>
                   ) : (
-                    <p className="text-sm text-green-600">
+                    <p className="text-sm text-green-700">
                       <strong>Good:</strong> Transformer is properly sized with good utilization ({results.utilizationPercentage.toFixed(1)}%).
                     </p>
                   )}
@@ -1181,7 +1349,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
             <ul className="list-disc pl-5 mt-2 text-sm space-y-1 text-blue-800">
               <li>Ideal transformer loading is between 40-80% of rated capacity for good efficiency and reserve capacity.</li>
               <li>Keep voltage drops under 3% for normal operation, under 5% for motor starting conditions.</li>
-              <li>Consider K-factor transformers for circuits with high harmonic content (5% THD).</li>
+              <li>Consider K-factor transformers for circuits with high harmonic content (&gt;5% THD).</li>
               <li>Balance loads among multiple transformers when possible for redundancy.</li>
               <li>For motor loads, ensure proper protection settings for starting currents.</li>
               <li>Transformer inrush current (8-12x full load) affects primary protection coordination.</li>
@@ -1192,17 +1360,14 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
       </div>
       
       <div className="mt-8 bg-gray-100 p-4 rounded-lg border border-gray-200">
-        <h3 className="font-medium text-lg mb-2 text-gray-700">Important Considerations</h3>
+        <h3 className="font-medium text-lg mb-2 text-gray-700">Import Instructions</h3>
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-          <li>Load and demand factors are crucial for accurate sizing; use realistic values based on actual usage patterns.</li>
-          <li>K-factor transformers are designed for non-linear loads with high harmonic content (VFDs, UPS, LED lighting).</li>
-          <li>Standard transformers (K-1) may require derating when handling significant harmonics (&gt;5% THD).</li>
-          <li>Altitude/temperature derating per IEC 60076 or manufacturer data - critical for high-altitude or hot climate installations.</li>
-          <li>Motor starting currents can cause significant voltage dips; verify acceptability with connected equipment.</li>
-          <li>Transformer energization inrush (8-12x FLC for 0.1s) impacts primary protection coordination.</li>
-          <li>Consider protection coordination with downstream devices and selectivity requirements.</li>
-          <li>Parallel operation requires matched impedances and proper load sharing considerations.</li>
-          <li>Always consult relevant standards (IEC, IEEE, BS) and manufacturer specifications for final design.</li>
+          <li>Use the "Import Electrical Data" button to load JSON files exported from the Electrical Load Estimation Calculator.</li>
+          <li>The system will automatically create transformers based on the number of risers in your electrical design.</li>
+          <li>All loads will be automatically assigned to transformers based on their riser assignments.</li>
+          <li>Transformer sizes will be initially sized based on total connected load with ~75% utilization target.</li>
+          <li>Review and adjust transformer specifications, load assignments, and sizing as needed for your specific application.</li>
+          <li>Click on transformer headers to expand/collapse detailed load information for better visual management.</li>
         </ul>
       </div>
     </div>
