@@ -617,7 +617,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Fire Service Installation</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Fire Service</label>
         <input
           type="checkbox"
           checked={item.fsi}
@@ -1121,1890 +1121,2261 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     }
   };
 
-  const categoryTypeToNameMap: Record<string, string> = {
-    'lighting': 'A. Lighting Installation',
-    'generalPower': 'B. General Power',
-    'hvacPlant': 'C1. HVAC - Plant',
-    'hvacWater': 'C2. HVAC - Water Distribution',
-    'hvacAir': 'C3. HVAC - Air Distribution',
-    'hvacVent': 'C4. HVAC - Mechanical Ventilation',
-    'fireServiceD': 'D. Fire Service Installations',
-    'waterPump': 'E. Water Pumps for P&D',
-    'liftEscalator': 'F. Lift & Escalator Installation',
-    'hotWater': 'G. Hot Water Installation',
-    'misc': 'H. Miscellaneous Installation',
-  };
+// FULL HARMONIZED EQUIPMENT CARD LAYOUTS
+// Complete revised code with standardized structure, wording, and visual design
 
+const categoryTypeToNameMap: Record<string, string> = {
+  'lighting': 'A. Lighting Installation',
+  'generalPower': 'B. General Power',
+  'hvacPlant': 'C1. HVAC - Plant',
+  'hvacWater': 'C2. HVAC - Water Distribution',
+  'hvacAir': 'C3. HVAC - Air Distribution',
+  'hvacVent': 'C4. HVAC - Mechanical Ventilation',
+  'fireServiceD': 'D. Fire Service Installations',
+  'waterPump': 'E. Water Pumps for P&D',
+  'liftEscalator': 'F. Lift & Escalator Installation',
+  'hotWater': 'G. Hot Water Installation',
+  'misc': 'H. Miscellaneous Installation',
+};
 
-  // Render content based on active tab
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'projectInfo':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="font-medium text-lg mb-4 text-gray-700">Project Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.projectName} 
-                  onChange={(e) => setProjectInfo({...projectInfo, projectName: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Building Type</label>
-                <select 
-                  value={projectInfo.buildingType} 
-                  onChange={(e) => setProjectInfo({...projectInfo, buildingType: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Building Type</option>
-                  <option value="Office">Office</option>
-                  <option value="Residential">Residential</option>
-                  <option value="Commercial">Commercial</option>
-                  <option value="Industrial">Industrial</option>
-                  <option value="Institutional">Institutional</option>
-                  <option value="Mixed Use">Mixed Use</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input 
-                  type="date" 
-                  value={projectInfo.date} 
-                  onChange={(e) => setProjectInfo({...projectInfo, date: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inform No. / Reference</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.informNo} 
-                  onChange={(e) => setProjectInfo({...projectInfo, informNo: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Construction Floor Area (m²)</label>
-                <input 
-                  type="number" 
-                  value={projectInfo.totalArea} 
-                  onChange={(e) => setProjectInfo({...projectInfo, totalArea: Math.max(0, Number(e.target.value))})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Number of Floors</label>
-                <input 
-                  type="number" 
-                  value={projectInfo.numberOfFloors} 
-                  onChange={(e) => setProjectInfo({...projectInfo, numberOfFloors: Math.max(1, Number(e.target.value))})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  min="1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Number of Risers</label>
-                <input 
-                  type="number" 
-                  value={projectInfo.numberOfRisers} 
-                  onChange={(e) => setProjectInfo({...projectInfo, numberOfRisers: Math.max(1, Number(e.target.value))})}
-                  className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  min="1"
-                />
-              </div>
+// Render content based on active tab
+const renderTabContent = () => {
+  switch (activeTab) {
+    case 'projectInfo':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="font-medium text-lg mb-4 text-gray-700">Project Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+              <input 
+                type="text" 
+                value={projectInfo.projectName} 
+                onChange={(e) => setProjectInfo({...projectInfo, projectName: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-          </div>
-        );
-        
-      case 'lighting':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">A. Lighting Installation</h3>
-              <button 
-                onClick={handleAddLightingSpace}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Building Type</label>
+              <select 
+                value={projectInfo.buildingType} 
+                onChange={(e) => setProjectInfo({...projectInfo, buildingType: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               >
-                Add Space
-              </button>
+                <option value="">Select Building Type</option>
+                <option value="Office">Office</option>
+                <option value="Residential">Residential</option>
+                <option value="Commercial">Commercial</option>
+                <option value="Industrial">Industrial</option>
+                <option value="Institutional">Institutional</option>
+                <option value="Mixed Use">Mixed Use</option>
+              </select>
             </div>
-            
-            {lightingSpaces.map((space) => (
-              <div key={space.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{space.name}</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(lightingSpaces, setLightingSpaces, space.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {renderFloorRiserFields(space, (id, updates) => updateItem(lightingSpaces, setLightingSpaces, id, updates), space.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Space Name</label>
-                    <input
-                      type="text"
-                      value={space.name}
-                      onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { name: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {/* Starting method selector not typically shown for lighting (defaults to 1x) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
-                    <input
-                      type="number"
-                      value={space.area}
-                      onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { area: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PD (W/m²)</label>
-                    <input
-                      type="number"
-                      value={space.powerDensity}
-                      onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { powerDensity: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                      step="0.1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input
-                      type="number"
-                      value={space.powerFactor}
-                      onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1"
-                      max="1"
-                      step="0.01"
-                    />
-                  </div>
-                  {renderEmergencyPowerToggle(space, (id, updates) => updateItem(lightingSpaces, setLightingSpaces, id, updates), space.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {space.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {space.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-600">Connected Load (kVA) = Area (m²) × Power Density (W/m²) / (1000 × Power Factor)</p>
-                  <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (default 1x for lighting)</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input 
+                type="date" 
+                value={projectInfo.date} 
+                onChange={(e) => setProjectInfo({...projectInfo, date: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Inform No. / Reference</label>
+              <input 
+                type="text" 
+                value={projectInfo.informNo} 
+                onChange={(e) => setProjectInfo({...projectInfo, informNo: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Construction Floor Area (m²)</label>
+              <input 
+                type="number" 
+                value={projectInfo.totalArea} 
+                onChange={(e) => setProjectInfo({...projectInfo, totalArea: Math.max(0, Number(e.target.value))})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Number of Floors</label>
+              <input 
+                type="number" 
+                value={projectInfo.numberOfFloors} 
+                onChange={(e) => setProjectInfo({...projectInfo, numberOfFloors: Math.max(1, Number(e.target.value))})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                min="1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Number of Risers</label>
+              <input 
+                type="number" 
+                value={projectInfo.numberOfRisers} 
+                onChange={(e) => setProjectInfo({...projectInfo, numberOfRisers: Math.max(1, Number(e.target.value))})}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                min="1"
+              />
             </div>
           </div>
-        );
+        </div>
+      );
 
-      case 'hvacWater':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">C2. HVAC - Water Side Distribution</h3>
-              <button 
-                onClick={handleAddHVACWaterDistribution}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+    case 'summary':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">Total Estimated Electrical Demand Summary</h3>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Report Type:</label>
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value as 'overall' | 'byFloor' | 'byRiser')}
+                className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               >
-                Add System
-              </button>
-            </div>
-            
-            {hvacWaterDistributions.map((dist) => (
-              <div key={dist.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{dist.system}</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">System/Equipment Name</label>
-                    <input
-                      type="text"
-                      value={dist.system}
-                      onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { system: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <select
-                      value={dist.equipmentType}
-                      onChange={(e) => {
-                        const newType = e.target.value as HVACWaterDistribution['equipmentType'];
-                        const updates: Partial<HVACWaterDistribution> = { equipmentType: newType };
-                        if (newType === 'otherLoad') {
-                            updates.startingMethod = defaultResistiveStartingMethod;
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
-                        } else if (newType === 'motorLoad' && dist.startingMethod === defaultResistiveStartingMethod) { 
-                            updates.startingMethod = 'vsd'; 
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'vsd')?.multiplier || 1.8;
-                        }
-                        updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, updates);
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
-                      <option value="otherLoad">Other Load</option>
-                    </select>
-                  </div>
-                   {renderStartingMethodSelector(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id, dist.equipmentType === 'motorLoad')}
-                  
-                  {/* Cooling Load Served removed */}
-
-                  {dist.equipmentType === 'motorLoad' && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Water Flow Rate (L/s)</label>
-                        <input
-                          type="number"
-                          value={dist.waterFlowRate ?? ''}
-                          onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { waterFlowRate: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pump Head (kPa)</label>
-                        <input
-                          type="number"
-                          value={dist.pumpHead ?? ''}
-                          onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpHead: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
-                        <input
-                          type="number"
-                          value={dist.pumpEfficiency ?? ''}
-                          onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          min="0.1" max="1" step="0.01"
-                        />
-                      </div>
-                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                        <input
-                          type="number"
-                          value={dist.motorEfficiency ?? ''}
-                          onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          min="0.1" max="1" step="0.01"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {dist.equipmentType === 'otherLoad' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Power (kW)</label>
-                      <input
-                        type="number"
-                        value={dist.powerKWPerUnit ?? ''}
-                        onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { powerKWPerUnit: Number(e.target.value) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        min="0" step="0.01"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input
-                      type="number"
-                      value={dist.powerFactor}
-                      onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  {renderEmergencyPowerToggle(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {dist.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {dist.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                {dist.equipmentType === 'motorLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</p>
-                  </div>
-                )}
-                {dist.equipmentType === 'otherLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Load (kVA) = Power (kW) / Power Factor</p>
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
+                <option value="overall">Overall Summary</option>
+                <option value="byFloor">Summary by Floor</option>
+                <option value="byRiser">Summary by Riser</option>
+              </select>
             </div>
           </div>
-        );
 
-      case 'liftEscalator':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">F. Lift & Escalator Installation</h3>
-              <button 
-                onClick={handleAddLiftEscalator}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {liftEscalators.map((item) => {
-              const isEscalatorOrWalkway = item.type === 'Escalator' || item.type === 'Moving Walkway';
-              return (
-                <div key={item.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-medium text-gray-700">{item.type} (Qty: {item.quantity})</h4>
-                    <div>
-                      <button 
-                        onClick={() => removeItem(liftEscalators, setLiftEscalators, item.id)}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {renderFloorRiserFields(item, (id, updates) => updateItem(liftEscalators, setLiftEscalators, id, updates), item.id)}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                      <select value={item.type} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { type: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="Passenger Lift">Passenger Lift</option>
-                        <option value="Goods Lift">Goods Lift</option>
-                        <option value="Fireman Lift">Fireman Lift</option>
-                        <option value="Service Lift">Service Lift</option>
-                        <option value="Escalator">Escalator</option>
-                        <option value="Moving Walkway">Moving Walkway</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                      <input type="number" value={item.quantity} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="1"/>
-                    </div>
-                    {/* No Starting Method Selector for Lifts/Escalators */}
-
-                    {!isEscalatorOrWalkway && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Rated Load (kg)</label>
-                          <input type="number" value={item.ratedLoad ?? ''} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { ratedLoad: Math.max(0, Number(e.target.value)) })}
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Rated Speed (m/s)</label>
-                          <input type="number" value={item.ratedSpeed ?? ''} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { ratedSpeed: Math.max(0, Number(e.target.value)) })}
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.1"/>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                          <input type="number" value={item.motorEfficiency ?? ''} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                        </div>
-                      </>
-                    )}
-                     {isEscalatorOrWalkway && (
-                        <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Load per Unit (kW)</label>
-                        <input type="number" value={item.connectedLoadPerUnitInput ?? ''} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { connectedLoadPerUnitInput: Math.max(0, Number(e.target.value)) })}
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.1"/>
-                        </div>
-                     )}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                      <input type="number" value={item.powerFactor} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                    </div>
-                    {renderLiftEscalatorToggles(item, (id, updates) => updateItem(liftEscalators, setLiftEscalators, id, updates), item.id)}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
-                      <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                          {item.connectedLoadPerUnit.toFixed(2)} 
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                      <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                        {item.connectedLoad.toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                      <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                        {item.startingKVA.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {!isEscalatorOrWalkway && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Power (kW) = (0.00981 × Load (kg) × Speed (m/s) × k_unbalance) / Motor Eff (k_unbalance ≈ 0.6)</p>
-                    <p className="text-gray-600">Unit Load (kVA) = Power (kW) / Power Factor</p>
-                    <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) (assumed 1x multiplier)</p>
-                    </div>
-                  )}
-                   {isEscalatorOrWalkway && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Unit Load (kVA) = Load per Unit (kW) / Power Factor</p>
-                    <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) (assumed 1x multiplier)</p>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'summary':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">Total Estimated Electrical Demand Summary</h3>
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">Report Type:</label>
-                <select
-                  value={reportType}
-                  onChange={(e) => setReportType(e.target.value as 'overall' | 'byFloor' | 'byRiser')}
-                  className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="overall">Overall Summary</option>
-                  <option value="byFloor">Summary by Floor</option>
-                  <option value="byRiser">Summary by Riser</option>
-                </select>
-              </div>
-            </div>
-
-            {reportType === 'overall' && (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Connected Load (kVA)</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Starting kVA</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversity Factor</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Future Growth Factor (Category)</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversified Load (incl. Category Growth) (kVA)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {categorySummaries.map((summary, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{summary.category}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedConnectedLoad.toFixed(2)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedStartingKVA.toFixed(2)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <input type="number" value={summary.diversityFactor}
-                              onChange={(e) => {
-                                const newFactor = Number(e.target.value);
-                                   setCategorySummaries(prevSummaries => 
-                                    prevSummaries.map((prevSummary, i) => 
-                                      i === index ? { ...prevSummary, diversityFactor: Math.max(0.1, Math.min(1, newFactor)) } : prevSummary
-                                    )
-                                  );
-                              }}
-                              className="w-20 p-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                              min="0.1" max="1" step="0.01" />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <input type="number" value={summary.futureGrowthFactor}
-                               onChange={(e) => {
-                                const newFactor = Number(e.target.value);
-                                   setCategorySummaries(prevSummaries => 
-                                    prevSummaries.map((prevSummary, i) => 
-                                      i === index ? { ...prevSummary, futureGrowthFactor: Math.max(0, Math.min(1, newFactor)) } : prevSummary
-                                    )
-                                  );
-                              }}
-                              className="w-20 p-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                              min="0" max="1" step="0.01" />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{summary.diversifiedConnectedLoad.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-blue-50">
-                      <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total Connected Load</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          {categorySummaries.reduce((sum, summary) => sum + summary.estimatedConnectedLoad, 0).toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          {categorySummaries.reduce((sum, summary) => sum + summary.estimatedStartingKVA, 0).toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={1}> 
-                          Diversity: {overallDiversityFactor.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900" colSpan={2}>{totalDiversifiedLoad.toFixed(2)}</td> 
-                      </tr>
-                      <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Additional Demand</td>
-                        <td colSpan={4}></td> 
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totalAdditionalDemand.toFixed(2)}</td>
-                      </tr>
-                      <tr className="bg-blue-100">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-900">Total Estimated Electrical Demand</td>
-                        <td colSpan={4}></td> 
-                        <td className="px-6 py-4 whitespace-nowrap text-lg font-bold text-blue-900">{totalEstimatedDemand.toFixed(2)} kVA</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                {/* Emergency Power and FSI Summary */}
-                <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <h4 className="font-medium text-lg mb-2 text-yellow-800">Special Load Summary</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-yellow-800">Total Emergency Power Load:</p>
-                      <p className="font-bold text-yellow-900 text-lg">{totalEmergencyPowerLoad.toFixed(2)} kVA</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-yellow-800">Total FSI Load (Lifts FSI + Cat. D):</p>
-                      <p className="font-bold text-yellow-900 text-lg">{totalFSILoad.toFixed(2)} kVA</p>
-                    </div>
-                  </div>
-                   <p className="mt-2 text-xs text-yellow-700">Note: "Total FSI Load" includes FSI-designated lifts and all equipment from "D. Fire Service Installations".</p>
-                </div>
-
-                <div className="mt-6 bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-lg mb-2 text-blue-700">Electrical Demand Metrics</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-blue-800">Total Construction Floor Area:</p>
-                      <p className="font-semibold text-blue-900">{projectInfo.totalArea.toFixed(2)} m²</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-blue-800">Demand Density:</p>
-                      <p className="font-bold text-blue-900 text-lg">{demandDensity.toFixed(2)} VA/m²</p>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-sm text-blue-800">Recommended Transformer Size:</p>
-                    <p className="font-bold text-blue-900 text-lg">
-                      {Math.ceil(totalEstimatedDemand / 100) * 100} kVA
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      (Approximated by rounding up Total Estimated Demand to the next 100 kVA. Consult standards for precise sizing.)
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {reportType === 'byFloor' && (
+          {reportType === 'overall' && (
+            <>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Connected Load (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Starting kVA</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversity Factor</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Future Growth Factor (Category)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversified Load (incl. Category Growth) (kVA)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFloorSummaries().map((floorSummary, index) => {
-                        const isExpanded = expandedFloors.has(floorSummary.floor);
-                        const floorEquipment = getAllFlattenedEquipment().filter(item => item.floorNumber === floorSummary.floor);
-                        const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
-                        floorEquipment.forEach(item => {
-                            if (!equipmentByCategory[item.categoryType]) {
-                                equipmentByCategory[item.categoryType] = [];
-                            }
-                            equipmentByCategory[item.categoryType].push(item);
-                        });
-
-                        return (
-                            <React.Fragment key={floorSummary.floor}>
-                                <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                    <td className="px-2 py-4 whitespace-nowrap">
-                                        <button onClick={() => toggleFloorExpansion(floorSummary.floor)} className="text-blue-500 hover:text-blue-700">
-                                            {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Floor {floorSummary.floor}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalLoad.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalStartingKVA.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.emergencyLoad.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.fsiLoad.toFixed(2)}</td>
-                                </tr>
-                                {isExpanded && (
-                                    <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
-                                        <td colSpan={6} className="px-4 py-2">
-                                            <div className="p-2 bg-white rounded shadow">
-                                                <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Floor {floorSummary.floor}:</h5>
-                                                <table className="min-w-full text-xs">
-                                                    <thead className="bg-gray-200">
-                                                        <tr>
-                                                            <th className="px-2 py-1 text-left">Category</th>
-                                                            <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
-                                                            <th className="px-2 py-1 text-right">Start. kVA</th>
-                                                            <th className="px-2 py-1 text-right">Emergency (kVA)</th>
-                                                            <th className="px-2 py-1 text-right">FSI (kVA)</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
-                                                            const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
-                                                            const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
-                                                            const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
-                                                            const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
-                                                                .reduce((sum, item) => sum + item.connectedLoad, 0);
-                                                            
-                                                            if (catConnLoad === 0 && catStartKVA === 0) return null; 
-
-                                                            return (
-                                                                <tr key={categoryKey}>
-                                                                    <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
+                    {categorySummaries.map((summary, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{summary.category}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedConnectedLoad.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedStartingKVA.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <input type="number" value={summary.diversityFactor}
+                            onChange={(e) => {
+                              const newFactor = Number(e.target.value);
+                                 setCategorySummaries(prevSummaries => 
+                                  prevSummaries.map((prevSummary, i) => 
+                                    i === index ? { ...prevSummary, diversityFactor: Math.max(0.1, Math.min(1, newFactor)) } : prevSummary
+                                  )
+                                );
+                            }}
+                            className="w-20 p-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            min="0.1" max="1" step="0.01" />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <input type="number" value={summary.futureGrowthFactor}
+                             onChange={(e) => {
+                              const newFactor = Number(e.target.value);
+                                 setCategorySummaries(prevSummaries => 
+                                  prevSummaries.map((prevSummary, i) => 
+                                    i === index ? { ...prevSummary, futureGrowthFactor: Math.max(0, Math.min(1, newFactor)) } : prevSummary
+                                  )
+                                );
+                            }}
+                            className="w-20 p-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            min="0" max="1" step="0.01" />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{summary.diversifiedConnectedLoad.toFixed(2)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                   <tfoot className="bg-blue-50">
                     <tr>
-                        <td className="px-2 py-4"></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total Connected Load</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getFloorSummaries().reduce((sum, floor) => sum + floor.totalLoad, 0).toFixed(2)}
+                        {categorySummaries.reduce((sum, summary) => sum + summary.estimatedConnectedLoad, 0).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getFloorSummaries().reduce((sum, floor) => sum + floor.totalStartingKVA, 0).toFixed(2)}
+                        {categorySummaries.reduce((sum, summary) => sum + summary.estimatedStartingKVA, 0).toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getFloorSummaries().reduce((sum, floor) => sum + floor.emergencyLoad, 0).toFixed(2)}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={1}> 
+                        Diversity: {overallDiversityFactor.toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getFloorSummaries().reduce((sum, floor) => sum + floor.fsiLoad, 0).toFixed(2)}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900" colSpan={2}>{totalDiversifiedLoad.toFixed(2)}</td> 
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Additional Demand</td>
+                      <td colSpan={4}></td> 
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totalAdditionalDemand.toFixed(2)}</td>
+                    </tr>
+                    <tr className="bg-blue-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-900">Total Estimated Electrical Demand</td>
+                      <td colSpan={4}></td> 
+                      <td className="px-6 py-4 whitespace-nowrap text-lg font-bold text-blue-900">{totalEstimatedDemand.toFixed(2)} kVA</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            )}
 
-            {reportType === 'byRiser' && (
-               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Riser</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {getRiserSummaries().map((riserSummary, index) => {
-                        const isExpanded = expandedRisers.has(riserSummary.riser);
-                        const riserEquipment = getAllFlattenedEquipment().filter(item => item.riserNumber === riserSummary.riser);
-                        const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
-                        riserEquipment.forEach(item => {
-                            if (!equipmentByCategory[item.categoryType]) {
-                                equipmentByCategory[item.categoryType] = [];
-                            }
-                            equipmentByCategory[item.categoryType].push(item);
-                        });
-                        return (
-                            <React.Fragment key={riserSummary.riser}>
-                                <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                    <td className="px-2 py-4 whitespace-nowrap">
-                                        <button onClick={() => toggleRiserExpansion(riserSummary.riser)} className="text-blue-500 hover:text-blue-700">
-                                            {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Riser {riserSummary.riser}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalLoad.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalStartingKVA.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.emergencyLoad.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.fsiLoad.toFixed(2)}</td>
-                                </tr>
-                                {isExpanded && (
-                                    <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
-                                        <td colSpan={6} className="px-4 py-2">
-                                            <div className="p-2 bg-white rounded shadow">
-                                                <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Riser {riserSummary.riser}:</h5>
-                                                <table className="min-w-full text-xs">
-                                                    <thead className="bg-gray-200">
-                                                        <tr>
-                                                            <th className="px-2 py-1 text-left">Category</th>
-                                                            <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
-                                                            <th className="px-2 py-1 text-right">Start. kVA</th>
-                                                            <th className="px-2 py-1 text-right">Emergency (kVA)</th>
-                                                            <th className="px-2 py-1 text-right">FSI (kVA)</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
-                                                            const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
-                                                            const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
-                                                            const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
-                                                            const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
-                                                                .reduce((sum, item) => sum + item.connectedLoad, 0);
-
-                                                            if (catConnLoad === 0 && catStartKVA === 0) return null;
-
-                                                            return (
-                                                                <tr key={categoryKey}>
-                                                                    <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
-                                                                    <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
-                  </tbody>
-                  <tfoot className="bg-blue-50">
-                    <tr>
-                        <td className="px-2 py-4"></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getRiserSummaries().reduce((sum, riser) => sum + riser.totalLoad, 0).toFixed(2)}
-                      </td>
-                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getRiserSummaries().reduce((sum, riser) => sum + riser.totalStartingKVA, 0).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getRiserSummaries().reduce((sum, riser) => sum + riser.emergencyLoad, 0).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {getRiserSummaries().reduce((sum, riser) => sum + riser.fsiLoad, 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'generalPower':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">B. General Power</h3>
-              <button 
-                onClick={handleAddGeneralPowerSpace}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Space
-              </button>
-            </div>
-            
-            {generalPowerSpaces.map((space) => (
-              <div key={space.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{space.name}</h4>
+              {/* Emergency Power and FSI Summary */}
+              <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <h4 className="font-medium text-lg mb-2 text-yellow-800">Special Load Summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <button 
-                      onClick={() => removeItem(generalPowerSpaces, setGeneralPowerSpaces, space.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
+                    <p className="text-sm text-yellow-800">Total Emergency Power Load:</p>
+                    <p className="font-bold text-yellow-900 text-lg">{totalEmergencyPowerLoad.toFixed(2)} kVA</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-yellow-800">Total FSI Load (Lifts FSI + Cat. D):</p>
+                    <p className="font-bold text-yellow-900 text-lg">{totalFSILoad.toFixed(2)} kVA</p>
+                  </div>
+                </div>
+                 <p className="mt-2 text-xs text-yellow-700">Note: "Total FSI Load" includes FSI-designated lifts and all equipment from "D. Fire Service Installations".</p>
+              </div>
+
+              <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-lg mb-2 text-blue-700">Electrical Demand Metrics</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-blue-800">Total Construction Floor Area:</p>
+                    <p className="font-semibold text-blue-900">{projectInfo.totalArea.toFixed(2)} m²</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-800">Demand Density:</p>
+                    <p className="font-bold text-blue-900 text-lg">{demandDensity.toFixed(2)} VA/m²</p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm text-blue-800">Recommended Transformer Size:</p>
+                  <p className="font-bold text-blue-900 text-lg">
+                    {Math.ceil(totalEstimatedDemand / 100) * 100} kVA
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    (Approximated by rounding up Total Estimated Demand to the next 100 kVA. Consult standards for precise sizing.)
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {reportType === 'byFloor' && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getFloorSummaries().map((floorSummary, index) => {
+                      const isExpanded = expandedFloors.has(floorSummary.floor);
+                      const floorEquipment = getAllFlattenedEquipment().filter(item => item.floorNumber === floorSummary.floor);
+                      const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
+                      floorEquipment.forEach(item => {
+                          if (!equipmentByCategory[item.categoryType]) {
+                              equipmentByCategory[item.categoryType] = [];
+                          }
+                          equipmentByCategory[item.categoryType].push(item);
+                      });
+
+                      return (
+                          <React.Fragment key={floorSummary.floor}>
+                              <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                  <td className="px-2 py-4 whitespace-nowrap">
+                                      <button onClick={() => toggleFloorExpansion(floorSummary.floor)} className="text-blue-500 hover:text-blue-700">
+                                          {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
+                                      </button>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Floor {floorSummary.floor}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalLoad.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalStartingKVA.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.emergencyLoad.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.fsiLoad.toFixed(2)}</td>
+                              </tr>
+                              {isExpanded && (
+                                  <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
+                                      <td colSpan={6} className="px-4 py-2">
+                                          <div className="p-2 bg-white rounded shadow">
+                                              <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Floor {floorSummary.floor}:</h5>
+                                              <table className="min-w-full text-xs">
+                                                  <thead className="bg-gray-200">
+                                                      <tr>
+                                                          <th className="px-2 py-1 text-left">Category</th>
+                                                          <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
+                                                          <th className="px-2 py-1 text-right">Start. kVA</th>
+                                                          <th className="px-2 py-1 text-right">Emergency (kVA)</th>
+                                                          <th className="px-2 py-1 text-right">FSI (kVA)</th>
+                                                      </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                      {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
+                                                          const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                          const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
+                                                          const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                          const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
+                                                              .reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                          
+                                                          if (catConnLoad === 0 && catStartKVA === 0) return null; 
+
+                                                          return (
+                                                              <tr key={categoryKey}>
+                                                                  <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
+                                                              </tr>
+                                                          );
+                                                      })}
+                                                  </tbody>
+                                              </table>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              )}
+                          </React.Fragment>
+                      );
+                  })}
+                </tbody>
+                <tfoot className="bg-blue-50">
+                  <tr>
+                      <td className="px-2 py-4"></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getFloorSummaries().reduce((sum, floor) => sum + floor.totalLoad, 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getFloorSummaries().reduce((sum, floor) => sum + floor.totalStartingKVA, 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getFloorSummaries().reduce((sum, floor) => sum + floor.emergencyLoad, 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getFloorSummaries().reduce((sum, floor) => sum + floor.fsiLoad, 0).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {reportType === 'byRiser' && (
+             <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Riser</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getRiserSummaries().map((riserSummary, index) => {
+                      const isExpanded = expandedRisers.has(riserSummary.riser);
+                      const riserEquipment = getAllFlattenedEquipment().filter(item => item.riserNumber === riserSummary.riser);
+                      const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
+                      riserEquipment.forEach(item => {
+                          if (!equipmentByCategory[item.categoryType]) {
+                              equipmentByCategory[item.categoryType] = [];
+                          }
+                          equipmentByCategory[item.categoryType].push(item);
+                      });
+                      return (
+                          <React.Fragment key={riserSummary.riser}>
+                              <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                  <td className="px-2 py-4 whitespace-nowrap">
+                                      <button onClick={() => toggleRiserExpansion(riserSummary.riser)} className="text-blue-500 hover:text-blue-700">
+                                          {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
+                                      </button>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Riser {riserSummary.riser}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalLoad.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalStartingKVA.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.emergencyLoad.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.fsiLoad.toFixed(2)}</td>
+                              </tr>
+                              {isExpanded && (
+                                  <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
+                                      <td colSpan={6} className="px-4 py-2">
+                                          <div className="p-2 bg-white rounded shadow">
+                                              <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Riser {riserSummary.riser}:</h5>
+                                              <table className="min-w-full text-xs">
+                                                  <thead className="bg-gray-200">
+                                                      <tr>
+                                                          <th className="px-2 py-1 text-left">Category</th>
+                                                          <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
+                                                          <th className="px-2 py-1 text-right">Start. kVA</th>
+                                                          <th className="px-2 py-1 text-right">Emergency (kVA)</th>
+                                                          <th className="px-2 py-1 text-right">FSI (kVA)</th>
+                                                      </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                      {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
+                                                          const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                          const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
+                                                          const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                          const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
+                                                              .reduce((sum, item) => sum + item.connectedLoad, 0);
+
+                                                          if (catConnLoad === 0 && catStartKVA === 0) return null;
+
+                                                          return (
+                                                              <tr key={categoryKey}>
+                                                                  <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
+                                                                  <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
+                                                              </tr>
+                                                          );
+                                                      })}
+                                                  </tbody>
+                                              </table>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              )}
+                          </React.Fragment>
+                      );
+                  })}
+                </tbody>
+                <tfoot className="bg-blue-50">
+                  <tr>
+                      <td className="px-2 py-4"></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getRiserSummaries().reduce((sum, riser) => sum + riser.totalLoad, 0).toFixed(2)}
+                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getRiserSummaries().reduce((sum, riser) => sum + riser.totalStartingKVA, 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getRiserSummaries().reduce((sum, riser) => sum + riser.emergencyLoad, 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {getRiserSummaries().reduce((sum, riser) => sum + riser.fsiLoad, 0).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+      
+    case 'lighting':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">A. Lighting Installation</h3>
+            <button 
+              onClick={handleAddLightingSpace}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {lightingSpaces.map((space) => (
+            <div key={space.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{space.name || "Unnamed Equipment"}</h4>
+                <button 
+                  onClick={() => removeItem(lightingSpaces, setLightingSpaces, space.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(space, (id, updates) => updateItem(lightingSpaces, setLightingSpaces, id, updates), space.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={space.name}
+                    onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { name: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
+                  <input
+                    type="number"
+                    value={space.area}
+                    onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { area: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Density (W/m²)</label>
+                  <input
+                    type="number"
+                    value={space.powerDensity}
+                    onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { powerDensity: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input
+                    type="number"
+                    value={space.powerFactor}
+                    onChange={(e) => updateItem(lightingSpaces, setLightingSpaces, space.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1"
+                    max="1"
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(space, (id, updates) => updateItem(lightingSpaces, setLightingSpaces, id, updates), space.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {space.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {space.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Connected Load (kVA) = Area (m²) × Power Density (W/m²) / (1000 × Power Factor)</p>
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (1.0x for lighting)</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'generalPower':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">B. General Power</h3>
+            <button 
+              onClick={handleAddGeneralPowerSpace}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {generalPowerSpaces.map((space) => (
+            <div key={space.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{space.name || "Unnamed Equipment"}</h4>
+                <button 
+                  onClick={() => removeItem(generalPowerSpaces, setGeneralPowerSpaces, space.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(space, (id, updates) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, id, updates), space.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={space.name}
+                    onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { name: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
+                  <input
+                    type="number"
+                    value={space.area}
+                    onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { area: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Density (VA/m²)</label>
+                  <input
+                    type="number"
+                    value={space.powerDensity}
+                    onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { powerDensity: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(space, (id, updates) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, id, updates), space.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {space.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {space.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Connected Load (kVA) = Area (m²) × Power Density (VA/m²) / 1000</p>
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (1.0x for general power)</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'hvacPlant': 
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">C1. HVAC - Refrigeration/Heating Water Plant</h3>
+            <button 
+              onClick={handleAddHVACPlant}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {hvacPlants.map((plant) => (
+            <div key={plant.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{plant.type || "Unnamed Equipment"} (Qty: {plant.quantity})</h4>
+                <button 
+                  onClick={() => removeItem(hvacPlants, setHVACPlants, plant.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={plant.type}
+                    onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { type: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
+                
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={plant.quantity}
+                    onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="1"
+                  />
+                </div>
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cool. Load (kWth)</label>
+                  <input
+                    type="number"
+                    value={plant.coolingHeatingLoad}
+                    onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { coolingHeatingLoad: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">COP</label>
+                  <input
+                    type="number"
+                    value={plant.cop}
+                    onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { cop: Math.max(0.1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input
+                    type="number"
+                    value={plant.powerFactor}
+                    onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {(plant.connectedLoad / (plant.quantity || 1)).toFixed(2)} {/* Avoid division by zero */}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {plant.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {plant.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Unit Load (kVA) = (Cooling Load (kWth) / COP) / Power Factor</p>
+                <p className="text-gray-600">Total Connected Load (kVA) = Unit Load (kVA) × Quantity</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'hvacWater':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">C2. HVAC - Water Side Distribution</h3>
+            <button 
+              onClick={handleAddHVACWaterDistribution}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {hvacWaterDistributions.map((dist) => (
+            <div key={dist.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{dist.system || "Unnamed Equipment"}</h4>
+                <button 
+                  onClick={() => removeItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={dist.system}
+                    onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { system: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Equipment Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
+                  <select
+                    value={dist.equipmentType}
+                    onChange={(e) => {
+                      const newType = e.target.value as HVACWaterDistribution['equipmentType'];
+                      const updates: Partial<HVACWaterDistribution> = { equipmentType: newType };
+                      if (newType === 'otherLoad') {
+                          updates.startingMethod = defaultResistiveStartingMethod;
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                      } else if (newType === 'motorLoad' && dist.startingMethod === defaultResistiveStartingMethod) { 
+                          updates.startingMethod = 'vsd'; 
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'vsd')?.multiplier || 1.8;
+                      }
+                      updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, updates);
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                    <option value="otherLoad">Other Load</option>
+                  </select>
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id, dist.equipmentType === 'motorLoad')}
+                
+                {/* Technical Parameters - Motor Load */}
+                {dist.equipmentType === 'motorLoad' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
+                      <input
+                        type="number"
+                        value={dist.waterFlowRate ?? ''}
+                        onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { waterFlowRate: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pump Head (kPa)</label>
+                      <input
+                        type="number"
+                        value={dist.pumpHead ?? ''}
+                        onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpHead: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
+                      <input
+                        type="number"
+                        value={dist.pumpEfficiency ?? ''}
+                        onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                      <input
+                        type="number"
+                        value={dist.motorEfficiency ?? ''}
+                        onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Technical Parameters - Other Load */}
+                {dist.equipmentType === 'otherLoad' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Power (kW)</label>
+                    <input
+                      type="number"
+                      value={dist.powerKWPerUnit ?? ''}
+                      onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { powerKWPerUnit: Number(e.target.value) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      min="0" 
+                      step="0.01"
+                    />
+                  </div>
+                )}
+
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input
+                    type="number"
+                    value={dist.powerFactor}
+                    onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {dist.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {dist.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                {dist.equipmentType === 'motorLoad' && (
+                  <p className="text-gray-600"><strong>Calculation:</strong> Motor Power (kW) = (Flow (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</p>
+                )}
+                {dist.equipmentType === 'otherLoad' && (
+                  <p className="text-gray-600"><strong>Calculation:</strong> Load (kVA) = Power (kW) / Power Factor</p>
+                )}
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'hvacAir':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">C3. HVAC - Air Side Distribution</h3>
+            <button 
+              onClick={handleAddHVACAirDistribution}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {hvacAirDistributions.map((equip) => (
+            <div key={equip.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{equip.equipment || "Unnamed Equipment"}</h4>
+                <button 
+                  onClick={() => removeItem(hvacAirDistributions, setHVACAirDistributions, equip.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={equip.equipment}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { equipment: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
+                  <input
+                    type="number"
+                    value={equip.airFlowRate}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { airFlowRate: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fan Pressure (Pa)</label>
+                  <input
+                    type="number"
+                    value={equip.fanPressure}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { fanPressure: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fan Efficiency</label>
+                  <input
+                    type="number"
+                    value={equip.fanEfficiency}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { fanEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                  <input
+                    type="number"
+                    value={equip.motorEfficiency}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input
+                    type="number"
+                    value={equip.powerFactor}
+                    onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {equip.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {equip.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Fan Power (kW) = (Air Flow (L/s) × Pressure (Pa)) / (1000 × 1000 × Fan Eff × Motor Eff)</p>
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+      
+    case 'hvacVent':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">C4. HVAC - Mechanical Ventilation</h3>
+            <button 
+              onClick={handleAddHVACVentilation}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {hvacVentilations.map((vent) => (
+            <div key={vent.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{vent.equipment || "Unnamed Equipment"}</h4>
+                <button 
+                  onClick={() => removeItem(hvacVentilations, setHVACVentilations, vent.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={vent.equipment}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { equipment: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
+                  <input
+                    type="number"
+                    value={vent.airFlowRate}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { airFlowRate: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fan Pressure (Pa)</label>
+                  <input
+                    type="number"
+                    value={vent.fanPressure}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { fanPressure: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fan Efficiency</label>
+                  <input
+                    type="number"
+                    value={vent.fanEfficiency}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { fanEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                  <input
+                    type="number"
+                    value={vent.motorEfficiency}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input
+                    type="number"
+                    value={vent.powerFactor}
+                    onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {vent.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {vent.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Fan Power (kW) = (Air Flow (L/s) × Pressure (Pa)) / (1000 × 1000 × Fan Eff × Motor Eff)</p>
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+      
+    case 'fireService':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">D. Fire Service Installations</h3>
+            <button 
+              onClick={handleAddFireService}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {fireServices.map((service) => (
+            <div key={service.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{service.description || "Unnamed Equipment"} (Qty: {service.quantity})</h4>
+                <button 
+                  onClick={() => removeItem(fireServices, setFireServices, service.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={service.description}
+                    onChange={(e) => updateItem(fireServices, setFireServices, service.id, { description: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Equipment Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
+                  <select
+                    value={service.equipmentType}
+                    onChange={(e) => {
+                      const newType = e.target.value as FireService['equipmentType'];
+                      const updates: Partial<FireService> = { equipmentType: newType };
+                       if (newType === 'otherLoad') {
+                          updates.startingMethod = defaultResistiveStartingMethod;
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                      } else if (newType === 'motorLoad' && service.startingMethod === defaultResistiveStartingMethod) {
+                          updates.startingMethod = 'dol'; 
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
+                      }
+                      updateItem(fireServices, setFireServices, service.id, updates);
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                    <option value="otherLoad">Other Load</option>
+                  </select>
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id, service.equipmentType === 'motorLoad')}
+                
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={service.quantity}
+                    onChange={(e) => updateItem(fireServices, setFireServices, service.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="1"
+                  />
+                </div>
+                
+                {/* Technical Parameters - Motor Load */}
+                {service.equipmentType === 'motorLoad' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
+                      <input 
+                        type="number" 
+                        value={service.pressure ?? ''} 
+                        onChange={(e) => updateItem(fireServices, setFireServices, service.id, { pressure: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
+                      <input 
+                        type="number" 
+                        value={service.flowRate ?? ''} 
+                        onChange={(e) => updateItem(fireServices, setFireServices, service.id, { flowRate: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
+                      <input 
+                        type="number" 
+                        value={service.pumpEfficiency ?? 0.7} 
+                        onChange={(e) => updateItem(fireServices, setFireServices, service.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                      <input 
+                        type="number" 
+                        value={service.motorEfficiency ?? 0.9} 
+                        onChange={(e) => updateItem(fireServices, setFireServices, service.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {/* Technical Parameters - Other Load */}
+                {service.equipmentType === 'otherLoad' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
+                    <input 
+                      type="number" 
+                      value={service.powerKWPerUnit ?? ''} 
+                      onChange={(e) => updateItem(fireServices, setFireServices, service.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min="0" 
+                      step="0.01"
+                    />
+                  </div>
+                )}
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input 
+                    type="number" 
+                    value={service.powerFactor} 
+                    onChange={(e) => updateItem(fireServices, setFireServices, service.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {service.connectedLoadPerUnit.toFixed(2)}
+                  </div>
+                </div>
+                                  
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {service.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {service.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                {service.equipmentType === 'motorLoad' && (
+                  <>
+                    <p className="text-gray-600"><strong>Calculation:</strong> Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
+                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
+                  </>
+                )}
+                {service.equipmentType === 'otherLoad' && (
+                  <p className="text-gray-600"><strong>Calculation:</strong> Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
+                )}
+                <p className="text-gray-600">Total Connected Load (kVA) = Unit Load (kVA) × Quantity</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+             <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+      
+    case 'waterPumps':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">E. Water Pumps for P&D</h3>
+            <button 
+              onClick={handleAddWaterPump}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {waterPumps.map((pump) => (
+            <div key={pump.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{pump.type || "Unnamed Equipment"} (Qty: {pump.quantity})</h4>
+                <button 
+                  onClick={() => removeItem(waterPumps, setWaterPumps, pump.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input
+                    type="text"
+                    value={pump.type}
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { type: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
+                
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={pump.quantity}
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="1"
+                  />
+                </div>
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Pressure (m)</label>
+                  <input
+                    type="number"
+                    value={pump.pressure}
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { pressure: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
+                  <input
+                    type="number"
+                    value={pump.flowRate}
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { flowRate: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    min="0" 
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
+                  <input 
+                    type="number" 
+                    value={pump.pumpEfficiency} 
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                  <input 
+                    type="number" 
+                    value={pump.motorEfficiency} 
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input 
+                    type="number" 
+                    value={pump.powerFactor} 
+                    onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {pump.connectedLoadPerUnit.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {pump.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {pump.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Pump Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
+                <p className="text-gray-600">Unit Load (kVA) = Pump Power (kW) / Power Factor</p>
+              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'liftEscalator':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">F. Lift & Escalator Installation</h3>
+            <button 
+              onClick={handleAddLiftEscalator}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {liftEscalators.map((item) => {
+            const isEscalatorOrWalkway = item.type === 'Escalator' || item.type === 'Moving Walkway';
+            return (
+              <div key={item.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-medium text-gray-700">{item.type || "Unnamed Equipment"} (Qty: {item.quantity})</h4>
+                  <button 
+                    onClick={() => removeItem(liftEscalators, setLiftEscalators, item.id)}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {/* Floor/Riser Assignment */}
+                  {renderFloorRiserFields(item, (id, updates) => updateItem(liftEscalators, setLiftEscalators, id, updates), item.id)}
+                  
+                  {/* Equipment Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
+                    <select 
+                      value={item.type} 
+                      onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { type: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     >
-                      Remove
-                    </button>
+                      <option value="Passenger Lift">Passenger Lift</option>
+                      <option value="Goods Lift">Goods Lift</option>
+                      <option value="Fireman Lift">Fireman Lift</option>
+                      <option value="Service Lift">Service Lift</option>
+                      <option value="Escalator">Escalator</option>
+                      <option value="Moving Walkway">Moving Walkway</option>
+                    </select>
+                  </div>
+                  
+                  {/* Quantity */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input 
+                      type="number" 
+                      value={item.quantity} 
+                      onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min="1"
+                    />
+                  </div>
+
+                  {/* Technical Parameters - Lifts */}
+                  {!isEscalatorOrWalkway && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rated Load (kg)</label>
+                        <input 
+                          type="number" 
+                          value={item.ratedLoad ?? ''} 
+                          onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { ratedLoad: Math.max(0, Number(e.target.value)) })}
+                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rated Speed (m/s)</label>
+                        <input 
+                          type="number" 
+                          value={item.ratedSpeed ?? ''} 
+                          onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { ratedSpeed: Math.max(0, Number(e.target.value)) })}
+                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                          min="0" 
+                          step="0.1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                        <input 
+                          type="number" 
+                          value={item.motorEfficiency ?? ''} 
+                          onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                          min="0.1" 
+                          max="1" 
+                          step="0.01"
+                        />
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Technical Parameters - Escalators/Walkways */}
+                   {isEscalatorOrWalkway && (
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Load per Unit (kW)</label>
+                      <input 
+                        type="number" 
+                        value={item.connectedLoadPerUnitInput ?? ''} 
+                        onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { connectedLoadPerUnitInput: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0" 
+                        step="0.1"
+                      />
+                      </div>
+                   )}
+                   
+                  {/* Power Factor */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                    <input 
+                      type="number" 
+                      value={item.powerFactor} 
+                      onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min="0.1" 
+                      max="1" 
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  {/* Special Toggles */}
+                  {renderLiftEscalatorToggles(item, (id, updates) => updateItem(liftEscalators, setLiftEscalators, id, updates), item.id)}
+                  
+                  {/* Calculated Results */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                        {item.connectedLoadPerUnit.toFixed(2)} 
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {item.connectedLoad.toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {item.startingKVA.toFixed(2)}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(space, (id, updates) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, id, updates), space.id)}
+                {/* Calculation Formula */}
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                  {!isEscalatorOrWalkway && (
+                    <>
+                      <p className="text-gray-600"><strong>Calculation:</strong> Power (kW) = (0.00981 × Load (kg) × Speed (m/s) × k_unbalance) / Motor Eff (k_unbalance ≈ 0.6)</p>
+                      <p className="text-gray-600">Unit Load (kVA) = Power (kW) / Power Factor</p>
+                    </>
+                  )}
+                   {isEscalatorOrWalkway && (
+                    <p className="text-gray-600"><strong>Calculation:</strong> Unit Load (kVA) = Load per Unit (kW) / Power Factor</p>
+                  )}
+                  <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) (assumed 1x multiplier)</p>
+                </div>
+              </div>
+            )
+          })}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'hotWater':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">G. Hot Water Boiler / Calorifier Installation</h3>
+            <button 
+              onClick={handleAddHotWaterSystem}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {hotWaterSystems.map((system) => (
+            <div key={system.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{system.description || "Unnamed Equipment"} (Qty: {system.quantity})</h4>
+                <button 
+                  onClick={() => removeItem(hotWaterSystems, setHotWaterSystems, system.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input 
+                    type="text" 
+                    value={system.description} 
+                    onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { description: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
+                </div>
+                
+                {/* Equipment Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
+                  <select 
+                    value={system.equipmentType} 
+                    onChange={(e) => {
+                      const newType = e.target.value as HotWaterSystem['equipmentType'];
+                      const updates: Partial<HotWaterSystem> = { equipmentType: newType };
+                      if (newType === 'boilerCalorifier' || newType === 'otherLoad') {
+                          updates.startingMethod = defaultResistiveStartingMethod;
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                      } else if (newType === 'motorLoad' && system.startingMethod === defaultResistiveStartingMethod) {
+                          updates.startingMethod = 'dol'; 
+                          updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
+                      }
+                      updateItem(hotWaterSystems, setHotWaterSystems, system.id, updates);
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="boilerCalorifier">Boiler/Calorifier</option>
+                    <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                    <option value="otherLoad">Other Load</option>
+                  </select>
+                </div>
+                
+                {/* Starting Method */}
+                {renderStartingMethodSelector(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id, system.equipmentType === 'motorLoad')}
+                
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input 
+                    type="number" 
+                    value={system.quantity} 
+                    onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="1"
+                  />
+                </div>
+                
+                {/* Technical Parameters - Boiler/Calorifier */}
+                {system.equipmentType === 'boilerCalorifier' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Space Name</label>
-                    <input
-                      type="text"
-                      value={space.name}
-                      onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { name: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {/* Starting method not typically shown for general power */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
-                    <input
-                      type="number"
-                      value={space.area}
-                      onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { area: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PD (VA/m²)</label>
-                    <input
-                      type="number"
-                      value={space.powerDensity}
-                      onChange={(e) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, space.id, { powerDensity: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Capacity (kW)</label>
+                    <input 
+                      type="number" 
+                      value={system.capacity ?? ''} 
+                      onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { capacity: Math.max(0, Number(e.target.value)) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min="0" 
                       step="0.1"
                     />
                   </div>
-                  {renderEmergencyPowerToggle(space, (id, updates) => updateItem(generalPowerSpaces, setGeneralPowerSpaces, id, updates), space.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {space.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {space.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-600">Connected Load (kVA) = Area (m²) × Power Density (VA/m²) / 1000</p>
-                  <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (default 1x for general power)</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'hvacPlant': 
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">C1. HVAC - Refrigeration/Heating Water Plant</h3>
-              <button 
-                onClick={handleAddHVACPlant}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Plant Unit
-              </button>
-            </div>
-            
-            {hvacPlants.map((plant) => (
-              <div key={plant.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{plant.type} (Qty: {plant.quantity})</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(hvacPlants, setHVACPlants, plant.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Plant Type</label>
-                    <input
-                      type="text"
-                      value={plant.type}
-                      onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { type: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {renderStartingMethodSelector(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      value={plant.quantity}
-                      onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cooling Load (kWth)</label>
-                    <input
-                      type="number"
-                      value={plant.coolingHeatingLoad}
-                      onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { coolingHeatingLoad: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">COP</label>
-                    <input
-                      type="number"
-                      value={plant.cop}
-                      onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { cop: Math.max(0.1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input
-                      type="number"
-                      value={plant.powerFactor}
-                      onChange={(e) => updateItem(hvacPlants, setHVACPlants, plant.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  {renderEmergencyPowerToggle(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {plant.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {plant.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-600">Load (kVA) = (Load per Unit (kWth) / COP / Power Factor) × Quantity</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'hvacAir':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">C3. HVAC - Air Side Distribution</h3>
-              <button 
-                onClick={handleAddHVACAirDistribution}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {hvacAirDistributions.map((equip) => (
-              <div key={equip.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{equip.equipment}</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(hvacAirDistributions, setHVACAirDistributions, equip.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <input
-                      type="text"
-                      value={equip.equipment}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { equipment: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {renderStartingMethodSelector(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
-                  {/* Cooling Load Served removed */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
-                    <input
-                      type="number"
-                      value={equip.airFlowRate}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { airFlowRate: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fan Total Pressure (Pa)</label>
-                    <input
-                      type="number"
-                      value={equip.fanPressure}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { fanPressure: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fan Efficiency</label>
-                    <input
-                      type="number"
-                      value={equip.fanEfficiency}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { fanEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                    <input
-                      type="number"
-                      value={equip.motorEfficiency}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input
-                      type="number"
-                      value={equip.powerFactor}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  {renderEmergencyPowerToggle(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {equip.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {equip.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-600">Fan Power (kW) = (Air Flow (L/s) × Pressure (Pa)) / (1000 × 1000 × Fan Eff × Motor Eff)</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-               <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 'hvacVent':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">C4. HVAC - Mechanical Ventilation</h3>
-              <button 
-                onClick={handleAddHVACVentilation}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {hvacVentilations.map((vent) => (
-              <div key={vent.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{vent.equipment}</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(hvacVentilations, setHVACVentilations, vent.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <input
-                      type="text"
-                      value={vent.equipment}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { equipment: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {renderStartingMethodSelector(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
-                    <input
-                      type="number"
-                      value={vent.airFlowRate}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { airFlowRate: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fan Total Pressure (Pa)</label>
-                    <input
-                      type="number"
-                      value={vent.fanPressure}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { fanPressure: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fan Efficiency</label>
-                    <input
-                      type="number"
-                      value={vent.fanEfficiency}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { fanEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                    <input
-                      type="number"
-                      value={vent.motorEfficiency}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input
-                      type="number"
-                      value={vent.powerFactor}
-                      onChange={(e) => updateItem(hvacVentilations, setHVACVentilations, vent.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0.1" max="1" step="0.01"
-                    />
-                  </div>
-                  {renderEmergencyPowerToggle(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {vent.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {vent.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                   <p className="text-gray-600">Fan Power (kW) = (Air Flow (L/s) × Pressure (Pa)) / (1000 × 1000 × Fan Eff × Motor Eff)</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 'fireService':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">D. Fire Service Installations</h3>
-              <button 
-                onClick={handleAddFireService}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {fireServices.map((service) => (
-              <div key={service.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{service.description} (Qty: {service.quantity})</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(fireServices, setFireServices, service.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <input
-                      type="text"
-                      value={service.description}
-                      onChange={(e) => updateItem(fireServices, setFireServices, service.id, { description: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <select
-                      value={service.equipmentType}
-                      onChange={(e) => {
-                        const newType = e.target.value as FireService['equipmentType'];
-                        const updates: Partial<FireService> = { equipmentType: newType };
-                         if (newType === 'otherLoad') {
-                            updates.startingMethod = defaultResistiveStartingMethod;
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
-                        } else if (newType === 'motorLoad' && service.startingMethod === defaultResistiveStartingMethod) {
-                            updates.startingMethod = 'dol'; 
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
-                        }
-                        updateItem(fireServices, setFireServices, service.id, updates);
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
-                      <option value="otherLoad">Other Load</option>
-                    </select>
-                  </div>
-                  {renderStartingMethodSelector(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id, service.equipmentType === 'motorLoad')}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      value={service.quantity}
-                      onChange={(e) => updateItem(fireServices, setFireServices, service.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="1"
-                    />
-                  </div>
-                  
-                  {service.equipmentType === 'motorLoad' && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
-                        <input type="number" value={service.pressure ?? ''} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { pressure: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
-                        <input type="number" value={service.flowRate ?? ''} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { flowRate: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
-                        <input type="number" value={service.pumpEfficiency ?? 0.7} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                        <input type="number" value={service.motorEfficiency ?? 0.9} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                      </div>
-                    </>
-                  )}
-                  
-                  {service.equipmentType === 'otherLoad' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
-                      <input type="number" value={service.powerKWPerUnit ?? ''} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.01"/>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input type="number" value={service.powerFactor} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                  </div>
-                  {renderEmergencyPowerToggle(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
-                      <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {service.connectedLoadPerUnit.toFixed(2)}
-                    </div>
-                  </div>
-                                    
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {service.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {service.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                {service.equipmentType === 'motorLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
-                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
-                  </div>
                 )}
-                {service.equipmentType === 'otherLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-               <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 'waterPumps':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">E. Water Pumps for P&D</h3>
-              <button 
-                onClick={handleAddWaterPump}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Pump
-              </button>
-            </div>
-            
-            {waterPumps.map((pump) => (
-              <div key={pump.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{pump.type} (Qty: {pump.quantity})</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(waterPumps, setWaterPumps, pump.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pump Type</label>
-                    <input
-                      type="text"
-                      value={pump.type}
-                      onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { type: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {renderStartingMethodSelector(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      value={pump.quantity}
-                      onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Pressure (m)</label>
-                    <input
-                      type="number"
-                      value={pump.pressure}
-                      onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { pressure: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
-                    <input
-                      type="number"
-                      value={pump.flowRate}
-                      onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { flowRate: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0" step="0.1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
-                    <input type="number" value={pump.pumpEfficiency} onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                    <input type="number" value={pump.motorEfficiency} onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input type="number" value={pump.powerFactor} onChange={(e) => updateItem(waterPumps, setWaterPumps, pump.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                  </div>
-                  {renderEmergencyPowerToggle(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {pump.connectedLoadPerUnit.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {pump.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {pump.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-600">Pump Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
-                </div>
-              </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'hotWater':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">G. Hot Water Boiler / Calorifier Installation</h3>
-              <button 
-                onClick={handleAddHotWaterSystem}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {hotWaterSystems.map((system) => (
-              <div key={system.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{system.description} (Qty: {system.quantity})</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(hotWaterSystems, setHotWaterSystems, system.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <input type="text" value={system.description} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { description: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <select value={system.equipmentType} 
-                      onChange={(e) => {
-                        const newType = e.target.value as HotWaterSystem['equipmentType'];
-                        const updates: Partial<HotWaterSystem> = { equipmentType: newType };
-                        if (newType === 'boilerCalorifier' || newType === 'otherLoad') {
-                            updates.startingMethod = defaultResistiveStartingMethod;
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
-                        } else if (newType === 'motorLoad' && system.startingMethod === defaultResistiveStartingMethod) {
-                            updates.startingMethod = 'dol'; 
-                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
-                        }
-                        updateItem(hotWaterSystems, setHotWaterSystems, system.id, updates);
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                      <option value="boilerCalorifier">Boiler/Calorifier</option>
-                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
-                      <option value="otherLoad">Other Load</option>
-                    </select>
-                  </div>
-                  {renderStartingMethodSelector(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id, system.equipmentType === 'motorLoad')}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                    <input type="number" value={system.quantity} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="1"/>
-                  </div>
-                  
-                  {system.equipmentType === 'boilerCalorifier' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Capacity per Unit (kW)</label>
-                      <input type="number" value={system.capacity ?? ''} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { capacity: Math.max(0, Number(e.target.value)) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.1"/>
-                    </div>
-                  )}
-                  
-                  {system.equipmentType === 'motorLoad' && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
-                        <input type="number" value={system.pressure ?? ''} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { pressure: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
-                        <input type="number" value={system.flowRate ?? ''} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { flowRate: Math.max(0, Number(e.target.value)) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
-                        <input type="number" value={system.pumpEfficiency ?? 0.7} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
-                        <input type="number" value={system.motorEfficiency ?? 0.9} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                      </div>
-                    </>
-                  )}
-                  
-                  {system.equipmentType === 'otherLoad' && (
-                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
-                      <input type="number" value={system.powerKWPerUnit ?? ''} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.01"/>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
-                    <input type="number" value={system.powerFactor} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0.1" max="1" step="0.01"/>
-                  </div>
-                  {renderEmergencyPowerToggle(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                    {system.connectedLoadPerUnit.toFixed(2)}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {system.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {system.startingKVA.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
+                {/* Technical Parameters - Motor Load */}
                 {system.equipmentType === 'motorLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
-                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
+                      <input 
+                        type="number" 
+                        value={system.pressure ?? ''} 
+                        onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { pressure: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Flow Rate (L/s)</label>
+                      <input 
+                        type="number" 
+                        value={system.flowRate ?? ''} 
+                        onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { flowRate: Math.max(0, Number(e.target.value)) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
+                      <input 
+                        type="number" 
+                        value={system.pumpEfficiency ?? 0.7} 
+                        onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
+                      <input 
+                        type="number" 
+                        value={system.motorEfficiency ?? 0.9} 
+                        onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                        min="0.1" 
+                        max="1" 
+                        step="0.01"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {/* Technical Parameters - Other Load */}
+                {system.equipmentType === 'otherLoad' && (
+                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
+                    <input 
+                      type="number" 
+                      value={system.powerKWPerUnit ?? ''} 
+                      onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                      min="0" 
+                      step="0.01"
+                    />
                   </div>
+                )}
+
+                {/* Power Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
+                  <input 
+                    type="number" 
+                    value={system.powerFactor} 
+                    onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { powerFactor: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0.1" 
+                    max="1" 
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                  {system.connectedLoadPerUnit.toFixed(2)}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {system.connectedLoad.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {system.startingKVA.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                {system.equipmentType === 'motorLoad' && (
+                  <>
+                    <p className="text-gray-600"><strong>Calculation:</strong> Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
+                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
+                  </>
                 )}
                  {system.equipmentType === 'boilerCalorifier' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Unit Load (kVA) = Capacity per Unit (kW) / Power Factor</p>
-                  </div>
+                  <p className="text-gray-600"><strong>Calculation:</strong> Unit Load (kVA) = Capacity per Unit (kW) / Power Factor</p>
                 )}
                  {system.equipmentType === 'otherLoad' && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
-                  </div>
+                  <p className="text-gray-600"><strong>Calculation:</strong> Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
                 )}
+                <p className="text-gray-600">Total Connected Load (kVA) = Unit Load (kVA) × Quantity</p>
               </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
+            </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
             </div>
           </div>
-        );
-        
-      case 'miscellaneous':
-        return (
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-lg text-gray-700">H. Miscellaneous Installation</h3>
-              <button 
-                onClick={handleAddMiscInstallation}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-              >
-                Add Equipment
-              </button>
-            </div>
-            
-            {miscInstallations.map((misc) => (
-              <div key={misc.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-700">{misc.type} (Qty: {misc.quantity})</h4>
-                  <div>
-                    <button 
-                      onClick={() => removeItem(miscInstallations, setMiscInstallations, misc.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
+        </div>
+      );
+      
+    case 'miscellaneous':
+      return (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-lg text-gray-700">H. Miscellaneous Installation</h3>
+            <button 
+              onClick={handleAddMiscInstallation}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+            >
+              Add Equipment
+            </button>
+          </div>
+          
+          {miscInstallations.map((misc) => (
+            <div key={misc.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">{misc.type || "Unnamed Equipment"} (Qty: {misc.quantity})</h4>
+                <button 
+                  onClick={() => removeItem(miscInstallations, setMiscInstallations, misc.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Floor/Riser Assignment */}
+                {renderFloorRiserFields(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id)}
+                
+                {/* Equipment Identification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                  <input 
+                    type="text" 
+                    value={misc.type} 
+                    onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { type: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter equipment name"
+                  />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {renderFloorRiserFields(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <input type="text" value={misc.type} onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { type: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
-                  </div>
-                  {renderStartingMethodSelector(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id, true)} 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                    <input type="number" value={misc.quantity} onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="1"/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Load per Unit (kVA)</label>
-                    <input type="number" value={misc.connectedLoadPerUnit} onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { connectedLoadPerUnit: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="0" step="0.1"/>
-                  </div>
-                  {renderEmergencyPowerToggle(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id)}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {misc.connectedLoad.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
-                      {misc.startingKVA.toFixed(2)}
-                    </div>
+                {/* Starting Method */}
+                {renderStartingMethodSelector(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id, true)}
+                
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input 
+                    type="number" 
+                    value={misc.quantity} 
+                    onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="1"
+                  />
+                </div>
+                
+                {/* Technical Parameters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Load per Unit (kVA)</label>
+                  <input 
+                    type="number" 
+                    value={misc.connectedLoadPerUnit} 
+                    onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { connectedLoadPerUnit: Math.max(0, Number(e.target.value)) })}
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+                    min="0" 
+                    step="0.1"
+                  />
+                </div>
+                
+                {/* Special Toggles */}
+                {renderEmergencyPowerToggle(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id)}
+                
+                {/* Calculated Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Connected Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {misc.connectedLoad.toFixed(2)}
                   </div>
                 </div>
-                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Total Load (kVA) = Quantity × Load per Unit (kVA)</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                  <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                    {misc.startingKVA.toFixed(2)}
                   </div>
+                </div>
               </div>
-            ))}
-            
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
-                </p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
-                <p className="font-bold text-blue-800 text-lg">
-                  {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
-                </p>
+              
+              {/* Calculation Formula */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-gray-600"><strong>Calculation:</strong> Total Load (kVA) = Quantity × Load per Unit (kVA)</p>
+                <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier</p>
               </div>
             </div>
+          ))}
+          
+          {/* Category Total Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+              <p className="font-bold text-blue-800 text-lg">
+                {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
+              </p>
+            </div>
           </div>
-        );
+        </div>
+      );
 
       case 'additionalDemand':
         return (
