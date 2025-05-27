@@ -22,8 +22,27 @@ const STARTING_METHODS = [
   { value: 'none', label: 'None (Resistive Load)', multiplier: 1 }
 ];
 
-// Define interface for load items
-interface LoadItem {
+// Standard generator ratings
+const STANDARD_GENERATOR_SIZES = [200, 250, 300, 400, 500, 625, 750, 1000, 1250, 1500, 2000, 2500, 3000]; // kVA
+
+// Define generator types
+type GeneratorType = 'emergency' | 'fsi' | 'general';
+
+// Define generator interface
+interface Generator {
+  id: string;
+  name: string;
+  type: GeneratorType;
+  rating: number; // kVA
+  powerFactor: number;
+  stepLoadAcceptance: number;
+  maxVoltageDropAllowed: number;
+  numberOfSteps: number;
+  assignedLoads: string[];
+}
+
+// Define load interface for generator loads
+interface GeneratorLoad {
   id: string;
   name: string;
   powerFactor: number;
@@ -31,6 +50,44 @@ interface LoadItem {
   startingMethod: string;
   currentMultiplier: number;
   stepAssignment: number;
+  steadyKVA: number;
+  startingKW: number;
+  startingKVA: number;
+  category: string;
+  floorNumber: number;
+  riserNumber: number;
+  emergencyPower: boolean;
+  fsi: boolean;
+  assignedTo: string[]; // Array of generator IDs
+  originalConnectedLoad: number;
+}
+
+// Define results interface for each generator
+interface GeneratorResults {
+  id: string;
+  totalSteadyKW: number;
+  totalSteadyKVA: number;
+  maxStepStartingKW: number;
+  maxStepStartingKVA: number;
+  maxTransientLoad: number;
+  utilizationPercentage: number;
+  overallPowerFactor: number;
+  estimatedVoltageDip: number;
+  stepTotals: StepTotal[];
+  criteriaResults: {
+    steadyKWPassed: boolean;
+    steadyKVAPassed: boolean;
+    stepLoadPassed: boolean;
+    overloadCapacityPassed: boolean;
+    voltageDipPassed: boolean;
+    overallPassed: boolean;
+  };
+  loadDetails: GeneratorLoad[];
+}
+
+interface StepTotal {
+  step: number;
+  steadyKW: number;
   steadyKVA: number;
   startingKW: number;
   startingKVA: number;
@@ -93,14 +150,23 @@ const CombinedGeneratorCalculator: React.FC<CombinedGeneratorCalculatorProps> = 
 // ======================== GENERATOR SIZING CALCULATOR ========================
 
 const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutorial }) => {
-  // State for generator specifications
-  const [gensetRatingKVA, setGensetRatingKVA] = useState<number>(1000);
-  const [gensetPowerFactor, setGensetPowerFactor] = useState<number>(0.8);
-  const [stepLoadAcceptance, setStepLoadAcceptance] = useState<number>(60);
-  const [maxVoltageDropAllowed, setMaxVoltageDropAllowed] = useState<number>(20);
+  // State for generators
+  const [generators, setGenerators] = useState<Generator[]>([
+    {
+      id: '1',
+      name: 'Emergency Generator',
+      type: 'emergency',
+      rating: 1000,
+      powerFactor: 0.8,
+      stepLoadAcceptance: 60,
+      maxVoltageDropAllowed: 20,
+      numberOfSteps: 3,
+      assignedLoads: []
+    }
+  ]);
   
-  // State for load list
-  const [loads, setLoads] = useState<LoadItem[]>([
+  // State for loads
+  const [loads, setLoads] = useState<GeneratorLoad[]>([
     {
       id: '1',
       name: 'Emergency Lighting',
@@ -111,99 +177,379 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
       stepAssignment: 3,
       steadyKVA: 52.63,
       startingKW: 50,
-      startingKVA: 52.63
+      startingKVA: 52.63,
+      category: 'Lighting',
+      floorNumber: 1,
+      riserNumber: 1,
+      emergencyPower: true,
+      fsi: false,
+      assignedTo: [],
+      originalConnectedLoad: 52.63
     }
   ]);
   
-  // State for number of steps
-  const [numberOfSteps, setNumberOfSteps] = useState<number>(3);
-  
   // State for calculation results
-  const [calculationPerformed, setCalculationPerformed] = useState<boolean>(false);
-  const [stepTotals, setStepTotals] = useState<any[]>([]);
-  const [gensetCriteria, setGensetCriteria] = useState({
-    steadyKWPassed: false,
-    steadyKVAPassed: false,
-    stepLoadPassed: false,
-    overloadCapacityPassed: false,
-    voltageDipPassed: false,
-    overallPassed: false
-  });
+  const [generatorResults, setGeneratorResults] = useState<Record<string, GeneratorResults>>({});
   
-  // State for editing load
+  // State for editing generator and load
+  const [editingGeneratorId, setEditingGeneratorId] = useState<string | null>(null);
   const [editingLoadId, setEditingLoadId] = useState<string | null>(null);
   
-  // Calculate derived generator values
-  const gensetRatingKW = gensetRatingKVA * gensetPowerFactor;
-  const maxAcceptableStepLoad = gensetRatingKW * (stepLoadAcceptance / 100);
-  const overloadCapacity = gensetRatingKW * 1.1;
+  // State for load details expansion
+  const [expandedGenerators, setExpandedGenerators] = useState<Set<string>>(new Set());
+  
+  // State for imported project info
+  const [projectInfo, setProjectInfo] = useState<any>(null);
 
-  // Calculate load KVA and starting values whenever loads are updated
+  // Toggle generator load details expansion
+  const toggleGeneratorExpansion = (generatorId: string) => {
+    setExpandedGenerators(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(generatorId)) {
+        newSet.delete(generatorId);
+      } else {
+        newSet.add(generatorId);
+      }
+      return newSet;
+    });
+  };
+
+  // Function to import data from Electrical Load Estimation
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target?.result as string) as any;
+          if (importedData && importedData.projectInfo) {
+            setProjectInfo(importedData.projectInfo);
+            
+            // Create generators for Emergency and FSI loads
+            const newGenerators: Generator[] = [
+              {
+                id: 'emergency',
+                name: 'Emergency Power Generator',
+                type: 'emergency',
+                rating: 1000,
+                powerFactor: 0.8,
+                stepLoadAcceptance: 60,
+                maxVoltageDropAllowed: 20,
+                numberOfSteps: 3,
+                assignedLoads: []
+              },
+              {
+                id: 'fsi',
+                name: 'Fire Service Installation Generator',
+                type: 'fsi',
+                rating: 750,
+                powerFactor: 0.8,
+                stepLoadAcceptance: 60,
+                maxVoltageDropAllowed: 20,
+                numberOfSteps: 3,
+                assignedLoads: []
+              }
+            ];
+            
+            // Convert electrical loads to generator loads
+            const newLoads: GeneratorLoad[] = [];
+            let loadIdCounter = 1;
+            
+            // Helper function to map starting method
+            const mapStartingMethod = (startingMethod?: string): string => {
+              if (!startingMethod) return 'none';
+              switch (startingMethod) {
+                case 'dol': return 'dol';
+                case 'sd': return 'sd';
+                case 'vsd': return 'vsd';
+                case 'softstart': return 'softstart';
+                case 'none': return 'none';
+                default: return 'none';
+              }
+            };
+            
+            // Process each load category
+            const processLoadCategory = (loads: any[], categoryName: string) => {
+              loads.forEach((load: any) => {
+                if (load.connectedLoad > 0.1 && (load.emergencyPower || load.fsi)) { // Only emergency or FSI loads
+                  const powerKW = load.connectedLoad * (load.powerFactor || 0.9); // Convert kVA to kW
+                  const mappedStartingMethod = mapStartingMethod(load.startingMethod);
+                  const startingMultiplier = STARTING_METHODS.find(m => m.value === mappedStartingMethod)?.multiplier || 1;
+                  
+                  const newLoad: GeneratorLoad = {
+                    id: `load-${loadIdCounter++}`,
+                    name: `${load.name || load.type || load.description || 'Unnamed'} (${categoryName})`,
+                    powerFactor: load.powerFactor || 0.9,
+                    steadyKW: powerKW,
+                    startingMethod: mappedStartingMethod,
+                    currentMultiplier: startingMultiplier,
+                    stepAssignment: 1,
+                    steadyKVA: load.connectedLoad,
+                    startingKW: powerKW * startingMultiplier,
+                    startingKVA: load.connectedLoad * startingMultiplier,
+                    category: categoryName,
+                    floorNumber: load.floorNumber || 1,
+                    riserNumber: load.riserNumber || 1,
+                    emergencyPower: load.emergencyPower || false,
+                    fsi: load.fsi || (categoryName === 'Fire Service'),
+                    assignedTo: [],
+                    originalConnectedLoad: load.connectedLoad
+                  };
+                  
+                  // Auto-assign to appropriate generator
+                  if (newLoad.fsi) {
+                    newLoad.assignedTo = ['fsi'];
+                  } else if (newLoad.emergencyPower) {
+                    newLoad.assignedTo = ['emergency'];
+                  }
+                  
+                  newLoads.push(newLoad);
+                }
+              });
+            };
+            
+            // Process all load categories
+            if (importedData.lightingSpaces) processLoadCategory(importedData.lightingSpaces, 'Lighting');
+            if (importedData.generalPowerSpaces) processLoadCategory(importedData.generalPowerSpaces, 'General Power');
+            if (importedData.hvacPlants) processLoadCategory(importedData.hvacPlants, 'HVAC Plant');
+            if (importedData.hvacWaterDistributions) processLoadCategory(importedData.hvacWaterDistributions, 'HVAC Water');
+            if (importedData.hvacAirDistributions) processLoadCategory(importedData.hvacAirDistributions, 'HVAC Air');
+            if (importedData.hvacVentilations) processLoadCategory(importedData.hvacVentilations, 'HVAC Ventilation');
+            if (importedData.fireServices) processLoadCategory(importedData.fireServices, 'Fire Service');
+            if (importedData.waterPumps) processLoadCategory(importedData.waterPumps, 'Water Pumps');
+            if (importedData.liftEscalators) processLoadCategory(importedData.liftEscalators, 'Lift & Escalator');
+            if (importedData.hotWaterSystems) processLoadCategory(importedData.hotWaterSystems, 'Hot Water');
+            if (importedData.miscInstallations) processLoadCategory(importedData.miscInstallations, 'Miscellaneous');
+            
+            // Update generator assignments
+            newGenerators.forEach(generator => {
+              const assignedLoadIds = newLoads
+                .filter(load => load.assignedTo.includes(generator.id))
+                .map(load => load.id);
+              generator.assignedLoads = assignedLoadIds;
+            });
+            
+            // Calculate recommended generator sizes based on total load
+            newGenerators.forEach(generator => {
+              const totalLoad = newLoads
+                .filter(load => load.assignedTo.includes(generator.id))
+                .reduce((sum, load) => sum + load.steadyKVA, 0);
+              
+              // Size generator at ~70% utilization
+              const recommendedSize = Math.ceil(totalLoad / 0.7 / 100) * 100;
+              const availableSize = STANDARD_GENERATOR_SIZES.find(size => size >= recommendedSize) || STANDARD_GENERATOR_SIZES[STANDARD_GENERATOR_SIZES.length - 1];
+              generator.rating = availableSize;
+            });
+            
+            setGenerators(newGenerators);
+            setLoads(newLoads);
+            setExpandedGenerators(new Set(newGenerators.map(g => g.id))); // Expand all by default
+            
+            event.target.value = '';
+            alert(`Data imported successfully! Created ${newGenerators.length} generators and ${newLoads.length} loads.`);
+          } else {
+            alert('Invalid file format. Please import a valid Electrical Load Estimation export file.');
+          }
+        } catch (error) {
+          console.error('Error importing data:', error);
+          alert('Error importing data. Make sure the file is a valid JSON export from Electrical Load Estimation Calculator.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Calculate results whenever generators or loads change
   useEffect(() => {
-    const updatedLoads = loads.map(load => {
-      const steadyKVA = load.steadyKW / load.powerFactor;
-      const startingKW = load.steadyKW * load.currentMultiplier;
-      const startingKVA = steadyKVA * load.currentMultiplier;
+    const results: Record<string, GeneratorResults> = {};
+    
+    generators.forEach(generator => {
+      const assignedLoads = loads.filter(load => load.assignedTo.includes(generator.id));
       
-      return {
-        ...load,
-        steadyKVA,
-        startingKW,
-        startingKVA
+      // Calculate totals for each step
+      const stepData: StepTotal[] = [];
+      for (let i = 1; i <= generator.numberOfSteps; i++) {
+        const loadsInStep = assignedLoads.filter(load => load.stepAssignment === i);
+        
+        const stepSteadyKW = loadsInStep.reduce((sum, load) => sum + load.steadyKW, 0);
+        const stepSteadyKVA = loadsInStep.reduce((sum, load) => sum + load.steadyKVA, 0);
+        const stepStartingKW = loadsInStep.reduce((sum, load) => sum + load.startingKW, 0);
+        const stepStartingKVA = loadsInStep.reduce((sum, load) => sum + load.startingKVA, 0);
+        
+        stepData.push({
+          step: i,
+          steadyKW: stepSteadyKW,
+          steadyKVA: stepSteadyKVA,
+          startingKW: stepStartingKW,
+          startingKVA: stepStartingKVA
+        });
+      }
+      
+      // Calculate totals
+      const totalSteadyKW = assignedLoads.reduce((sum, load) => sum + load.steadyKW, 0);
+      const totalSteadyKVA = assignedLoads.reduce((sum, load) => sum + load.steadyKVA, 0);
+      const maxStepStartingKW = Math.max(...stepData.map(step => step.startingKW));
+      const maxStepStartingKVA = Math.max(...stepData.map(step => step.startingKVA));
+      
+      // Calculate maximum transient load
+      let maxTransientLoad = 0;
+      let cumulativeSteadyKW = 0;
+      for (let i = 0; i < stepData.length; i++) {
+        const transientLoad = cumulativeSteadyKW + stepData[i].startingKW;
+        maxTransientLoad = Math.max(maxTransientLoad, transientLoad);
+        cumulativeSteadyKW += stepData[i].steadyKW;
+      }
+      
+      // Calculate utilization and power factor
+      const gensetRatingKW = generator.rating * generator.powerFactor;
+      const utilizationPercentage = generator.rating > 0 ? (totalSteadyKVA / generator.rating) * 100 : 0;
+      const overallPowerFactor = totalSteadyKVA > 0 ? totalSteadyKW / totalSteadyKVA : 0;
+      
+      // Calculate voltage dip estimation
+      const maxStepLoadRatio = maxStepStartingKVA / generator.rating;
+      const estimatedVoltageDip = maxStepLoadRatio * 100 * 0.2; // Simple linear estimation
+      
+      // Calculate step load acceptance
+      const maxAcceptableStepLoad = gensetRatingKW * (generator.stepLoadAcceptance / 100);
+      const overloadCapacity = gensetRatingKW * 1.1;
+      
+      // Evaluate criteria
+      const criteriaResults = {
+        steadyKWPassed: gensetRatingKW > totalSteadyKW,
+        steadyKVAPassed: generator.rating > totalSteadyKVA,
+        stepLoadPassed: maxAcceptableStepLoad >= maxStepStartingKW,
+        overloadCapacityPassed: overloadCapacity > maxTransientLoad,
+        voltageDipPassed: estimatedVoltageDip <= generator.maxVoltageDropAllowed,
+        overallPassed: false
+      };
+      
+      criteriaResults.overallPassed = 
+        criteriaResults.steadyKWPassed && 
+        criteriaResults.steadyKVAPassed && 
+        criteriaResults.stepLoadPassed && 
+        criteriaResults.overloadCapacityPassed && 
+        criteriaResults.voltageDipPassed;
+      
+      results[generator.id] = {
+        id: generator.id,
+        totalSteadyKW,
+        totalSteadyKVA,
+        maxStepStartingKW,
+        maxStepStartingKVA,
+        maxTransientLoad,
+        utilizationPercentage,
+        overallPowerFactor,
+        estimatedVoltageDip,
+        stepTotals: stepData,
+        criteriaResults,
+        loadDetails: assignedLoads
       };
     });
     
-    setLoads(updatedLoads);
-  }, [loads.map(l => `${l.steadyKW}-${l.powerFactor}-${l.currentMultiplier}`)]);
+    setGeneratorResults(results);
+  }, [generators, loads]);
+
+  // Function to add a new generator
+  const addGenerator = () => {
+    const newGenerator: Generator = {
+      id: Date.now().toString(),
+      name: `Generator ${generators.length + 1}`,
+      type: 'general',
+      rating: 1000,
+      powerFactor: 0.8,
+      stepLoadAcceptance: 60,
+      maxVoltageDropAllowed: 20,
+      numberOfSteps: 3,
+      assignedLoads: []
+    };
+    setGenerators([...generators, newGenerator]);
+  };
+
+  // Function to remove a generator
+  const removeGenerator = (id: string) => {
+    // Remove this generator from any loads assigned to it
+    setLoads(loads.map(load => {
+      if (load.assignedTo.includes(id)) {
+        return {
+          ...load,
+          assignedTo: load.assignedTo.filter(assignedId => assignedId !== id)
+        };
+      }
+      return load;
+    }));
+
+    // Then remove the generator
+    setGenerators(generators.filter(g => g.id !== id));
+  };
+
+  // Function to update a generator
+  const updateGenerator = (id: string, updates: Partial<Generator>) => {
+    setGenerators(
+      generators.map(generator => 
+        generator.id === id ? { ...generator, ...updates } : generator
+      )
+    );
+  };
 
   // Function to add a new load
   const addLoad = () => {
-    const newId = (loads.length + 1).toString();
-    
-    setLoads([
-      ...loads,
-      {
-        id: newId,
-        name: '',
-        powerFactor: 0.85,
-        steadyKW: 0,
-        startingMethod: 'sd',
-        currentMultiplier: 2.5,
-        stepAssignment: 1,
-        steadyKVA: 0,
-        startingKW: 0,
-        startingKVA: 0
-      }
-    ]);
+    const newLoad: GeneratorLoad = {
+      id: Date.now().toString(),
+      name: `Load ${loads.length + 1}`,
+      powerFactor: 0.85,
+      steadyKW: 20,
+      startingMethod: 'sd',
+      currentMultiplier: 2.5,
+      stepAssignment: 1,
+      steadyKVA: 23.5,
+      startingKW: 50,
+      startingKVA: 58.8,
+      category: 'General',
+      floorNumber: 1,
+      riserNumber: 1,
+      emergencyPower: false,
+      fsi: false,
+      assignedTo: [],
+      originalConnectedLoad: 23.5
+    };
+    setLoads([...loads, newLoad]);
   };
 
   // Function to remove a load
   const removeLoad = (id: string) => {
-    if (loads.length > 1) {
-      setLoads(loads.filter(load => load.id !== id));
-    }
+    // Remove this load from any generators it's assigned to
+    setGenerators(generators.map(generator => {
+      if (generator.assignedLoads.includes(id)) {
+        return {
+          ...generator,
+          assignedLoads: generator.assignedLoads.filter(loadId => loadId !== id)
+        };
+      }
+      return generator;
+    }));
+
+    // Then remove the load
+    setLoads(loads.filter(load => load.id !== id));
   };
 
-  // Function to update a load property
-  const updateLoad = (id: string, field: keyof LoadItem, value: any) => {
+  // Function to update a load
+  const updateLoad = (id: string, updates: Partial<GeneratorLoad>) => {
     setLoads(loads.map(load => {
       if (load.id === id) {
-        const updatedLoad = { ...load, [field]: value };
+        const updatedLoad = { ...load, ...updates };
         
         // If we're changing the starting method, update the current multiplier
-        if (field === 'startingMethod') {
-          const method = STARTING_METHODS.find(m => m.value === value);
+        if (updates.startingMethod) {
+          const method = STARTING_METHODS.find(m => m.value === updates.startingMethod);
           if (method) {
             updatedLoad.currentMultiplier = method.multiplier;
           }
         }
         
-        // If we're updating power factor, steady kW, or current multiplier, recalculate derived values
-        if (['powerFactor', 'steadyKW', 'currentMultiplier'].includes(field)) {
-          updatedLoad.steadyKVA = updatedLoad.steadyKW / updatedLoad.powerFactor;
-          updatedLoad.startingKW = updatedLoad.steadyKW * updatedLoad.currentMultiplier;
-          updatedLoad.startingKVA = updatedLoad.steadyKVA * updatedLoad.currentMultiplier;
-        }
+        // Recalculate derived values
+        updatedLoad.steadyKVA = updatedLoad.steadyKW / updatedLoad.powerFactor;
+        updatedLoad.startingKW = updatedLoad.steadyKW * updatedLoad.currentMultiplier;
+        updatedLoad.startingKVA = updatedLoad.steadyKVA * updatedLoad.currentMultiplier;
         
         return updatedLoad;
       }
@@ -211,222 +557,155 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
     }));
   };
 
-  // Function to perform the generator sizing calculation
-  const performCalculation = () => {
-    // Calculate totals for each step
-    const stepData = [];
-    for (let i = 1; i <= numberOfSteps; i++) {
-      const loadsInStep = loads.filter(load => load.stepAssignment === i);
-      
-      const stepSteadyKW = loadsInStep.reduce((sum, load) => sum + load.steadyKW, 0);
-      const stepSteadyKVA = loadsInStep.reduce((sum, load) => sum + load.steadyKVA, 0);
-      const stepStartingKW = loadsInStep.reduce((sum, load) => sum + load.startingKW, 0);
-      const stepStartingKVA = loadsInStep.reduce((sum, load) => sum + load.startingKVA, 0);
-      
-      stepData.push({
-        step: i,
-        steadyKW: stepSteadyKW,
-        steadyKVA: stepSteadyKVA,
-        startingKW: stepStartingKW,
-        startingKVA: stepStartingKVA
-      });
-    }
-    setStepTotals(stepData);
-    
-    // Calculate total steady loads
-    const totalSteadyKW = loads.reduce((sum, load) => sum + load.steadyKW, 0);
-    const totalSteadyKVA = loads.reduce((sum, load) => sum + load.steadyKVA, 0);
-    
-    // Find the max transient load in any step
-    const maxStepStartingKW = Math.max(...stepData.map(step => step.startingKW));
-    const maxStepStartingKVA = Math.max(...stepData.map(step => step.startingKVA));
-    
-    // Calculate maximum transient load
-    let maxTransientLoad = 0;
-    
-    // Assuming steps are executed in sequence
-    let cumulativeSteadyKW = 0;
-    for (let i = 0; i < stepData.length; i++) {
-      // Previous steps' steady load + current step's starting load
-      const transientLoad = cumulativeSteadyKW + stepData[i].startingKW;
-      maxTransientLoad = Math.max(maxTransientLoad, transientLoad);
-      
-      // Add current step's steady load for next iteration
-      cumulativeSteadyKW += stepData[i].steadyKW;
-    }
-    
-    // Calculate voltage dip (simple estimation without actual curve)
-    // This is a simplified assumption - in reality, would use manufacturer's curve
-    const maxStepLoadRatio = maxStepStartingKVA / gensetRatingKVA;
-    const estimatedVoltageDip = maxStepLoadRatio * 100 * 0.2; // Simple linear estimation
-    
-    // Evaluate criteria
-    const criteriaResults = {
-      steadyKWPassed: gensetRatingKW > totalSteadyKW,
-      steadyKVAPassed: gensetRatingKVA > totalSteadyKVA,
-      stepLoadPassed: maxAcceptableStepLoad >= maxStepStartingKW,
-      overloadCapacityPassed: overloadCapacity > maxTransientLoad,
-      voltageDipPassed: estimatedVoltageDip <= maxVoltageDropAllowed,
-      overallPassed: false
-    };
-    
-    criteriaResults.overallPassed = 
-      criteriaResults.steadyKWPassed && 
-      criteriaResults.steadyKVAPassed && 
-      criteriaResults.stepLoadPassed && 
-      criteriaResults.overloadCapacityPassed && 
-      criteriaResults.voltageDipPassed;
-    
-    setGensetCriteria(criteriaResults);
-    setCalculationPerformed(true);
-  };
+  // Function to toggle load assignment to a generator
+  const toggleLoadAssignment = (loadId: string, generatorId: string) => {
+    const load = loads.find(l => l.id === loadId);
+    if (!load) return;
 
-  // Reset calculation
-  const resetCalculation = () => {
-    setCalculationPerformed(false);
+    if (load.assignedTo.includes(generatorId)) {
+      // Remove assignment
+      updateLoad(loadId, {
+        assignedTo: load.assignedTo.filter(id => id !== generatorId)
+      });
+      
+      // Also remove from generator's assigned loads
+      const generator = generators.find(g => g.id === generatorId);
+      if (generator) {
+        updateGenerator(generatorId, {
+          assignedLoads: generator.assignedLoads.filter(id => id !== loadId)
+        });
+      }
+    } else {
+      // Add assignment
+      updateLoad(loadId, {
+        assignedTo: [...load.assignedTo, generatorId]
+      });
+      
+      // Also add to generator's assigned loads
+      const generator = generators.find(g => g.id === generatorId);
+      if (generator) {
+        updateGenerator(generatorId, {
+          assignedLoads: [...generator.assignedLoads, loadId]
+        });
+      }
+    }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Input Section */}
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Generator Specifications</h3>
-        
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Genset Rating (kVA)
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-medium text-lg">Generator Configuration</h3>
+          <div className="flex items-center space-x-2">
+            <label
+              htmlFor="import-electrical-data"
+              className="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-green-700 shadow-sm cursor-pointer"
+            >
+              Import Data
             </label>
             <input
-              type="number"
-              min="10"
-              value={gensetRatingKVA}
-              onChange={(e) => setGensetRatingKVA(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Genset Power Factor
-            </label>
-            <input
-              type="number"
-              min="0.1"
-              max="1"
-              step="0.01"
-              value={gensetPowerFactor}
-              onChange={(e) => setGensetPowerFactor(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
+              type="file"
+              id="import-electrical-data"
+              accept=".json"
+              onChange={handleImportData}
+              className="hidden"
             />
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Step Load Acceptance (%)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              value={stepLoadAcceptance}
-              onChange={(e) => setStepLoadAcceptance(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-            <p className="text-xs text-gray-500 mt-1">Typically 60% for most generators</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Max Voltage Dip Allowed (%)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="30"
-              value={maxVoltageDropAllowed}
-              onChange={(e) => setMaxVoltageDropAllowed(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            />
-            <p className="text-xs text-gray-500 mt-1">Typically 20% maximum</p>
-          </div>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Number of Steps
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="10"
-            value={numberOfSteps}
-            onChange={(e) => setNumberOfSteps(Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
-          />
-          <p className="text-xs text-gray-500 mt-1">How many sequential starting steps</p>
-        </div>
-        
-        <div className="mt-4 p-2 bg-blue-50 rounded-md">
-          <p className="text-sm font-medium text-blue-700">Calculated Values:</p>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div>
-              <p className="text-xs text-gray-700">Genset Rating (kW):</p>
-              <p className="font-medium">{gensetRatingKW.toFixed(1)} kW</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-700">Max Step Load Acceptance:</p>
-              <p className="font-medium">{maxAcceptableStepLoad.toFixed(1)} kW</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-700">Overload Capacity (110%):</p>
-              <p className="font-medium">{overloadCapacity.toFixed(1)} kW</p>
+
+        {/* Project Information Display */}
+        {projectInfo && (
+          <div className="mb-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-700 mb-2">Imported Project</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-blue-600">Project:</p>
+                <p className="font-semibold text-blue-800">{projectInfo.projectName || 'Unnamed'}</p>
+              </div>
+              <div>
+                <p className="text-blue-600">Building Type:</p>
+                <p className="font-semibold text-blue-800">{projectInfo.buildingType || 'Not specified'}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         
-        <div className="border-t border-gray-300 my-4"></div>
-        
-        {/* RESTYLED LOAD CONFIGURATION SECTION */}
-        <div className="mb-4">
+        {/* Generators Section */}
+        <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-medium text-lg text-gray-700">Load Configuration</h3>
-            <button
-              onClick={addLoad}
+            <h4 className="font-medium text-gray-700">Generators ({generators.length})</h4>
+            <button 
+              onClick={addGenerator}
               className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
             >
-              Add Load
+              Add Generator
             </button>
           </div>
           
-          {loads.map((load) => (
-            <div key={load.id} className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          {generators.map((generator) => (
+            <div key={generator.id} className="mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="font-medium text-gray-700">{load.name || "Unnamed Load"}</h4>
-                {loads.length > 1 && (
-                  <button 
-                    onClick={() => removeLoad(load.id)} 
-                    className="text-red-600 hover:text-red-800 text-sm font-medium"
-                  >
-                    Remove
-                  </button>
-                )}
+                <h5 className="font-medium text-gray-700">{generator.name}</h5>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    generator.type === 'emergency' ? 'bg-red-100 text-red-700' :
+                    generator.type === 'fsi' ? 'bg-orange-100 text-orange-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {generator.type.toUpperCase()}
+                  </span>
+                  {generators.length > 1 && (
+                    <button 
+                      onClick={() => removeGenerator(generator.id)} 
+                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
               
-              {editingLoadId === load.id ? (
+              {editingGeneratorId === generator.id ? (
                 <div className="pl-3 border-l-4 border-blue-400">
                   <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Generator Name</label>
                     <input
                       type="text"
-                      value={load.name}
-                      onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
+                      value={generator.name}
+                      onChange={(e) => updateGenerator(generator.id, { name: e.target.value })}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Equipment name"
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <select
+                        value={generator.type}
+                        onChange={(e) => updateGenerator(generator.id, { type: e.target.value as GeneratorType })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="emergency">Emergency Power</option>
+                        <option value="fsi">Fire Service Installation</option>
+                        <option value="general">General Purpose</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rating (kVA)</label>
+                      <select
+                        value={generator.rating}
+                        onChange={(e) => updateGenerator(generator.id, { rating: Number(e.target.value) })}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {STANDARD_GENERATOR_SIZES.map(size => (
+                          <option key={size} value={size}>{size} kVA</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Power Factor</label>
                       <input
@@ -434,56 +713,52 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
                         min="0.1"
                         max="1"
                         step="0.01"
-                        value={load.powerFactor}
-                        onChange={(e) => updateLoad(load.id, 'powerFactor', Number(e.target.value))}
+                        value={generator.powerFactor}
+                        onChange={(e) => updateGenerator(generator.id, { powerFactor: Number(e.target.value) })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Steady kW</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Number of Steps</label>
                       <input
                         type="number"
-                        min="0"
-                        step="0.1"
-                        value={load.steadyKW}
-                        onChange={(e) => updateLoad(load.id, 'steadyKW', Number(e.target.value))}
+                        min="1"
+                        max="10"
+                        value={generator.numberOfSteps}
+                        onChange={(e) => updateGenerator(generator.id, { numberOfSteps: Number(e.target.value) })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Starting Method</label>
-                      <select
-                        value={load.startingMethod}
-                        onChange={(e) => updateLoad(load.id, 'startingMethod', e.target.value)}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Step Load Acceptance (%)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={generator.stepLoadAcceptance}
+                        onChange={(e) => updateGenerator(generator.id, { stepLoadAcceptance: Number(e.target.value) })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {STARTING_METHODS.map(method => (
-                          <option key={method.value} value={method.value}>
-                            {method.label} ({method.multiplier}x)
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Step Assignment</label>
-                      <select
-                        value={load.stepAssignment}
-                        onChange={(e) => updateLoad(load.id, 'stepAssignment', Number(e.target.value))}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Max Voltage Drop (%)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={generator.maxVoltageDropAllowed}
+                        onChange={(e) => updateGenerator(generator.id, { maxVoltageDropAllowed: Number(e.target.value) })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {Array.from({ length: numberOfSteps }, (_, i) => i + 1).map(step => (
-                          <option key={step} value={step}>{step}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                   
                   <div className="flex justify-end mt-3">
                     <button 
-                      onClick={() => setEditingLoadId(null)} 
+                      onClick={() => setEditingGeneratorId(null)} 
                       className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700"
                     >
                       Done
@@ -494,47 +769,37 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mb-3 text-sm">
                     <div>
+                      <p className="text-gray-600">Rating:</p>
+                      <p className="font-semibold text-gray-800">{generator.rating} kVA</p>
+                    </div>
+                    <div>
                       <p className="text-gray-600">Power Factor:</p>
-                      <p className="font-semibold text-gray-800">{load.powerFactor}</p>
+                      <p className="font-semibold text-gray-800">{generator.powerFactor}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Steady kW:</p>
-                      <p className="font-semibold text-gray-800">{load.steadyKW}</p>
+                      <p className="text-gray-600">Steps:</p>
+                      <p className="font-semibold text-gray-800">{generator.numberOfSteps}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Starting Method:</p>
-                      <p className="font-semibold text-gray-800">
-                        {STARTING_METHODS.find(m => m.value === load.startingMethod)?.label || 'None'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Step:</p>
-                      <p className="font-semibold text-gray-800">{load.stepAssignment}</p>
+                      <p className="text-gray-600">Step Load:</p>
+                      <p className="font-semibold text-gray-800">{generator.stepLoadAcceptance}%</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mb-3 text-sm">
                     <div>
-                      <p className="text-gray-600">Steady kVA:</p>
-                      <p className="font-semibold text-gray-800">{load.steadyKVA.toFixed(2)}</p>
+                      <p className="text-gray-600">Max Voltage Drop:</p>
+                      <p className="font-semibold text-gray-800">{generator.maxVoltageDropAllowed}%</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Starting kW:</p>
-                      <p className="font-semibold text-gray-800">{load.startingKW.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Starting kVA:</p>
-                      <p className="font-semibold text-gray-800">{load.startingKVA.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Multiplier:</p>
-                      <p className="font-semibold text-gray-800">{load.currentMultiplier}x</p>
+                      <p className="text-gray-600">Assigned Loads:</p>
+                      <p className="font-semibold text-gray-800">{generator.assignedLoads.length}</p>
                     </div>
                   </div>
                   
                   <div className="flex justify-end">
                     <button 
-                      onClick={() => setEditingLoadId(load.id)} 
+                      onClick={() => setEditingGeneratorId(generator.id)} 
                       className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded-md text-sm hover:bg-blue-50 flex items-center"
                     >
                       <Icons.Edit />
@@ -546,23 +811,197 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
             </div>
           ))}
         </div>
-        {/* END OF RESTYLED LOAD CONFIGURATION SECTION */}
-
-        <div className="mt-4">
-          <button
-            onClick={performCalculation}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Calculate
-          </button>
-          {calculationPerformed && (
-            <button
-              onClick={resetCalculation}
-              className="ml-2 bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 transition-colors"
+        
+        {/* Loads Section */}
+        <div className="border-t border-gray-300 my-6"></div>
+        
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-medium text-gray-700">Loads ({loads.length} total)</h4>
+            <button 
+              onClick={addLoad} 
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
             >
-              Reset
+              Add Load
             </button>
-          )}
+          </div>
+          
+          <div className="max-h-96 overflow-y-auto">
+            {loads.map((load) => (
+              <div key={load.id} className="mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <h5 className="font-medium text-sm text-gray-700 truncate">{load.name}</h5>
+                  <div className="flex space-x-1">
+                    {loads.length > 1 && (
+                      <button 
+                        onClick={() => removeLoad(load.id)} 
+                        className="text-red-600 hover:text-red-800 text-xs font-medium"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {editingLoadId === load.id ? (
+                  <div className="pl-2 border-l-4 border-blue-400">
+                    <div className="mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Load Name</label>
+                      <input 
+                        type="text" 
+                        value={load.name} 
+                        onChange={(e) => updateLoad(load.id, { name: e.target.value })} 
+                        className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Steady kW</label>
+                        <input 
+                          type="number" 
+                          value={load.steadyKW} 
+                          onChange={(e) => updateLoad(load.id, { steadyKW: Number(e.target.value) })} 
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                          step="0.1" min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Power Factor</label>
+                        <input 
+                          type="number" 
+                          value={load.powerFactor} 
+                          onChange={(e) => updateLoad(load.id, { powerFactor: Number(e.target.value) })} 
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                          step="0.01" min="0.1" max="1"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Starting Method</label>
+                        <select 
+                          value={load.startingMethod} 
+                          onChange={(e) => updateLoad(load.id, { startingMethod: e.target.value })}
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {STARTING_METHODS.map(method => (
+                            <option key={method.value} value={method.value}>
+                              {method.label} ({method.multiplier}x)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Step Assignment</label>
+                        <select 
+                          value={load.stepAssignment} 
+                          onChange={(e) => updateLoad(load.id, { stepAssignment: Number(e.target.value) })}
+                          className="w-full p-1 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {Array.from({ length: Math.max(...generators.map(g => g.numberOfSteps)) }, (_, i) => i + 1).map(step => (
+                            <option key={step} value={step}>Step {step}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end mt-2">
+                      <button 
+                        onClick={() => setEditingLoadId(null)} 
+                        className="bg-blue-600 text-white px-2 py-1 rounded-md text-xs hover:bg-blue-700"
+                      >
+                        <Icons.Check />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                      <div>
+                        <p className="text-gray-600">Steady kW:</p>
+                        <p className="font-semibold text-gray-800">{load.steadyKW.toFixed(1)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Starting kW:</p>
+                        <p className="font-semibold text-gray-800">{load.startingKW.toFixed(1)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Step:</p>
+                        <p className="font-semibold text-gray-800">Step {load.stepAssignment}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                      <div>
+                        <p className="text-gray-600">Starting Method:</p>
+                        <p className="font-semibold text-gray-800">
+                          {STARTING_METHODS.find(m => m.value === load.startingMethod)?.label || 'None'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Multiplier:</p>
+                        <p className="font-semibold text-gray-800">{load.currentMultiplier}x</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Floor:</p>
+                        <p className="font-semibold text-gray-800">{load.floorNumber}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <div className="flex items-center space-x-1">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          load.emergencyPower ? 'bg-red-100 text-red-700' : 
+                          load.fsi ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {load.category}
+                        </span>
+                        {load.emergencyPower && (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                            Emergency
+                          </span>
+                        )}
+                        {load.fsi && (
+                          <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                            FSI
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Generator Assignment */}
+                    <div className="border-t border-gray-200 pt-2">
+                      <p className="text-xs font-medium text-gray-700 mb-1">Assigned to:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {generators.map(generator => (
+                          <label key={generator.id} className="inline-flex items-center bg-gray-100 p-1 rounded text-xs">
+                            <input 
+                              type="checkbox" 
+                              checked={load.assignedTo.includes(generator.id)} 
+                              onChange={() => toggleLoadAssignment(load.id, generator.id)} 
+                              className="mr-1 h-3 w-3 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">{generator.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end mt-2">
+                      <button 
+                        onClick={() => setEditingLoadId(load.id)} 
+                        className="text-blue-600 hover:text-blue-800 px-2 py-1 rounded-md text-xs hover:bg-blue-50 flex items-center"
+                      >
+                        <Icons.Edit />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -570,186 +1009,251 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
         
-        {!calculationPerformed ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>Enter generator specifications and load details, then click Calculate</p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Overall Assessment</h4>
-              <div className={`p-3 rounded-md ${gensetCriteria.overallPassed ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}`}>
-                <p className={`font-bold ${gensetCriteria.overallPassed ? 'text-green-700' : 'text-red-700'}`}>
-                  {gensetCriteria.overallPassed 
-                    ? 'PASS ✓ Generator size is adequate'
-                    : 'FAIL ✗ Generator size is inadequate'}
-                </p>
-                <p className="text-sm mt-1">
-                  {gensetCriteria.overallPassed 
-                    ? 'All sizing criteria are satisfied' 
-                    : 'One or more sizing criteria not satisfied - see details below'}
-                </p>
+        {/* Each Generator Results */}
+        {generators.map(generator => {
+          const results = generatorResults[generator.id];
+          if (!results) return null;
+          
+          const isExpanded = expandedGenerators.has(generator.id);
+          const gensetRatingKW = generator.rating * generator.powerFactor;
+          const maxAcceptableStepLoad = gensetRatingKW * (generator.stepLoadAcceptance / 100);
+          const overloadCapacity = gensetRatingKW * 1.1;
+          
+          return (
+            <div key={generator.id} className="mb-6">
+              <div 
+                className="flex justify-between items-center mb-3 pb-2 border-b border-blue-200 cursor-pointer"
+                onClick={() => toggleGeneratorExpansion(generator.id)}
+              >
+                <h4 className="font-medium text-base text-blue-800">
+                  {generator.name} ({generator.rating} kVA)
+                </h4>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    results.criteriaResults.overallPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {results.criteriaResults.overallPassed ? 'PASS' : 'FAIL'}
+                  </span>
+                  <span className="text-blue-600">
+                    {isExpanded ? '▲' : '▼'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Load:</p>
+                    <p className="font-semibold text-gray-800">{results.totalSteadyKVA.toFixed(1)} kVA</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Utilization:</p>
+                    <p className={`font-semibold ${
+                      results.utilizationPercentage > 90 ? 'text-red-600' :
+                      results.utilizationPercentage > 80 ? 'text-orange-600' :
+                      'text-green-600'
+                    }`}>
+                      {results.utilizationPercentage.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Power Factor:</p>
+                    <p className="font-semibold text-gray-800">{results.overallPowerFactor.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Assigned Loads:</p>
+                    <p className="font-semibold text-gray-800">{results.loadDetails.length}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {isExpanded && (
+                <>
+                  <div className="mb-4">
+                    <div className={`p-3 rounded-md ${results.criteriaResults.overallPassed ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}`}>
+                      <p className={`font-bold ${results.criteriaResults.overallPassed ? 'text-green-700' : 'text-red-700'}`}>
+                        {results.criteriaResults.overallPassed 
+                          ? 'PASS ✓ Generator size is adequate'
+                          : 'FAIL ✗ Generator size is inadequate'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
+                    <h5 className="font-medium text-gray-800 mb-3">Criteria Assessment</h5>
+                    <table className="min-w-full bg-white border border-gray-200 text-sm">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="px-3 py-2 text-left">Criteria</th>
+                          <th className="px-3 py-2 text-left">Required</th>
+                          <th className="px-3 py-2 text-left">Actual</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">Steady kW</td>
+                          <td className="px-3 py-2">Genset kW `&gt;` Total Steady kW</td>
+                          <td className="px-3 py-2">{gensetRatingKW.toFixed(1)} `&gt;` {results.totalSteadyKW.toFixed(1)}</td>
+                          <td className={`px-3 py-2 font-medium ${results.criteriaResults.steadyKWPassed ? 'text-green-600' : 'text-red-600'}`}>
+                            {results.criteriaResults.steadyKWPassed ? 'PASS ✓' : 'FAIL ✗'}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">Steady kVA</td>
+                          <td className="px-3 py-2">Genset kVA `&gt;` Total Steady kVA</td>
+                          <td className="px-3 py-2">{generator.rating.toFixed(1)} `&gt;` {results.totalSteadyKVA.toFixed(1)}</td>
+                          <td className={`px-3 py-2 font-medium ${results.criteriaResults.steadyKVAPassed ? 'text-green-600' : 'text-red-600'}`}>
+                            {results.criteriaResults.steadyKVAPassed ? 'PASS ✓' : 'FAIL ✗'}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">Step Load</td>
+                          <td className="px-3 py-2">Step Load Acceptance `&gt;`= Max Step kW</td>
+                          <td className="px-3 py-2">{maxAcceptableStepLoad.toFixed(1)} `&gt;`= {results.maxStepStartingKW.toFixed(1)}</td>
+                          <td className={`px-3 py-2 font-medium ${results.criteriaResults.stepLoadPassed ? 'text-green-600' : 'text-red-600'}`}>
+                            {results.criteriaResults.stepLoadPassed ? 'PASS ✓' : 'FAIL ✗'}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">Overload</td>
+                          <td className="px-3 py-2">110% Capacity `&gt;` Max Transient</td>
+                          <td className="px-3 py-2">{overloadCapacity.toFixed(1)} `&gt;` {results.maxTransientLoad.toFixed(1)}</td>
+                          <td className={`px-3 py-2 font-medium ${results.criteriaResults.overloadCapacityPassed ? 'text-green-600' : 'text-red-600'}`}>
+                            {results.criteriaResults.overloadCapacityPassed ? 'PASS ✓' : 'FAIL ✗'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Step Load Details */}
+                  <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200">
+                    <h5 className="font-medium text-gray-800 mb-3">Step Load Details</h5>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full bg-white border border-gray-200 text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="px-3 py-2 text-left">Step</th>
+                            <th className="px-3 py-2 text-right">Steady kW</th>
+                            <th className="px-3 py-2 text-right">Steady kVA</th>
+                            <th className="px-3 py-2 text-right">Starting kW</th>
+                            <th className="px-3 py-2 text-right">Starting kVA</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {results.stepTotals.map((step) => (
+                            <tr key={step.step} className="border-t border-gray-200">
+                              <td className="px-3 py-2">{step.step}</td>
+                              <td className="px-3 py-2 text-right">{step.steadyKW.toFixed(1)}</td>
+                              <td className="px-3 py-2 text-right">{step.steadyKVA.toFixed(1)}</td>
+                              <td className={`px-3 py-2 text-right ${step.startingKW > maxAcceptableStepLoad ? 'text-red-600 font-medium' : ''}`}>
+                                {step.startingKW.toFixed(1)}
+                              </td>
+                              <td className="px-3 py-2 text-right">{step.startingKVA.toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  
+                  {/* Assigned Loads Table */}
+                  {results.loadDetails.length > 0 && (
+                    <div className="bg-white p-4 rounded-md shadow mb-4 border border-gray-200 overflow-x-auto">
+                      <h5 className="font-medium text-gray-800 mb-3">Assigned Loads ({results.loadDetails.length})</h5>
+                      <table className="min-w-full divide-y divide-gray-200 text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Load</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Steady kW</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Starting kW</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Step</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">PF</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
+                            <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {results.loadDetails.map((load) => (
+                            <tr key={load.id} className={load.emergencyPower || load.fsi ? 'bg-yellow-50' : ''}>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700">
+                                {load.name}
+                                {load.emergencyPower && (
+                                  <span className="ml-1 text-xs text-red-600">(Emergency)</span>
+                                )}
+                                {load.fsi && (
+                                  <span className="ml-1 text-xs text-orange-600">(FSI)</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.steadyKW.toFixed(1)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.startingKW.toFixed(1)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
+                                <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+                                  load.stepAssignment === 1 ? 'bg-green-100 text-green-700' :
+                                  load.stepAssignment === 2 ? 'bg-blue-100 text-blue-700' :
+                                  load.stepAssignment === 3 ? 'bg-purple-100 text-purple-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {load.stepAssignment}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.powerFactor.toFixed(2)}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.floorNumber}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-700">{load.category}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-700">Total</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">{results.totalSteadyKW.toFixed(1)}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">{results.overallPowerFactor.toFixed(2)}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-right text-gray-700">-</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <div className="mt-3 bg-blue-100 p-3 rounded-md border border-blue-300">
+                <h5 className="font-medium text-blue-700 mb-2">Evaluation</h5>
+                {results.loadDetails.length === 0 ? (
+                  <p className="text-sm text-blue-800">No loads assigned to this generator.</p>
+                ) : results.utilizationPercentage > 90 ? (
+                  <p className="text-sm text-red-700">
+                    <strong>Warning:</strong> Generator is heavily loaded ({results.utilizationPercentage.toFixed(1)}%). 
+                    Consider upgrading to the next size or redistributing loads.
+                  </p>
+                ) : results.utilizationPercentage < 40 ? (
+                  <p className="text-sm text-orange-700">
+                    <strong>Note:</strong> Generator is lightly loaded ({results.utilizationPercentage.toFixed(1)}%).
+                    Consider using a smaller generator for better efficiency.
+                  </p>
+                ) : (
+                  <p className="text-sm text-green-700">
+                    <strong>Good:</strong> Generator is properly sized with good utilization ({results.utilizationPercentage.toFixed(1)}%).
+                  </p>
+                )}
               </div>
             </div>
-            
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Criteria Assessment</h4>
-              <table className="min-w-full bg-white border border-gray-200 text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-3 py-2 text-left">Criteria</th>
-                    <th className="px-3 py-2 text-left">Required</th>
-                    <th className="px-3 py-2 text-left">Actual</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Criteria 1: Genset Rating (kW) > Total Steady Load (kW) */}
-                  <tr className="border-t border-gray-200">
-                    <td className="px-3 py-2 font-medium">1. Steady kW</td>
-                    <td className="px-3 py-2">
-                      Genset kW &gt; Total Steady kW
-                    </td>
-                    <td className="px-3 py-2">
-                      {gensetRatingKW.toFixed(1)} &gt; {loads.reduce((sum, load) => sum + load.steadyKW, 0).toFixed(1)}
-                    </td>
-                    <td className={`px-3 py-2 font-medium ${gensetCriteria.steadyKWPassed ? 'text-green-600' : 'text-red-600'}`}>
-                      {gensetCriteria.steadyKWPassed ? 'PASS ✓' : 'FAIL ✗'}
-                    </td>
-                  </tr>
-                  
-                  {/* Criteria 2: Genset Rating (kVA) > Total Steady Load (kVA) */}
-                  <tr className="border-t border-gray-200">
-                    <td className="px-3 py-2 font-medium">2. Steady kVA</td>
-                    <td className="px-3 py-2">
-                      Genset kVA &gt; Total Steady kVA
-                    </td>
-                    <td className="px-3 py-2">
-                      {gensetRatingKVA.toFixed(1)} &gt; {loads.reduce((sum, load) => sum + load.steadyKVA, 0).toFixed(1)}
-                    </td>
-                    <td className={`px-3 py-2 font-medium ${gensetCriteria.steadyKVAPassed ? 'text-green-600' : 'text-red-600'}`}>
-                      {gensetCriteria.steadyKVAPassed ? 'PASS ✓' : 'FAIL ✗'}
-                    </td>
-                  </tr>
-                  
-                  {/* Criteria 3: Max. Transient Load in any step (kW) <= Step Load Acceptance */}
-                  <tr className="border-t border-gray-200">
-                    <td className="px-3 py-2 font-medium">3. Step Load</td>
-                    <td className="px-3 py-2">
-                      Step Load Acceptance &gt;= Max Step kW
-                    </td>
-                    <td className="px-3 py-2">
-                      {maxAcceptableStepLoad.toFixed(1)} &gt;= {Math.max(...stepTotals.map(step => step.startingKW)).toFixed(1)}
-                    </td>
-                    <td className={`px-3 py-2 font-medium ${gensetCriteria.stepLoadPassed ? 'text-green-600' : 'text-red-600'}`}>
-                      {gensetCriteria.stepLoadPassed ? 'PASS ✓' : 'FAIL ✗'}
-                    </td>
-                  </tr>
-                  
-                  {/* Criteria 4: Genset Overload Capacity (kW) > Max. Transient Load (kW) */}
-                  <tr className="border-t border-gray-200">
-                    <td className="px-3 py-2 font-medium">4. Overload</td>
-                    <td className="px-3 py-2">
-                      110% Capacity &gt; Max Transient
-                    </td>
-                    <td className="px-3 py-2">
-                      {overloadCapacity.toFixed(1)} &gt; {/* Get max transient load value */}
-                      {(() => {
-                        // Calculate max transient load here to display it
-                        let maxTL = 0;
-                        let cumulativeSteadyKW = 0;
-                        
-                        for (let i = 0; i < stepTotals.length; i++) {
-                          const tLoad = cumulativeSteadyKW + stepTotals[i].startingKW;
-                          maxTL = Math.max(maxTL, tLoad);
-                          cumulativeSteadyKW += stepTotals[i].steadyKW;
-                        }
-                        
-                        return maxTL.toFixed(1);
-                      })()}
-                    </td>
-                    <td className={`px-3 py-2 font-medium ${gensetCriteria.overloadCapacityPassed ? 'text-green-600' : 'text-red-600'}`}>
-                      {gensetCriteria.overloadCapacityPassed ? 'PASS ✓' : 'FAIL ✗'}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">Step Load Details</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200 text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left">Step</th>
-                      <th className="px-3 py-2 text-right">Steady kW</th>
-                      <th className="px-3 py-2 text-right">Steady kVA</th>
-                      <th className="px-3 py-2 text-right">Starting kW</th>
-                      <th className="px-3 py-2 text-right">Starting kVA</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stepTotals.map((step) => (
-                      <tr key={step.step} className="border-t border-gray-200">
-                        <td className="px-3 py-2">{step.step}</td>
-                        <td className="px-3 py-2 text-right">{step.steadyKW.toFixed(1)}</td>
-                        <td className="px-3 py-2 text-right">{step.steadyKVA.toFixed(1)}</td>
-                        <td className={`px-3 py-2 text-right ${step.startingKW > maxAcceptableStepLoad ? 'text-red-600 font-medium' : ''}`}>
-                          {step.startingKW.toFixed(1)}
-                        </td>
-                        <td className="px-3 py-2 text-right">{step.startingKVA.toFixed(1)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t border-gray-200 bg-gray-50 font-medium">
-                      <td className="px-3 py-2">Totals</td>
-                      <td className="px-3 py-2 text-right">
-                        {stepTotals.reduce((sum, step) => sum + step.steadyKW, 0).toFixed(1)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {stepTotals.reduce((sum, step) => sum + step.steadyKVA, 0).toFixed(1)}
-                      </td>
-                      <td className="px-3 py-2 text-right">-</td>
-                      <td className="px-3 py-2 text-right">-</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            {!gensetCriteria.overallPassed && (
-              <div className="mt-6 bg-yellow-50 p-3 rounded-md border border-yellow-300">
-                <h4 className="font-medium text-yellow-800 mb-2">Recommendations</h4>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-yellow-800">
-                  {!gensetCriteria.steadyKWPassed && (
-                    <li>Increase generator kW rating to handle the total steady load</li>
-                  )}
-                  {!gensetCriteria.steadyKVAPassed && (
-                    <li>Increase generator kVA rating or improve overall power factor</li>
-                  )}
-                  {!gensetCriteria.stepLoadPassed && (
-                    <li>Redistribute loads into more steps or increase generator size for better step load acceptance</li>
-                  )}
-                  {!gensetCriteria.overloadCapacityPassed && (
-                    <li>Increase generator size to handle the maximum transient load</li>
-                  )}
-                  {!gensetCriteria.voltageDipPassed && (
-                    <li>Increase generator size to reduce voltage dip or use soft starters/VFDs to reduce starting current</li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
+          );
+        })}
         
-        <div className="mt-6 bg-gray-100 p-4 rounded-lg">
-          <h4 className="font-medium mb-2">Sizing Criteria Reference</h4>
-          <ul className="list-disc pl-5 space-y-1 text-sm">
-            <li><strong>Genset Rating (kW) &gt; Total Steady Load (kW)</strong> - Ensures generator can handle the continuous power requirements</li>
-            <li><strong>Genset Rating (kVA) &gt; Total Steady Load (kVA)</strong> - Accounts for power factor variations in the loads</li>
-            <li><strong>Max Step Starting Load (kW) &lt;= Step Load Acceptance</strong> - Prevents overloading during startup of each step</li>
-            <li><strong>Genset Overload Capacity &gt; Max Transient Load</strong> - Ensures generator can handle peak demands during sequence starting</li>
-            <li><strong>Voltage Dip &lt;= 20%</strong> - Prevents excessive voltage drops that may trip equipment</li>
+        <div className="mt-6 bg-blue-100 p-4 rounded-md border border-blue-300">
+          <h4 className="font-medium mb-2 text-blue-700">Import Instructions</h4>
+          <ul className="list-disc pl-5 space-y-1 text-sm text-blue-800">
+            <li>Use the "Import Data" button to load JSON files exported from the Electrical Load Estimation Calculator.</li>
+            <li>The system will automatically create Emergency and FSI generators based on your load requirements.</li>
+            <li>Only loads marked as Emergency Power or FSI will be imported and assigned to appropriate generators.</li>
+            <li>Generator sizes will be initially estimated based on total load with ~70% utilization target.</li>
+            <li>Review and adjust generator specifications, load assignments, and sizing as needed.</li>
+            <li>Click on generator headers to expand/collapse detailed information for better visual management.</li>
           </ul>
         </div>
       </div>
