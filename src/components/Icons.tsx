@@ -82,6 +82,11 @@ export const Icons = {
       <polyline points="6 9 12 15 18 9"></polyline>
     </svg>
   ),
+  ChevronRight: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+      <path d="M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z"/>
+    </svg>
+  ),
   Amplifier: () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
       <path d="M2 12h6m8 0h6M12 2v8m0 4v8M9 5.5L12 2l3 3.5M5 19l-3-3 3-3"></path>

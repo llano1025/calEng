@@ -5,6 +5,15 @@ interface ElectricalLoadCalculatorProps {
   onShowTutorial?: () => void;
 }
 
+// STARTING_METHODS constant
+const STARTING_METHODS = [
+  { value: 'dol', label: 'DOL', multiplier: 6 },
+  { value: 'sd', label: 'Star-Delta (S/D)', multiplier: 2.5 },
+  { value: 'vsd', label: 'VSD/VVVF', multiplier: 1.8 },
+  { value: 'softstart', label: 'Soft Start', multiplier: 2 },
+  { value: 'none', label: 'None (Resistive/Direct)', multiplier: 1 }
+];
+
 // Project Information
 interface ProjectInfo {
   projectName: string;
@@ -21,6 +30,8 @@ interface BaseEquipmentFields {
   floorNumber: number;
   riserNumber: number;
   emergencyPower: boolean;
+  startingMethod?: string; // Optional now, as Lift/Esc will not have it
+  startingMultiplier?: number; // Optional now
 }
 
 // Lighting Installation
@@ -31,6 +42,7 @@ interface LightingSpace extends BaseEquipmentFields {
   powerDensity: number; // in W/sq.m
   powerFactor: number;
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // General Power
@@ -40,6 +52,7 @@ interface GeneralPowerSpace extends BaseEquipmentFields {
   area: number;  // in square meters
   powerDensity: number; // in VA/sq.m
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // HVAC - Refrigeration/Heating Water Plant
@@ -51,34 +64,38 @@ interface HVACPlant extends BaseEquipmentFields {
   cop: number; // Coefficient of Performance
   powerFactor: number;
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
-// HVAC - Water Side Distribution (Enhanced with Other Equipment option)
+// HVAC - Water Side Distribution
 interface HVACWaterDistribution extends BaseEquipmentFields {
   id: string;
   system: string;
-  equipmentType: 'pump' | 'other';
-  coolingLoadServed: number; // in kWth
-  waterFlowRate: number; // in L/s
-  pumpHead: number; // in kPa
-  pumpEfficiency: number;
-  motorEfficiency: number;
-  powerKWPerUnit?: number; // for 'other' type
+  equipmentType: 'motorLoad' | 'otherLoad'; 
+  // Fields for motorLoad (pump)
+  waterFlowRate?: number; // in L/s
+  pumpHead?: number; // in kPa
+  pumpEfficiency?: number;
+  motorEfficiency?: number;
+  // Fields for otherLoad
+  powerKWPerUnit?: number; // for 'otherLoad' type
+  // Common
   powerFactor: number;
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // HVAC - Air Side Distribution
 interface HVACAirDistribution extends BaseEquipmentFields {
   id: string;
   equipment: string;
-  coolingLoadServed: number; // in kWth
   airFlowRate: number; // in L/s
   fanPressure: number; // in Pa
   fanEfficiency: number;
   motorEfficiency: number;
   powerFactor: number;
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // HVAC - Mechanical Ventilation
@@ -91,26 +108,28 @@ interface HVACVentilation extends BaseEquipmentFields {
   motorEfficiency: number;
   powerFactor: number;
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // Fire Service Installations
 interface FireService extends BaseEquipmentFields {
   id: string;
   description: string;
-  equipmentType: 'pump' | 'other';
+  equipmentType: 'motorLoad' | 'otherLoad'; 
   quantity: number;
-  // For pump
+  // For motorLoad (pump)
   pressure?: number; // in m
   flowRate?: number; // in L/s
   pumpEfficiency?: number;
   motorEfficiency?: number;
-  // For 'other' (input in kW)
+  // For 'otherLoad' (input in kW)
   powerKWPerUnit?: number; // in kW
   // Common
   powerFactor: number;
   // Calculated
   connectedLoadPerUnit: number; // in kVA
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // Water Pumps for P&D
@@ -125,14 +144,15 @@ interface WaterPump extends BaseEquipmentFields {
   powerFactor: number;
   connectedLoadPerUnit: number; // in kVA
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
-// Lift & Escalator Installation (Enhanced with FSI indicator)
-interface LiftEscalator extends BaseEquipmentFields {
+// Lift & Escalator Installation (FSI indicator, NO user-selectable starting method)
+interface LiftEscalator extends BaseEquipmentFields { // BaseEquipmentFields still used for floor/riser/emergency
   id: string;
-  type: string; // e.g., Passenger Lift, Escalator, Moving Walkway
+  type: string; 
   quantity: number;
-  fsi: boolean; // Fire Service Installation indicator
+  fsi: boolean; 
   // For lifts
   ratedLoad?: number; // in kg
   ratedSpeed?: number; // in m/s
@@ -143,28 +163,30 @@ interface LiftEscalator extends BaseEquipmentFields {
   powerFactor: number;
   connectedLoadPerUnit: number; // in kVA
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; // Calculated as connectedLoad * fixed_internal_multiplier (or 1x)
 }
 
 // Hot Water Boiler / Calorifier Installation
 interface HotWaterSystem extends BaseEquipmentFields {
   id: string;
-  equipmentType: 'boilerCalorifier' | 'pump' | 'other';
+  equipmentType: 'boilerCalorifier' | 'motorLoad' | 'otherLoad'; 
   description: string;
   quantity: number;
   // For 'boilerCalorifier' (input in kW)
   capacity?: number; // in kW
-  // For 'pump'
+  // For 'motorLoad' (pump)
   pressure?: number; // in m (for pump)
   flowRate?: number; // in L/s (for pump)
   pumpEfficiency?: number;
   motorEfficiency?: number;
-  // For 'other' (input in kW)
+  // For 'otherLoad' (input in kW)
   powerKWPerUnit?: number; // in kW
   // Common
   powerFactor: number;
   // Calculated
   connectedLoadPerUnit: number; // in kVA
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // Miscellaneous Installation
@@ -174,12 +196,14 @@ interface MiscInstallation extends BaseEquipmentFields {
   quantity: number;
   connectedLoadPerUnit: number; // in kVA (This is direct input)
   connectedLoad: number; // calculated in kVA
+  startingKVA: number; 
 }
 
 // Category Summary with Diversity
 interface CategorySummary {
   category: string;
   estimatedConnectedLoad: number; // in kVA
+  estimatedStartingKVA: number; 
   diversityFactor: number;
   futureGrowthFactor: number; // Category-specific future growth (0-1)
   diversifiedConnectedLoad: number; // in kVA
@@ -198,6 +222,7 @@ interface FloorSummary {
   totalLoad: number;
   emergencyLoad: number;
   fsiLoad: number;
+  totalStartingKVA: number; 
 }
 
 interface RiserSummary {
@@ -205,11 +230,13 @@ interface RiserSummary {
   totalLoad: number;
   emergencyLoad: number;
   fsiLoad: number;
+  totalStartingKVA: number; 
 }
 
 interface FlattenedEquipmentItem extends BaseEquipmentFields {
     id: string;
     connectedLoad: number;
+    startingKVA: number; 
     fsi?: boolean; 
     categoryType: string; 
 }
@@ -227,49 +254,54 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     numberOfRisers: 2
   });
 
+  const defaultResistiveStartingMethod = 'none';
+  const defaultResistiveStartingMultiplier = STARTING_METHODS.find(m => m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+
   // Load Category States
   const [lightingSpaces, setLightingSpaces] = useState<LightingSpace[]>([
-    { id: 'ls1', name: 'Office Area', area: 500, powerDensity: 9, powerFactor: 0.9, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'ls1', name: 'Office Area', area: 500, powerDensity: 9, powerFactor: 0.9, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier }
   ]);
 
   const [generalPowerSpaces, setGeneralPowerSpaces] = useState<GeneralPowerSpace[]>([
-    { id: 'gp1', name: 'Office Area', area: 500, powerDensity: 25, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'gp1', name: 'Office Area', area: 500, powerDensity: 25, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier }
   ]);
 
   const [hvacPlants, setHVACPlants] = useState<HVACPlant[]>([
-    { id: 'hp1', type: 'Chiller', quantity: 2, coolingHeatingLoad: 500, cop: 3.2, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'hp1', type: 'Chiller', quantity: 2, coolingHeatingLoad: 500, cop: 3.2, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m => m.value === 'vsd')?.multiplier || 1.8 }
   ]);
 
   const [hvacWaterDistributions, setHVACWaterDistributions] = useState<HVACWaterDistribution[]>([
-    { id: 'hwd1', system: 'Chilled Water Pump', equipmentType: 'pump', coolingLoadServed: 500, waterFlowRate: 25, pumpHead: 200, pumpEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, powerKWPerUnit: undefined }
+    { id: 'hwd1', system: 'Chilled Water Pump', equipmentType: 'motorLoad', waterFlowRate: 25, pumpHead: 200, pumpEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, powerKWPerUnit: undefined, startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m => m.value === 'vsd')?.multiplier || 1.8 }
   ]);
 
   const [hvacAirDistributions, setHVACAirDistributions] = useState<HVACAirDistribution[]>([
-    { id: 'had1', equipment: 'AHU', coolingLoadServed: 100, airFlowRate: 2000, fanPressure: 800, fanEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'had1', equipment: 'AHU', airFlowRate: 2000, fanPressure: 800, fanEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m => m.value === 'vsd')?.multiplier || 1.8 }
   ]);
 
   const [hvacVentilations, setHVACVentilations] = useState<HVACVentilation[]>([
-    { id: 'hv1', equipment: 'Exhaust Fan', airFlowRate: 1000, fanPressure: 300, fanEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'hv1', equipment: 'Exhaust Fan', airFlowRate: 1000, fanPressure: 300, fanEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'dol', startingMultiplier: STARTING_METHODS.find(m => m.value === 'dol')?.multiplier || 6 }
   ]);
 
   const [fireServices, setFireServices] = useState<FireService[]>([
     {
       id: 'fs1',
       description: 'Fire Alarm Panel',
-      equipmentType: 'other',
+      equipmentType: 'otherLoad',
       quantity: 1,
-      powerKWPerUnit: 4.25,
+      powerKWPerUnit: 3.00,
       powerFactor: 0.85,
       connectedLoadPerUnit: 0,
       connectedLoad: 0,
+      startingKVA: 0,
       floorNumber: 1,
       riserNumber: 1,
-      emergencyPower: true
+      emergencyPower: true,
+      startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier
     }
   ]);
 
   const [waterPumps, setWaterPumps] = useState<WaterPump[]>([
-    { id: 'wp1', type: 'Domestic Water Pump', quantity: 2, pressure: 30, flowRate: 10, pumpEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoadPerUnit: 0, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'wp1', type: 'Domestic Water Pump', quantity: 2, pressure: 30, flowRate: 10, pumpEfficiency: 0.7, motorEfficiency: 0.9, powerFactor: 0.85, connectedLoadPerUnit: 0, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'dol', startingMultiplier: STARTING_METHODS.find(m => m.value === 'dol')?.multiplier || 6 }
   ]);
 
   const [liftEscalators, setLiftEscalators] = useState<LiftEscalator[]>([
@@ -285,9 +317,11 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       connectedLoadPerUnitInput: undefined,
       connectedLoadPerUnit: 0, 
       connectedLoad: 0,
+      startingKVA: 0,
       floorNumber: 1,
       riserNumber: 1,
       emergencyPower: false
+      // No startingMethod/Multiplier here by user request
     },
     {
       id: 'le2',
@@ -298,32 +332,34 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       connectedLoadPerUnitInput: 10, // kW
       connectedLoadPerUnit: 0,
       connectedLoad: 0,
+      startingKVA: 0,
       floorNumber: 1,
       riserNumber: 1,
       emergencyPower: false
+      // No startingMethod/Multiplier here
     }
   ]);
 
   const [hotWaterSystems, setHotWaterSystems] = useState<HotWaterSystem[]>([
-    { id: 'hws1', equipmentType: 'boilerCalorifier', description: 'Electric Boiler', quantity: 1, capacity: 30, powerFactor: 1.0, connectedLoadPerUnit: 0, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'hws1', equipmentType: 'boilerCalorifier', description: 'Electric Boiler', quantity: 1, capacity: 30, powerFactor: 1.0, connectedLoadPerUnit: 0, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier }
   ]);
 
   const [miscInstallations, setMiscInstallations] = useState<MiscInstallation[]>([
-    { id: 'mi1', type: 'Computer Server Room', quantity: 1, connectedLoadPerUnit: 10, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false }
+    { id: 'mi1', type: 'Computer Server Room', quantity: 1, connectedLoadPerUnit: 10, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier }
   ]);
 
   const [categorySummaries, setCategorySummaries] = useState<CategorySummary[]>([
-    { category: 'A. Lighting Installation', estimatedConnectedLoad: 0, diversityFactor: 0.9, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 },
-    { category: 'B. General Power', estimatedConnectedLoad: 0, diversityFactor: 0.7, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 },
-    { category: 'C1. HVAC - Refrigeration/Heating Water Plant', estimatedConnectedLoad: 0, diversityFactor: 0.9, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'C2. HVAC - Water Side Distribution', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'C3. HVAC - Air Side Distribution', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'C4. HVAC - Mechanical Ventilation', estimatedConnectedLoad: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'D. Fire Service Installations', estimatedConnectedLoad: 0, diversityFactor: 1.0, futureGrowthFactor: 0, diversifiedConnectedLoad: 0 },
-    { category: 'E. Water Pumps for P&D', estimatedConnectedLoad: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'F. Lift & Escalator Installation', estimatedConnectedLoad: 0, diversityFactor: 0.6, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'G. Hot Water Boiler / Calorifier Installation', estimatedConnectedLoad: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
-    { category: 'H. Miscellaneous Installation', estimatedConnectedLoad: 0, diversityFactor: 0.6, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 }
+    { category: 'A. Lighting Installation', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.9, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 },
+    { category: 'B. General Power', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.7, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 },
+    { category: 'C1. HVAC - Refrigeration/Heating Water Plant', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.9, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'C2. HVAC - Water Side Distribution', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'C3. HVAC - Air Side Distribution', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'C4. HVAC - Mechanical Ventilation', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'D. Fire Service Installations', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 1.0, futureGrowthFactor: 0, diversifiedConnectedLoad: 0 },
+    { category: 'E. Water Pumps for P&D', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.7, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'F. Lift & Escalator Installation', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.6, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'G. Hot Water Boiler / Calorifier Installation', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.8, futureGrowthFactor: 0.1, diversifiedConnectedLoad: 0 },
+    { category: 'H. Miscellaneous Installation', estimatedConnectedLoad: 0, estimatedStartingKVA: 0, diversityFactor: 0.6, futureGrowthFactor: 0.2, diversifiedConnectedLoad: 0 }
   ]);
 
   const [additionalDemand, setAdditionalDemand] = useState<AdditionalDemand>({
@@ -341,6 +377,34 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
   const [totalFSILoad, setTotalFSILoad] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<string>('summary');
   const [reportType, setReportType] = useState<'overall' | 'byFloor' | 'byRiser'>('overall');
+
+  // State for expandable rows in floor/riser summary
+  const [expandedFloors, setExpandedFloors] = useState<Set<number>>(new Set());
+  const [expandedRisers, setExpandedRisers] = useState<Set<number>>(new Set());
+
+  const toggleFloorExpansion = (floorNumber: number) => {
+    setExpandedFloors(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(floorNumber)) {
+        newSet.delete(floorNumber);
+      } else {
+        newSet.add(floorNumber);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleRiserExpansion = (riserNumber: number) => {
+    setExpandedRisers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(riserNumber)) {
+        newSet.delete(riserNumber);
+      } else {
+        newSet.add(riserNumber);
+      }
+      return newSet;
+    });
+  };
 
   // Helper functions for floor/riser options
   const getFloorOptions = () => {
@@ -406,9 +470,10 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     allEquipmentFlattened.forEach(item => {
       const floor = item.floorNumber;
       if (!summaries[floor]) {
-        summaries[floor] = { floor, totalLoad: 0, emergencyLoad: 0, fsiLoad: 0 };
+        summaries[floor] = { floor, totalLoad: 0, emergencyLoad: 0, fsiLoad: 0, totalStartingKVA: 0 };
       }
       summaries[floor].totalLoad += item.connectedLoad;
+      summaries[floor].totalStartingKVA += item.startingKVA || 0;
       if (item.emergencyPower) {
         summaries[floor].emergencyLoad += item.connectedLoad;
       }
@@ -430,9 +495,11 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     allEquipmentFlattened.forEach(item => {
       const riser = item.riserNumber;
       if (!summaries[riser]) {
-        summaries[riser] = { riser, totalLoad: 0, emergencyLoad: 0, fsiLoad: 0 };
+        summaries[riser] = { riser, totalLoad: 0, emergencyLoad: 0, fsiLoad: 0, totalStartingKVA: 0 };
       }
       summaries[riser].totalLoad += item.connectedLoad;
+      summaries[riser].totalStartingKVA += item.startingKVA || 0;
+
       if (item.emergencyPower) {
         summaries[riser].emergencyLoad += item.connectedLoad;
       }
@@ -446,6 +513,41 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
 
     return Object.values(summaries).sort((a, b) => a.riser - b.riser);
   };
+
+  const renderStartingMethodSelector = <T extends BaseEquipmentFields>(
+    item: T,
+    updateFunction: (id: string, updates: Partial<T>) => void,
+    id: string,
+    isMotorLoad: boolean = true 
+  ) => {
+    // Do not render if startingMethod is not a property of item (e.g. for LiftEscalator)
+    // or if explicitly told not to (isMotorLoad = false for specific equipment types)
+    if (!('startingMethod' in item) || !isMotorLoad) return null; 
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Starting Method</label>
+            <select
+                value={item.startingMethod}
+                onChange={(e) => {
+                    const selectedMethod = STARTING_METHODS.find(m => m.value === e.target.value);
+                    updateFunction(id, {
+                        startingMethod: e.target.value,
+                        startingMultiplier: selectedMethod?.multiplier || 1
+                    } as Partial<T>);
+                }}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+                {STARTING_METHODS.map(method => (
+                    <option key={method.value} value={method.value}>
+                        {method.label} ({method.multiplier}x)
+                    </option>
+                ))}
+            </select>
+        </div>
+    );
+  };
+
 
   // Component for Floor and Riser fields
   const renderFloorRiserFields = <T extends BaseEquipmentFields>(
@@ -532,108 +634,140 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
   useEffect(() => {
     const updatedItems = lightingSpaces.map(item => {
       const cl = (item.area * item.powerDensity) / (1000 * (item.powerFactor || 1));
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(lightingSpaces) !== JSON.stringify(updatedItems)) {
         setLightingSpaces(updatedItems);
     }
-    updateCategorySummary('A. Lighting Installation', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [lightingSpaces.map(i => `${i.id}-${i.area}-${i.powerDensity}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('A. Lighting Installation', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [lightingSpaces.map(i => `${i.id}-${i.area}-${i.powerDensity}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = generalPowerSpaces.map(item => {
       const cl = (item.area * item.powerDensity) / 1000;
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(generalPowerSpaces) !== JSON.stringify(updatedItems)) {
         setGeneralPowerSpaces(updatedItems);
     }
-    updateCategorySummary('B. General Power', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [generalPowerSpaces.map(i => `${i.id}-${i.area}-${i.powerDensity}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('B. General Power', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [generalPowerSpaces.map(i => `${i.id}-${i.area}-${i.powerDensity}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = hvacPlants.map(item => {
       const elpu = (item.coolingHeatingLoad / (item.cop || 1));
       const cl = (elpu / (item.powerFactor || 1)) * item.quantity;
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(hvacPlants) !== JSON.stringify(updatedItems)) {
         setHVACPlants(updatedItems);
     }
-    updateCategorySummary('C1. HVAC - Refrigeration/Heating Water Plant', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [hvacPlants.map(i => `${i.id}-${i.quantity}-${i.coolingHeatingLoad}-${i.cop}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('C1. HVAC - Refrigeration/Heating Water Plant', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [hvacPlants.map(i => `${i.id}-${i.quantity}-${i.coolingHeatingLoad}-${i.cop}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = hvacWaterDistributions.map(item => {
       let cl = 0;
-      if (item.equipmentType === 'pump') {
+      if (item.equipmentType === 'motorLoad' && item.waterFlowRate && item.pumpHead && item.pumpEfficiency && item.motorEfficiency) {
         const pkw = (item.waterFlowRate * item.pumpHead) / (1000 * (item.pumpEfficiency || 1) * (item.motorEfficiency || 1));
         cl = pkw / (item.powerFactor || 1);
-      } else if (item.equipmentType === 'other' && typeof item.powerKWPerUnit === 'number') {
+      } else if (item.equipmentType === 'otherLoad' && typeof item.powerKWPerUnit === 'number') {
         cl = (item.powerKWPerUnit) / (item.powerFactor || 1);
       }
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(hvacWaterDistributions) !== JSON.stringify(updatedItems)) {
         setHVACWaterDistributions(updatedItems);
     }
-    updateCategorySummary('C2. HVAC - Water Side Distribution', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [hvacWaterDistributions.map(i => `${i.id}-${i.equipmentType}-${i.waterFlowRate}-${i.pumpHead}-${i.pumpEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.powerKWPerUnit}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('C2. HVAC - Water Side Distribution', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [hvacWaterDistributions.map(i => `${i.id}-${i.equipmentType}-${i.waterFlowRate}-${i.pumpHead}-${i.pumpEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.powerKWPerUnit}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = hvacAirDistributions.map(item => {
       const pkw = (item.airFlowRate * item.fanPressure) / (1000 * 1000 * (item.fanEfficiency || 1) * (item.motorEfficiency || 1));
       const cl = pkw / (item.powerFactor || 1);
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(hvacAirDistributions) !== JSON.stringify(updatedItems)) {
         setHVACAirDistributions(updatedItems);
     }
-    updateCategorySummary('C3. HVAC - Air Side Distribution', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [hvacAirDistributions.map(i => `${i.id}-${i.airFlowRate}-${i.fanPressure}-${i.fanEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('C3. HVAC - Air Side Distribution', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [hvacAirDistributions.map(i => `${i.id}-${i.airFlowRate}-${i.fanPressure}-${i.fanEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = hvacVentilations.map(item => {
       const pkw = (item.airFlowRate * item.fanPressure) / (1000 * 1000 * (item.fanEfficiency || 1) * (item.motorEfficiency || 1));
       const cl = pkw / (item.powerFactor || 1);
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(hvacVentilations) !== JSON.stringify(updatedItems)) {
         setHVACVentilations(updatedItems);
     }
-    updateCategorySummary('C4. HVAC - Mechanical Ventilation', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [hvacVentilations.map(i => `${i.id}-${i.airFlowRate}-${i.fanPressure}-${i.fanEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('C4. HVAC - Mechanical Ventilation', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [hvacVentilations.map(i => `${i.id}-${i.airFlowRate}-${i.fanPressure}-${i.fanEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedFireServices = fireServices.map(service => {
       let clpu_kVA = 0;
-      if (service.equipmentType === 'pump' && service.flowRate && service.pressure && service.pumpEfficiency && service.motorEfficiency) {
+      if (service.equipmentType === 'motorLoad' && service.flowRate && service.pressure && service.pumpEfficiency && service.motorEfficiency) {
         const powerKW = (9.81 * service.pressure * service.flowRate) / (1000 * (service.pumpEfficiency || 1) * (service.motorEfficiency || 1));
         clpu_kVA = powerKW / (service.powerFactor || 1);
-      } else if (service.equipmentType === 'other' && typeof service.powerKWPerUnit === 'number') {
+      } else if (service.equipmentType === 'otherLoad' && typeof service.powerKWPerUnit === 'number') {
         clpu_kVA = (service.powerKWPerUnit) / (service.powerFactor || 1);
       }
       const totalConnectedLoad = clpu_kVA * service.quantity;
-      return { ...service, connectedLoadPerUnit: clpu_kVA, connectedLoad: totalConnectedLoad };
+      const totalStartingKVA = totalConnectedLoad * (service.startingMultiplier || 1);
+      return { ...service, connectedLoadPerUnit: clpu_kVA, connectedLoad: totalConnectedLoad, startingKVA: totalStartingKVA };
     });
     if (JSON.stringify(fireServices) !== JSON.stringify(updatedFireServices)) {
         setFireServices(updatedFireServices);
     }
-    updateCategorySummary('D. Fire Service Installations', updatedFireServices.reduce((sum, s) => sum + s.connectedLoad, 0));
-  }, [fireServices.map(s => `${s.id}-${s.equipmentType}-${s.quantity}-${s.powerKWPerUnit}-${s.flowRate}-${s.pressure}-${s.pumpEfficiency}-${s.motorEfficiency}-${s.powerFactor}-${s.floorNumber}-${s.riserNumber}-${s.emergencyPower}`).join(',')]);
+    updateCategorySummary('D. Fire Service Installations', 
+        updatedFireServices.reduce((sum, s) => sum + s.connectedLoad, 0),
+        updatedFireServices.reduce((sum, s) => sum + s.startingKVA, 0)
+    );
+  }, [fireServices.map(s => `${s.id}-${s.equipmentType}-${s.quantity}-${s.powerKWPerUnit}-${s.flowRate}-${s.pressure}-${s.pumpEfficiency}-${s.motorEfficiency}-${s.powerFactor}-${s.floorNumber}-${s.riserNumber}-${s.emergencyPower}-${s.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = waterPumps.map(item => {
       const pkw = (9.81 * item.pressure * item.flowRate) / (1000 * (item.pumpEfficiency || 1) * (item.motorEfficiency || 1));
       const clpu = pkw / (item.powerFactor || 1);
       const cl = clpu * item.quantity;
-      return { ...item, connectedLoadPerUnit: clpu, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoadPerUnit: clpu, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(waterPumps) !== JSON.stringify(updatedItems)) {
         setWaterPumps(updatedItems);
     }
-    updateCategorySummary('E. Water Pumps for P&D', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [waterPumps.map(i => `${i.id}-${i.quantity}-${i.flowRate}-${i.pressure}-${i.pumpEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('E. Water Pumps for P&D', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [waterPumps.map(i => `${i.id}-${i.quantity}-${i.flowRate}-${i.pressure}-${i.pumpEfficiency}-${i.motorEfficiency}-${i.powerFactor}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
   useEffect(() => {
     const updatedLiftEscalators = liftEscalators.map(item => {
@@ -646,44 +780,61 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
         clpu_kVA = electricalPowerKW / (item.powerFactor || 1);
       }
       const totalConnectedLoad = clpu_kVA * item.quantity;
-      return { ...item, connectedLoadPerUnit: clpu_kVA, connectedLoad: totalConnectedLoad };
+      // For lifts/escalators, startingKVA is set to connectedLoad as per user request to remove selector
+      const totalStartingKVA = totalConnectedLoad; 
+      return { ...item, connectedLoadPerUnit: clpu_kVA, connectedLoad: totalConnectedLoad, startingKVA: totalStartingKVA };
     });
     if (JSON.stringify(liftEscalators) !== JSON.stringify(updatedLiftEscalators)) {
         setLiftEscalators(updatedLiftEscalators);
     }
-    updateCategorySummary('F. Lift & Escalator Installation', updatedLiftEscalators.reduce((sum, lift) => sum + lift.connectedLoad, 0));
-  }, [liftEscalators.map(lift => `${lift.id}-${lift.type}-${lift.quantity}-${lift.ratedLoad}-${lift.ratedSpeed}-${lift.motorEfficiency}-${lift.powerFactor}-${lift.connectedLoadPerUnitInput}-${lift.fsi}-${lift.floorNumber}-${lift.riserNumber}-${lift.emergencyPower}`).join(',')]);
+    updateCategorySummary('F. Lift & Escalator Installation', 
+        updatedLiftEscalators.reduce((sum, lift) => sum + lift.connectedLoad, 0),
+        updatedLiftEscalators.reduce((sum, lift) => sum + lift.startingKVA, 0)
+    );
+  }, [liftEscalators.map(lift => `${lift.id}-${lift.type}-${lift.quantity}-${lift.ratedLoad}-${lift.ratedSpeed}-${lift.motorEfficiency}-${lift.powerFactor}-${lift.connectedLoadPerUnitInput}-${lift.fsi}-${lift.floorNumber}-${lift.riserNumber}-${lift.emergencyPower}`).join(',')]); // Removed startingMultiplier from dependency
 
   useEffect(() => {
     const updatedItems = hotWaterSystems.map(item => {
       let clpu_kVA = 0;
+      let itemMultiplier = item.startingMultiplier || 1;
+
       if (item.equipmentType === 'boilerCalorifier' && typeof item.capacity === 'number') {
         clpu_kVA = item.capacity / (item.powerFactor || 1);
-      } else if (item.equipmentType === 'pump' && item.flowRate && item.pressure && item.pumpEfficiency && item.motorEfficiency) {
+        if (item.startingMethod === defaultResistiveStartingMethod) itemMultiplier = 1;
+      } else if (item.equipmentType === 'motorLoad' && item.flowRate && item.pressure && item.pumpEfficiency && item.motorEfficiency) {
         const pkw = (9.81 * item.pressure * item.flowRate) / (1000 * (item.pumpEfficiency || 1) * (item.motorEfficiency || 1));
         clpu_kVA = pkw / (item.powerFactor || 1);
-      } else if (item.equipmentType === 'other' && typeof item.powerKWPerUnit === 'number') {
+      } else if (item.equipmentType === 'otherLoad' && typeof item.powerKWPerUnit === 'number') {
         clpu_kVA = (item.powerKWPerUnit) / (item.powerFactor || 1);
+        if (item.startingMethod === defaultResistiveStartingMethod) itemMultiplier = 1;
       }
       const cl = clpu_kVA * item.quantity;
-      return { ...item, connectedLoadPerUnit: clpu_kVA, connectedLoad: cl };
+      const skva = cl * itemMultiplier; 
+      return { ...item, connectedLoadPerUnit: clpu_kVA, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(hotWaterSystems) !== JSON.stringify(updatedItems)) {
         setHotWaterSystems(updatedItems);
     }
-    updateCategorySummary('G. Hot Water Boiler / Calorifier Installation', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [hotWaterSystems.map(s => `${s.id}-${s.equipmentType}-${s.quantity}-${s.capacity}-${s.pressure}-${s.flowRate}-${s.pumpEfficiency}-${s.motorEfficiency}-${s.powerFactor}-${s.powerKWPerUnit}-${s.floorNumber}-${s.riserNumber}-${s.emergencyPower}`).join(',')]);
+    updateCategorySummary('G. Hot Water Boiler / Calorifier Installation', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [hotWaterSystems.map(s => `${s.id}-${s.equipmentType}-${s.quantity}-${s.capacity}-${s.pressure}-${s.flowRate}-${s.pumpEfficiency}-${s.motorEfficiency}-${s.powerFactor}-${s.powerKWPerUnit}-${s.floorNumber}-${s.riserNumber}-${s.emergencyPower}-${s.startingMultiplier}-${s.startingMethod}`).join(',')]);
 
   useEffect(() => {
     const updatedItems = miscInstallations.map(item => {
       const cl = item.quantity * item.connectedLoadPerUnit;
-      return { ...item, connectedLoad: cl };
+      const skva = cl * (item.startingMultiplier || 1);
+      return { ...item, connectedLoad: cl, startingKVA: skva };
     });
     if (JSON.stringify(miscInstallations) !== JSON.stringify(updatedItems)) {
         setMiscInstallations(updatedItems);
     }
-    updateCategorySummary('H. Miscellaneous Installation', updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0));
-  }, [miscInstallations.map(i => `${i.id}-${i.quantity}-${i.connectedLoadPerUnit}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}`).join(',')]);
+    updateCategorySummary('H. Miscellaneous Installation', 
+        updatedItems.reduce((sum, i) => sum + i.connectedLoad, 0),
+        updatedItems.reduce((sum, i) => sum + i.startingKVA, 0)
+    );
+  }, [miscInstallations.map(i => `${i.id}-${i.quantity}-${i.connectedLoadPerUnit}-${i.floorNumber}-${i.riserNumber}-${i.emergencyPower}-${i.startingMultiplier}`).join(',')]);
 
 
   useEffect(() => {
@@ -731,7 +882,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
 
     calculateSpecialLoads();
   }, [
-      categorySummaries.map(s=>`${s.estimatedConnectedLoad}-${s.diversityFactor}-${s.futureGrowthFactor}`).join(','), 
+      categorySummaries.map(s=>`${s.estimatedConnectedLoad}-${s.estimatedStartingKVA}-${s.diversityFactor}-${s.futureGrowthFactor}`).join(','), 
       totalAdditionalDemand, 
       projectInfo.totalArea, 
       lightingSpaces, generalPowerSpaces, hvacPlants, hvacWaterDistributions, 
@@ -739,19 +890,21 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       liftEscalators, hotWaterSystems, miscInstallations
   ]);
 
-  const updateCategorySummary = (categoryName: string, estimatedConnectedLoad: number) => {
+  const updateCategorySummary = (categoryName: string, estimatedConnectedLoad: number, estimatedStartingKVA: number) => {
     setCategorySummaries(prevSummaries => {
       const summaryIndex = prevSummaries.findIndex(s => s.category === categoryName);
       if (summaryIndex === -1) return prevSummaries; 
       
       const currentSummary = prevSummaries[summaryIndex];
-      if (currentSummary.estimatedConnectedLoad.toFixed(5) === estimatedConnectedLoad.toFixed(5)) {
+      if (currentSummary.estimatedConnectedLoad.toFixed(5) === estimatedConnectedLoad.toFixed(5) &&
+          currentSummary.estimatedStartingKVA.toFixed(5) === estimatedStartingKVA.toFixed(5)
+      ) {
           return prevSummaries;
       }
 
       return prevSummaries.map(summary => 
         summary.category === categoryName
-          ? { ...summary, estimatedConnectedLoad } 
+          ? { ...summary, estimatedConnectedLoad, estimatedStartingKVA } 
           : summary
       );
     });
@@ -771,53 +924,56 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
   };
 
   // --- Add Item Handlers ---
-  const handleAddLightingSpace = () => addItem(lightingSpaces, setLightingSpaces, { name: 'New Lighting Space', area: 100, powerDensity: 9, powerFactor: 0.9, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
-  const handleAddGeneralPowerSpace = () => addItem(generalPowerSpaces, setGeneralPowerSpaces, { name: 'New General Space', area: 100, powerDensity: 25, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
-  const handleAddHVACPlant = () => addItem(hvacPlants, setHVACPlants, { type: 'Chiller', quantity: 1, coolingHeatingLoad: 100, cop: 3, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
+  const handleAddLightingSpace = () => addItem(lightingSpaces, setLightingSpaces, { name: 'New Lighting Space', area: 100, powerDensity: 9, powerFactor: 0.9, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier });
+  const handleAddGeneralPowerSpace = () => addItem(generalPowerSpaces, setGeneralPowerSpaces, { name: 'New General Space', area: 100, powerDensity: 25, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier });
+  const handleAddHVACPlant = () => addItem(hvacPlants, setHVACPlants, { type: 'Chiller', quantity: 1, coolingHeatingLoad: 100, cop: 3, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m=>m.value==='vsd')?.multiplier || 1.8 });
   
   const handleAddHVACWaterDistribution = () => addItem(hvacWaterDistributions, setHVACWaterDistributions, { 
     system: 'New Pump', 
-    equipmentType: 'pump',
-    coolingLoadServed: 100, 
+    equipmentType: 'motorLoad', // Default to motorLoad
     waterFlowRate: 10, 
     pumpHead: 150, 
     pumpEfficiency: 0.7, 
     motorEfficiency: 0.9, 
     powerFactor: 0.85, 
     connectedLoad: 0, 
+    startingKVA: 0,
     floorNumber: 1, 
     riserNumber: 1, 
     emergencyPower: false,
-    powerKWPerUnit: 5 
+    powerKWPerUnit: 5, // Still provide a default for 'otherLoad' if user switches
+    startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m=>m.value==='vsd')?.multiplier || 1.8
   });
 
-  const handleAddHVACAirDistribution = () => addItem(hvacAirDistributions, setHVACAirDistributions, { equipment: 'New AHU', coolingLoadServed: 50, airFlowRate: 1000, fanPressure: 500, fanEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
-  const handleAddHVACVentilation = () => addItem(hvacVentilations, setHVACVentilations, { equipment: 'New Fan', airFlowRate: 500, fanPressure: 200, fanEfficiency: 0.6, motorEfficiency: 0.8, powerFactor: 0.85, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
+  const handleAddHVACAirDistribution = () => addItem(hvacAirDistributions, setHVACAirDistributions, { equipment: 'New AHU', airFlowRate: 1000, fanPressure: 500, fanEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'vsd', startingMultiplier: STARTING_METHODS.find(m=>m.value==='vsd')?.multiplier || 1.8 });
+  const handleAddHVACVentilation = () => addItem(hvacVentilations, setHVACVentilations, { equipment: 'New Fan', airFlowRate: 500, fanPressure: 200, fanEfficiency: 0.6, motorEfficiency: 0.8, powerFactor: 0.85, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'dol', startingMultiplier: STARTING_METHODS.find(m=>m.value==='dol')?.multiplier || 6 });
   
   const handleAddFireService = () => {
     const newService: Omit<FireService, 'id'> = {
       description: 'New Fire Equipment',
-      equipmentType: 'other', 
+      equipmentType: 'otherLoad', 
       quantity: 1,
       powerKWPerUnit: 2, 
       powerFactor: 0.85,
       connectedLoadPerUnit: 0,
       connectedLoad: 0,
+      startingKVA: 0,
       pressure: 30, 
       flowRate: 10, 
       pumpEfficiency: 0.7,
       motorEfficiency: 0.9,
       floorNumber: 1,
       riserNumber: 1,
-      emergencyPower: true 
+      emergencyPower: true,
+      startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier
     };
     addItem(fireServices, setFireServices, newService);
   };
 
-  const handleAddWaterPump = () => addItem(waterPumps, setWaterPumps, { type: 'New Water Pump', quantity: 1, pressure: 20, flowRate: 5, pumpEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoadPerUnit: 0, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
+  const handleAddWaterPump = () => addItem(waterPumps, setWaterPumps, { type: 'New Water Pump', quantity: 1, pressure: 20, flowRate: 5, pumpEfficiency: 0.65, motorEfficiency: 0.85, powerFactor: 0.85, connectedLoadPerUnit: 0, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: 'dol', startingMultiplier: STARTING_METHODS.find(m=>m.value==='dol')?.multiplier || 6 });
   
   const handleAddLiftEscalator = () => {
-    const newLift: Omit<LiftEscalator, 'id'> = {
+    const newLift: Omit<LiftEscalator, 'id' | 'startingMethod' | 'startingMultiplier'> = { // Omit SM and SMP
       type: 'Passenger Lift', 
       quantity: 1,
       fsi: false,
@@ -828,11 +984,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       powerFactor: 0.85,
       connectedLoadPerUnit: 0, 
       connectedLoad: 0,
+      startingKVA: 0,
       floorNumber: 1,
       riserNumber: 1,
       emergencyPower: false
     };
-    addItem(liftEscalators, setLiftEscalators, newLift);
+    addItem(liftEscalators, setLiftEscalators, newLift as Omit<LiftEscalator, 'id'>); // Cast to allow missing optional SM/SMP
   };
 
   const handleAddHotWaterSystem = () => {
@@ -843,6 +1000,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       powerFactor: 1.0,
       connectedLoadPerUnit: 0,
       connectedLoad: 0,
+      startingKVA: 0,
       capacity: 15,
       pressure: 20,
       flowRate: 5,
@@ -851,12 +1009,13 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       powerKWPerUnit: 5,
       floorNumber: 1,
       riserNumber: 1,
-      emergencyPower: false
+      emergencyPower: false,
+      startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier
     };
     addItem(hotWaterSystems, setHotWaterSystems, newSystem);
   };
   
-  const handleAddMiscInstallation = () => addItem(miscInstallations, setMiscInstallations, { type: 'New Misc Equipment', quantity: 1, connectedLoadPerUnit: 5, connectedLoad: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false });
+  const handleAddMiscInstallation = () => addItem(miscInstallations, setMiscInstallations, { type: 'New Misc Equipment', quantity: 1, connectedLoadPerUnit: 5, connectedLoad: 0, startingKVA: 0, floorNumber: 1, riserNumber: 1, emergencyPower: false, startingMethod: defaultResistiveStartingMethod, startingMultiplier: defaultResistiveStartingMultiplier });
 
   // --- Import/Export Handlers ---
   const handleExportData = () => {
@@ -870,14 +1029,14 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       hvacVentilations,
       fireServices,
       waterPumps,
-      liftEscalators,
+      liftEscalators: liftEscalators.map(({ startingMethod, startingMultiplier, ...rest }) => rest), // Remove SM/SMP for export
       hotWaterSystems,
       miscInstallations,
       categorySummaries: categorySummaries.map(s => ({ 
         category: s.category, 
         diversityFactor: s.diversityFactor, 
         futureGrowthFactor: s.futureGrowthFactor,
-      })),
+      })), 
       additionalDemand,
     };
     const jsonString = JSON.stringify(dataToExport, null, 2);
@@ -899,19 +1058,36 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       reader.onload = (e) => {
         try {
           const importedData = JSON.parse(e.target?.result as string) as any; 
-          if (importedData && importedData.projectInfo && importedData.lightingSpaces) { 
+          if (importedData && importedData.projectInfo) { 
             setProjectInfo(importedData.projectInfo);
-            setLightingSpaces(importedData.lightingSpaces || []);
-            setGeneralPowerSpaces(importedData.generalPowerSpaces || []);
-            setHVACPlants(importedData.hvacPlants || []);
-            setHVACWaterDistributions(importedData.hvacWaterDistributions || []);
-            setHVACAirDistributions(importedData.hvacAirDistributions || []);
-            setHVACVentilations(importedData.hvacVentilations || []);
-            setFireServices(importedData.fireServices || []);
-            setWaterPumps(importedData.waterPumps || []);
-            setLiftEscalators(importedData.liftEscalators || []);
-            setHotWaterSystems(importedData.hotWaterSystems || []);
-            setMiscInstallations(importedData.miscInstallations || []);
+            
+            const assignStartingMethodDefaults = (item: any, defaultSM: string, defaultSMP: number, isMotorType: boolean = true) => {
+                let sm = item.startingMethod;
+                let smp = item.startingMultiplier;
+                if (!isMotorType) { // If it's explicitly not a motor type, or a resistive type
+                    sm = defaultResistiveStartingMethod;
+                    smp = defaultResistiveStartingMultiplier;
+                } else if (!sm || !STARTING_METHODS.find(m => m.value === sm)) { // If SM is missing or invalid for a motor type
+                    sm = defaultSM; // Use the category-specific motor default
+                    smp = STARTING_METHODS.find(m => m.value === sm)?.multiplier || defaultSMP;
+                } else { // SM is valid
+                    smp = STARTING_METHODS.find(m => m.value === sm)?.multiplier || defaultSMP;
+                }
+                return { ...item, startingMethod: sm, startingMultiplier: smp, startingKVA: item.startingKVA || 0 };
+            };
+
+            setLightingSpaces((importedData.lightingSpaces || []).map((i:any) => assignStartingMethodDefaults(i, defaultResistiveStartingMethod, 1, false)));
+            setGeneralPowerSpaces((importedData.generalPowerSpaces || []).map((i:any) => assignStartingMethodDefaults(i, defaultResistiveStartingMethod, 1, false)));
+            setHVACPlants((importedData.hvacPlants || []).map((i:any) => assignStartingMethodDefaults(i, 'vsd', 1.8)));
+            setHVACWaterDistributions((importedData.hvacWaterDistributions || []).map((i:any) => assignStartingMethodDefaults(i, 'vsd', 1.8, i.equipmentType === 'motorLoad')));
+            setHVACAirDistributions((importedData.hvacAirDistributions || []).map((i:any) => assignStartingMethodDefaults(i, 'vsd', 1.8)));
+            setHVACVentilations((importedData.hvacVentilations || []).map((i:any) => assignStartingMethodDefaults(i, 'dol', 6)));
+            setFireServices((importedData.fireServices || []).map((i:any) => assignStartingMethodDefaults(i, 'dol', 6, i.equipmentType === 'motorLoad')));
+            setWaterPumps((importedData.waterPumps || []).map((i:any) => assignStartingMethodDefaults(i, 'dol', 6)));
+            // Lifts/Escalators don't have user-selectable SM, startingKVA will be recalculated based on connectedLoad
+            setLiftEscalators((importedData.liftEscalators || []).map((i:any) => ({ ...i, startingKVA: i.startingKVA || 0 }))); 
+            setHotWaterSystems((importedData.hotWaterSystems || []).map((i:any) => assignStartingMethodDefaults(i, 'dol', 6, i.equipmentType === 'motorLoad')));
+            setMiscInstallations((importedData.miscInstallations || []).map((i:any) => assignStartingMethodDefaults(i, defaultResistiveStartingMethod, 1, true))); // Assume misc can be motor, user can change to 'none'
             
             if (importedData.categorySummaries && Array.isArray(importedData.categorySummaries)) {
                  setCategorySummaries(prevSummaries => 
@@ -944,6 +1120,21 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
       reader.readAsText(file);
     }
   };
+
+  const categoryTypeToNameMap: Record<string, string> = {
+    'lighting': 'A. Lighting Installation',
+    'generalPower': 'B. General Power',
+    'hvacPlant': 'C1. HVAC - Plant',
+    'hvacWater': 'C2. HVAC - Water Distribution',
+    'hvacAir': 'C3. HVAC - Air Distribution',
+    'hvacVent': 'C4. HVAC - Mechanical Ventilation',
+    'fireServiceD': 'D. Fire Service Installations',
+    'waterPump': 'E. Water Pumps for P&D',
+    'liftEscalator': 'F. Lift & Escalator Installation',
+    'hotWater': 'G. Hot Water Installation',
+    'misc': 'H. Miscellaneous Installation',
+  };
+
 
   // Render content based on active tab
   const renderTabContent = () => {
@@ -1068,6 +1259,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  {/* Starting method selector not typically shown for lighting (defaults to 1x) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
                     <input
@@ -1108,10 +1300,17 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {space.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {space.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                   <p className="text-gray-600">Connected Load (kVA) = Area (m²) × Power Density (W/m²) / (1000 × Power Factor)</p>
+                  <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (default 1x for lighting)</p>
                 </div>
               </div>
             ))}
@@ -1121,6 +1320,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'A. Lighting Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1136,7 +1341,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 onClick={handleAddHVACWaterDistribution}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
               >
-                Add System/Pump
+                Add System
               </button>
             </div>
             
@@ -1169,32 +1374,35 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
                     <select
                       value={dist.equipmentType}
-                      onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { equipmentType: e.target.value as HVACWaterDistribution['equipmentType'] })}
+                      onChange={(e) => {
+                        const newType = e.target.value as HVACWaterDistribution['equipmentType'];
+                        const updates: Partial<HVACWaterDistribution> = { equipmentType: newType };
+                        if (newType === 'otherLoad') {
+                            updates.startingMethod = defaultResistiveStartingMethod;
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                        } else if (newType === 'motorLoad' && dist.startingMethod === defaultResistiveStartingMethod) { 
+                            updates.startingMethod = 'vsd'; 
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'vsd')?.multiplier || 1.8;
+                        }
+                        updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, updates);
+                      }}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="pump">Water Pump</option>
-                      <option value="other">Other Equipment</option>
+                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                      <option value="otherLoad">Other Load</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cooling Load (kWth)</label>
-                    <input
-                      type="number"
-                      value={dist.coolingLoadServed}
-                      onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { coolingLoadServed: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                     <p className="mt-1 text-xs text-gray-500">Informational or for alternative calculations.</p>
-                  </div>
+                   {renderStartingMethodSelector(dist, (id, updates) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, id, updates), dist.id, dist.equipmentType === 'motorLoad')}
+                  
+                  {/* Cooling Load Served removed */}
 
-                  {dist.equipmentType === 'pump' && (
+                  {dist.equipmentType === 'motorLoad' && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Water Flow Rate (L/s)</label>
                         <input
                           type="number"
-                          value={dist.waterFlowRate}
+                          value={dist.waterFlowRate ?? ''}
                           onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { waterFlowRate: Math.max(0, Number(e.target.value)) })}
                           className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                           min="0"
@@ -1204,7 +1412,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         <label className="block text-sm font-medium text-gray-700 mb-1">Pump Head (kPa)</label>
                         <input
                           type="number"
-                          value={dist.pumpHead}
+                          value={dist.pumpHead ?? ''}
                           onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpHead: Math.max(0, Number(e.target.value)) })}
                           className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                           min="0"
@@ -1214,7 +1422,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         <label className="block text-sm font-medium text-gray-700 mb-1">Pump Efficiency</label>
                         <input
                           type="number"
-                          value={dist.pumpEfficiency}
+                          value={dist.pumpEfficiency ?? ''}
                           onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { pumpEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
                           className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                           min="0.1" max="1" step="0.01"
@@ -1224,7 +1432,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         <label className="block text-sm font-medium text-gray-700 mb-1">Motor Efficiency</label>
                         <input
                           type="number"
-                          value={dist.motorEfficiency}
+                          value={dist.motorEfficiency ?? ''}
                           onChange={(e) => updateItem(hvacWaterDistributions, setHVACWaterDistributions, dist.id, { motorEfficiency: Math.max(0.1, Math.min(1, Number(e.target.value))) })}
                           className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                           min="0.1" max="1" step="0.01"
@@ -1233,7 +1441,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     </>
                   )}
 
-                  {dist.equipmentType === 'other' && (
+                  {dist.equipmentType === 'otherLoad' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Power (kW)</label>
                       <input
@@ -1263,14 +1471,20 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {dist.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {dist.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
-                {dist.equipmentType === 'pump' && (
+                {dist.equipmentType === 'motorLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Pump Power (kW) = (Flow (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</p>
+                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</p>
                   </div>
                 )}
-                {dist.equipmentType === 'other' && (
+                {dist.equipmentType === 'otherLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Load (kVA) = Power (kW) / Power Factor</p>
                   </div>
@@ -1283,6 +1497,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'C2. HVAC - Water Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1337,6 +1557,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       <input type="number" value={item.quantity} onChange={(e) => updateItem(liftEscalators, setLiftEscalators, item.id, { quantity: Math.max(1, Number(e.target.value)) })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" min="1"/>
                     </div>
+                    {/* No Starting Method Selector for Lifts/Escalators */}
 
                     {!isEscalatorOrWalkway && (
                       <>
@@ -1383,17 +1604,25 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         {item.connectedLoad.toFixed(2)}
                       </div>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                      <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                        {item.startingKVA.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                   
                   {!isEscalatorOrWalkway && (
                     <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Power (kW) = (0.00981 × Load (kg) × Speed (m/s) × k_unbalance) / Motor Eff (k_unbalance ≈ 0.6)</p>
                     <p className="text-gray-600">Unit Load (kVA) = Power (kW) / Power Factor</p>
+                    <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) (assumed 1x multiplier)</p>
                     </div>
                   )}
                    {isEscalatorOrWalkway && (
                     <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Unit Load (kVA) = Load per Unit (kW) / Power Factor</p>
+                    <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) (assumed 1x multiplier)</p>
                     </div>
                   )}
                 </div>
@@ -1405,6 +1634,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'F. Lift & Escalator Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1438,6 +1673,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       <tr>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Connected Load (kVA)</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Starting kVA</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversity Factor</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Future Growth Factor (Category)</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diversified Load (incl. Category Growth) (kVA)</th>
@@ -1448,6 +1684,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{summary.category}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedConnectedLoad.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{summary.estimatedStartingKVA.toFixed(2)}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <input type="number" value={summary.diversityFactor}
                               onChange={(e) => {
@@ -1484,19 +1721,22 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                           {categorySummaries.reduce((sum, summary) => sum + summary.estimatedConnectedLoad, 0).toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={2}>
-                          Overall Diversity (incl. Category Growth): {overallDiversityFactor.toFixed(2)}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {categorySummaries.reduce((sum, summary) => sum + summary.estimatedStartingKVA, 0).toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totalDiversifiedLoad.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={1}> 
+                          Diversity: {overallDiversityFactor.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900" colSpan={2}>{totalDiversifiedLoad.toFixed(2)}</td> 
                       </tr>
                       <tr>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Additional Demand</td>
-                        <td colSpan={3}></td>
+                        <td colSpan={4}></td> 
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totalAdditionalDemand.toFixed(2)}</td>
                       </tr>
                       <tr className="bg-blue-100">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-900">Total Estimated Electrical Demand</td>
-                        <td colSpan={3}></td>
+                        <td colSpan={4}></td> 
                         <td className="px-6 py-4 whitespace-nowrap text-lg font-bold text-blue-900">{totalEstimatedDemand.toFixed(2)} kVA</td>
                       </tr>
                     </tfoot>
@@ -1549,27 +1789,94 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Load (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFloorSummaries().map((floor, index) => (
-                      <tr key={floor.floor} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Floor {floor.floor}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floor.totalLoad.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floor.emergencyLoad.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floor.fsiLoad.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {getFloorSummaries().map((floorSummary, index) => {
+                        const isExpanded = expandedFloors.has(floorSummary.floor);
+                        const floorEquipment = getAllFlattenedEquipment().filter(item => item.floorNumber === floorSummary.floor);
+                        const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
+                        floorEquipment.forEach(item => {
+                            if (!equipmentByCategory[item.categoryType]) {
+                                equipmentByCategory[item.categoryType] = [];
+                            }
+                            equipmentByCategory[item.categoryType].push(item);
+                        });
+
+                        return (
+                            <React.Fragment key={floorSummary.floor}>
+                                <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-2 py-4 whitespace-nowrap">
+                                        <button onClick={() => toggleFloorExpansion(floorSummary.floor)} className="text-blue-500 hover:text-blue-700">
+                                            {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Floor {floorSummary.floor}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalLoad.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.totalStartingKVA.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.emergencyLoad.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{floorSummary.fsiLoad.toFixed(2)}</td>
+                                </tr>
+                                {isExpanded && (
+                                    <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
+                                        <td colSpan={6} className="px-4 py-2">
+                                            <div className="p-2 bg-white rounded shadow">
+                                                <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Floor {floorSummary.floor}:</h5>
+                                                <table className="min-w-full text-xs">
+                                                    <thead className="bg-gray-200">
+                                                        <tr>
+                                                            <th className="px-2 py-1 text-left">Category</th>
+                                                            <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
+                                                            <th className="px-2 py-1 text-right">Start. kVA</th>
+                                                            <th className="px-2 py-1 text-right">Emergency (kVA)</th>
+                                                            <th className="px-2 py-1 text-right">FSI (kVA)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
+                                                            const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                            const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
+                                                            const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                            const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
+                                                                .reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                            
+                                                            if (catConnLoad === 0 && catStartKVA === 0) return null; 
+
+                                                            return (
+                                                                <tr key={categoryKey}>
+                                                                    <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                   </tbody>
                   <tfoot className="bg-blue-50">
                     <tr>
+                        <td className="px-2 py-4"></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                         {getFloorSummaries().reduce((sum, floor) => sum + floor.totalLoad, 0).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {getFloorSummaries().reduce((sum, floor) => sum + floor.totalStartingKVA, 0).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                         {getFloorSummaries().reduce((sum, floor) => sum + floor.emergencyLoad, 0).toFixed(2)}
@@ -1584,31 +1891,97 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
             )}
 
             {reportType === 'byRiser' && (
-              <div className="overflow-x-auto">
+               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th> {/* For expand button */}
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Riser</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Load (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Conn. Load (kVA)</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Start. kVA</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency Load (kVA)</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FSI Load (Lifts FSI + Cat. D) (kVA)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getRiserSummaries().map((riser, index) => (
-                      <tr key={riser.riser} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Riser {riser.riser}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riser.totalLoad.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riser.emergencyLoad.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riser.fsiLoad.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {getRiserSummaries().map((riserSummary, index) => {
+                        const isExpanded = expandedRisers.has(riserSummary.riser);
+                        const riserEquipment = getAllFlattenedEquipment().filter(item => item.riserNumber === riserSummary.riser);
+                        const equipmentByCategory: Record<string, FlattenedEquipmentItem[]> = {};
+                        riserEquipment.forEach(item => {
+                            if (!equipmentByCategory[item.categoryType]) {
+                                equipmentByCategory[item.categoryType] = [];
+                            }
+                            equipmentByCategory[item.categoryType].push(item);
+                        });
+                        return (
+                            <React.Fragment key={riserSummary.riser}>
+                                <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-2 py-4 whitespace-nowrap">
+                                        <button onClick={() => toggleRiserExpansion(riserSummary.riser)} className="text-blue-500 hover:text-blue-700">
+                                            {isExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Riser {riserSummary.riser}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalLoad.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.totalStartingKVA.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.emergencyLoad.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{riserSummary.fsiLoad.toFixed(2)}</td>
+                                </tr>
+                                {isExpanded && (
+                                    <tr className={index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-100'}>
+                                        <td colSpan={6} className="px-4 py-2">
+                                            <div className="p-2 bg-white rounded shadow">
+                                                <h5 className="text-sm font-semibold mb-1 text-gray-700">Details for Riser {riserSummary.riser}:</h5>
+                                                <table className="min-w-full text-xs">
+                                                    <thead className="bg-gray-200">
+                                                        <tr>
+                                                            <th className="px-2 py-1 text-left">Category</th>
+                                                            <th className="px-2 py-1 text-right">Conn. Load (kVA)</th>
+                                                            <th className="px-2 py-1 text-right">Start. kVA</th>
+                                                            <th className="px-2 py-1 text-right">Emergency (kVA)</th>
+                                                            <th className="px-2 py-1 text-right">FSI (kVA)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {Object.entries(equipmentByCategory).map(([categoryKey, items]) => {
+                                                            const catConnLoad = items.reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                            const catStartKVA = items.reduce((sum, item) => sum + (item.startingKVA || 0), 0);
+                                                            const catEmergLoad = items.filter(i => i.emergencyPower).reduce((sum, item) => sum + item.connectedLoad, 0);
+                                                            const catFsiLoad = items.filter(i => (i.categoryType === 'liftEscalator' && i.fsi === true) || i.categoryType === 'fireServiceD')
+                                                                .reduce((sum, item) => sum + item.connectedLoad, 0);
+
+                                                            if (catConnLoad === 0 && catStartKVA === 0) return null;
+
+                                                            return (
+                                                                <tr key={categoryKey}>
+                                                                    <td className="px-2 py-1 border-t">{categoryTypeToNameMap[categoryKey] || categoryKey}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catConnLoad.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catStartKVA.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catEmergLoad.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 border-t text-right">{catFsiLoad.toFixed(2)}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                   </tbody>
                   <tfoot className="bg-blue-50">
                     <tr>
+                        <td className="px-2 py-4"></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                         {getRiserSummaries().reduce((sum, riser) => sum + riser.totalLoad, 0).toFixed(2)}
+                      </td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {getRiserSummaries().reduce((sum, riser) => sum + riser.totalStartingKVA, 0).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                         {getRiserSummaries().reduce((sum, riser) => sum + riser.emergencyLoad, 0).toFixed(2)}
@@ -1662,6 +2035,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  {/* Starting method not typically shown for general power */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Area (m²)</label>
                     <input
@@ -1690,10 +2064,17 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {space.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {space.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                   <p className="text-gray-600">Connected Load (kVA) = Area (m²) × Power Density (VA/m²) / 1000</p>
+                  <p className="text-gray-600">Starting Load (kVA) = Connected Load (kVA) × Starting Multiplier (default 1x for general power)</p>
                 </div>
               </div>
             ))}
@@ -1703,6 +2084,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'B. General Power')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1747,6 +2134,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  {renderStartingMethodSelector(plant, (id, updates) => updateItem(hvacPlants, setHVACPlants, id, updates), plant.id)}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                     <input
@@ -1794,6 +2182,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {plant.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {plant.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
@@ -1807,6 +2201,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'C1. HVAC - Refrigeration/Heating Water Plant')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1851,16 +2251,8 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cooling Load (kWth)</label>
-                    <input
-                      type="number"
-                      value={equip.coolingLoadServed}
-                      onChange={(e) => updateItem(hvacAirDistributions, setHVACAirDistributions, equip.id, { coolingLoadServed: Math.max(0, Number(e.target.value)) })}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                      min="0"
-                    />
-                  </div>
+                  {renderStartingMethodSelector(equip, (id, updates) => updateItem(hvacAirDistributions, setHVACAirDistributions, id, updates), equip.id)}
+                  {/* Cooling Load Served removed */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
                     <input
@@ -1918,6 +2310,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {equip.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {equip.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
@@ -1931,6 +2329,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+               <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'C3. HVAC - Air Side Distribution')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -1975,6 +2379,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  {renderStartingMethodSelector(vent, (id, updates) => updateItem(hvacVentilations, setHVACVentilations, id, updates), vent.id)}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Air Flow Rate (L/s)</label>
                     <input
@@ -2032,6 +2437,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {vent.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {vent.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
@@ -2045,6 +2456,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'C4. HVAC - Mechanical Ventilation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -2093,13 +2510,25 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
                     <select
                       value={service.equipmentType}
-                      onChange={(e) => updateItem(fireServices, setFireServices, service.id, { equipmentType: e.target.value as FireService['equipmentType'] })}
+                      onChange={(e) => {
+                        const newType = e.target.value as FireService['equipmentType'];
+                        const updates: Partial<FireService> = { equipmentType: newType };
+                         if (newType === 'otherLoad') {
+                            updates.startingMethod = defaultResistiveStartingMethod;
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                        } else if (newType === 'motorLoad' && service.startingMethod === defaultResistiveStartingMethod) {
+                            updates.startingMethod = 'dol'; 
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
+                        }
+                        updateItem(fireServices, setFireServices, service.id, updates);
+                      }}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="pump">Water Pump</option>
-                      <option value="other">Other Equipment</option>
+                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                      <option value="otherLoad">Other Load</option>
                     </select>
                   </div>
+                  {renderStartingMethodSelector(service, (id, updates) => updateItem(fireServices, setFireServices, id, updates), service.id, service.equipmentType === 'motorLoad')}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                     <input
@@ -2111,7 +2540,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     />
                   </div>
                   
-                  {service.equipmentType === 'pump' && (
+                  {service.equipmentType === 'motorLoad' && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
@@ -2136,7 +2565,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     </>
                   )}
                   
-                  {service.equipmentType === 'other' && (
+                  {service.equipmentType === 'otherLoad' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
                       <input type="number" value={service.powerKWPerUnit ?? ''} onChange={(e) => updateItem(fireServices, setFireServices, service.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
@@ -2163,15 +2592,21 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {service.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {service.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
-                {service.equipmentType === 'pump' && (
+                {service.equipmentType === 'motorLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Pump Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
-                    <p className="text-gray-600">Unit Load (kVA) = Pump Power (kW) / Power Factor</p>
+                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
+                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
                   </div>
                 )}
-                {service.equipmentType === 'other' && (
+                {service.equipmentType === 'otherLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
                   </div>
@@ -2184,6 +2619,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+               <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'D. Fire Service Installations')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -2228,6 +2669,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  {renderStartingMethodSelector(pump, (id, updates) => updateItem(waterPumps, setWaterPumps, id, updates), pump.id)}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                     <input
@@ -2286,6 +2728,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {pump.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {pump.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
@@ -2299,6 +2747,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'E. Water Pumps for P&D')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -2341,13 +2795,26 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Type</label>
-                    <select value={system.equipmentType} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { equipmentType: e.target.value as HotWaterSystem['equipmentType'] })}
+                    <select value={system.equipmentType} 
+                      onChange={(e) => {
+                        const newType = e.target.value as HotWaterSystem['equipmentType'];
+                        const updates: Partial<HotWaterSystem> = { equipmentType: newType };
+                        if (newType === 'boilerCalorifier' || newType === 'otherLoad') {
+                            updates.startingMethod = defaultResistiveStartingMethod;
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === defaultResistiveStartingMethod)?.multiplier || 1;
+                        } else if (newType === 'motorLoad' && system.startingMethod === defaultResistiveStartingMethod) {
+                            updates.startingMethod = 'dol'; 
+                            updates.startingMultiplier = STARTING_METHODS.find(m=>m.value === 'dol')?.multiplier || 6;
+                        }
+                        updateItem(hotWaterSystems, setHotWaterSystems, system.id, updates);
+                      }}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                       <option value="boilerCalorifier">Boiler/Calorifier</option>
-                      <option value="pump">Water Pump</option>
-                      <option value="other">Other Equipment</option>
+                      <option value="motorLoad">Motor Load (e.g. Pump)</option>
+                      <option value="otherLoad">Other Load</option>
                     </select>
                   </div>
+                  {renderStartingMethodSelector(system, (id, updates) => updateItem(hotWaterSystems, setHotWaterSystems, id, updates), system.id, system.equipmentType === 'motorLoad')}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                     <input type="number" value={system.quantity} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { quantity: Math.max(1, Number(e.target.value)) })}
@@ -2362,7 +2829,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     </div>
                   )}
                   
-                  {system.equipmentType === 'pump' && (
+                  {system.equipmentType === 'motorLoad' && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Pressure (m head)</label>
@@ -2387,7 +2854,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     </>
                   )}
                   
-                  {system.equipmentType === 'other' && (
+                  {system.equipmentType === 'otherLoad' && (
                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Power per Unit (kW)</label>
                       <input type="number" value={system.powerKWPerUnit ?? ''} onChange={(e) => updateItem(hotWaterSystems, setHotWaterSystems, system.id, { powerKWPerUnit: Math.max(0, Number(e.target.value)) })}
@@ -2414,11 +2881,17 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {system.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {system.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-                {system.equipmentType === 'pump' && (
+                {system.equipmentType === 'motorLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
-                    <p className="text-gray-600">Pump Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
-                    <p className="text-gray-600">Unit Load (kVA) = Pump Power (kW) / Power Factor</p>
+                    <p className="text-gray-600">Motor Power (kW) = (Flow (L/s) × Pressure (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</p>
+                    <p className="text-gray-600">Unit Load (kVA) = Motor Power (kW) / Power Factor</p>
                   </div>
                 )}
                  {system.equipmentType === 'boilerCalorifier' && (
@@ -2426,7 +2899,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     <p className="text-gray-600">Unit Load (kVA) = Capacity per Unit (kW) / Power Factor</p>
                   </div>
                 )}
-                 {system.equipmentType === 'other' && (
+                 {system.equipmentType === 'otherLoad' && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Unit Load (kVA) = Power per Unit (kW) / Power Factor</p>
                   </div>
@@ -2439,6 +2912,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'G. Hot Water Boiler / Calorifier Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -2479,6 +2958,7 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                     <input type="text" value={misc.type} onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { type: e.target.value })}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
                   </div>
+                  {renderStartingMethodSelector(misc, (id, updates) => updateItem(miscInstallations, setMiscInstallations, id, updates), misc.id, true)} 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                     <input type="number" value={misc.quantity} onChange={(e) => updateItem(miscInstallations, setMiscInstallations, misc.id, { quantity: Math.max(1, Number(e.target.value)) })}
@@ -2496,6 +2976,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                       {misc.connectedLoad.toFixed(2)}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Starting Load (kVA)</label>
+                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-md font-medium text-gray-800">
+                      {misc.startingKVA.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
                  <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                     <p className="text-gray-600">Total Load (kVA) = Quantity × Load per Unit (kVA)</p>
@@ -2508,6 +2994,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 <h4 className="font-medium text-blue-700">Total Connected Load:</h4>
                 <p className="font-bold text-blue-800 text-lg">
                   {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedConnectedLoad.toFixed(2) || '0.00'} kVA
+                </p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <h4 className="font-medium text-blue-700">Total Starting Load:</h4>
+                <p className="font-bold text-blue-800 text-lg">
+                  {categorySummaries.find(s => s.category === 'H. Miscellaneous Installation')?.estimatedStartingKVA.toFixed(2) || '0.00'} kVA
                 </p>
               </div>
             </div>
@@ -2754,6 +3246,12 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
                 </p>
               </div>
               <div>
+                <p className="text-sm text-gray-600">Total Starting kVA:</p>
+                <p className="font-semibold text-gray-800">
+                  {categorySummaries.reduce((sum, summary) => sum + summary.estimatedStartingKVA, 0).toFixed(2)} kVA
+                </p>
+              </div>
+              <div>
                 <p className="text-sm text-gray-600">Diversified Load (incl. Cat. Growth):</p>
                 <p className="font-semibold text-gray-800">{totalDiversifiedLoad.toFixed(2)} kVA</p>
               </div>
@@ -2792,13 +3290,14 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
               <li>Lighting Load (kVA) = Area (m²) × Power Density (W/m²) / (1000 × Power Factor)</li>
               <li>General Power Load (kVA) = Area (m²) × Power Density (VA/m²) / 1000</li>
               <li>HVAC Plant Load (kVA) = (Cooling/Heating Load per Unit (kWth) / COP / Power Factor) × Quantity</li>
-              <li>Pump Power (kW) (Head in kPa, Flow in L/s, e.g., HVAC Water Dist.): <br/> (Flow Rate (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</li>
-              <li>Pump Power (kW) (Head in m, Flow in L/s, e.g., P&D, Fire, Hot Water Pump): <br/> (Flow Rate (L/s) × Head (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</li>
+              <li>Motor Load (Pump type, Head in kPa, Flow in L/s, e.g., HVAC Water Dist.): <br/> (Flow Rate (L/s) × Head (kPa)) / (1000 × Pump Eff × Motor Eff)</li>
+              <li>Motor Load (Pump type, Head in m, Flow in L/s, e.g., P&D, Fire, Hot Water Pump): <br/> (Flow Rate (L/s) × Head (m) × 9.81) / (1000 × Pump Eff × Motor Eff)</li>
               <li>Fan Power (kW) (Flow in L/s, Pressure in Pa): <br/> (Flow Rate (L/s) × Pressure (Pa)) / (1000 × 1000 × Fan Eff × Motor Eff)</li>
               <li>Lift Power (kW): (0.00981 × Rated Load (kg) × Speed (m/s) × k_unbalance) / Motor Efficiency. (k_unbalance ≈ 0.6).</li>
               <li>Escalators/Walkways: Unit Load (kVA) = Load per Unit (kW) / Power Factor</li>
-              <li>Boiler/Calorifier or 'Other' type equipment (Hot Water, Fire Service): Unit Load (kVA) = Capacity/Power (kW) / Power Factor</li>
+              <li>Boiler/Calorifier or 'Other Load' type equipment: Unit Load (kVA) = Capacity/Power (kW) / Power Factor</li>
               <li>Misc. Installation: Total Load (kVA) = Quantity × Load per Unit (kVA)</li>
+              <li>Starting kVA = Connected kVA × Starting Multiplier (from Starting Method). For Lifts/Escalators, Starting kVA = Connected kVA.</li>
               <li>Diversified Load (kVA) = Est. Connected Load (kVA) × Diversity Factor × (1 + Category Future Growth Factor)</li>
               <li>Overall Diversity Factor = Total Diversified Load (incl. growth) / Total Est. Connected Load</li>
               <li>Total Estimated Demand (kVA) = Total Diversified Load (incl. growth) + Total Additional Demand</li>
