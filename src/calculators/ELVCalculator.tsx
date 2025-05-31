@@ -13,6 +13,7 @@ import RadiationCalculator from './elv/RadiationCalculator';
 import IPSubnetCalculator from './elv/IPSubnetCalculator';
 import HeatLoadRackCalculator from './elv/HeatLoadRackCalculator';
 import WirelessCoverageCalculator from './elv/WirelessCoverageCalculator';
+import LaserSafetyCalculator from './elv/LaserSafetyCalculator';
 // Import additional calculators as they are developed
 
 // Define props type for the component
@@ -59,6 +60,8 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
         return <HeatLoadRackCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'wireless':
         return <WirelessCoverageCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'laser':
+        return <LaserSafetyCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -301,6 +304,26 @@ const BroadcastCalculator: React.FC<BroadcastCalculatorProps> = ({ onBack }) => 
               <h3 className="font-semibold text-sm sm:text-base">Wireless Coverage Calculator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'wireless' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate wireless coverage
+              </p>
+            </div>
+          </button>
+
+          {/* Laser */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'laser'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('laser')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'laser' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Laser Safety Calculator</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'laser' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate MPE limits, Nominal Ocular Hazard Distance
               </p>
             </div>
           </button>
