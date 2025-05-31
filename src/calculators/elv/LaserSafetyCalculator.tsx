@@ -485,11 +485,12 @@ const IEC_AEL_TABLES = {
 
   // Table 5: Class 2 AEL values (visible only)
   getClass2AEL: (wavelength: number, exposureTime: number): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     if (wavelength >= 400 && wavelength <= 700) {
       if (exposureTime < 0.25) {
-        return 1e-3; // W
+        return 1e-3 * corrections.C6; // W
       } else {
-        return 1e-3; // W
+        return 1e-3 * corrections.C6; // W
       }
     }
     return 0; // Class 2 only applies to visible
@@ -498,54 +499,219 @@ const IEC_AEL_TABLES = {
   // Table 6: Class 3R AEL values
   getClass3RAEL: (wavelength: number, exposureTime: number): number => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
-    
+    const t = exposureTime;
+
     if (wavelength >= 180 && wavelength < 302.5) {
-      return 1.5e-3; // W/m²
-    } else if (wavelength >= 302.5 && wavelength < 315) {
-      return 1.2e-2; // W
-    } else if (wavelength >= 315 && wavelength < 400) {
-      if (exposureTime <= 0.25) {
-        return 4.0e-2 * corrections.C3; // J/m²
-      } else {
-        return 4.0e-1 * corrections.C3; // J/m²
+      if (t < 1e-9) { // 10^-13 to 10^-11 s
+        return 1.5e11; // W/m²
+      } else if (t >= 1e-9 && t < 3e4) { // Other time ranges
+        return 150; // J/m²
       }
-    } else if (wavelength >= 400 && wavelength <= 700) {
-      // Visible range - 5x Class 2 limit
-      return 5 * IEC_AEL_TABLES.getClass2AEL(wavelength, exposureTime);
-    } else if (wavelength > 700 && wavelength <= 1050) {
-      return 5 * IEC_AEL_TABLES.getClass1AEL(wavelength, exposureTime);
-    } else if (wavelength > 1050 && wavelength <= 1400) {
-      return 5 * IEC_AEL_TABLES.getClass1AEL(wavelength, exposureTime);
-    } else { // For far IR (wavelength > 1400 nm)
-      return 5e-2; // W
+      return 0;
+    } else if (wavelength >= 302.5 && wavelength < 315) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 1.2e5; // W
+      } else if (t >= 1e-9 && t <= corrections.T1 && t< 10) { // Thermal hazard (t ≤ T₁)
+        return 4e-6 * corrections.C1; // J
+      } else if (t >= 1e-9 && t > corrections.T1 && t < 10) { // Photochemical hazard (t > T₁)
+        return 4.0e-5 * corrections.C2; // J
+      } else if (t >= 10 && t < 3e4) { // 10 to 3×10⁴ s
+        return 4.0e-6 * corrections.C2; // J
+      }
+      return 0;
+    } else if (wavelength >= 315 && wavelength < 400) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 1.2e5; // W
+      } else if (t >= 1e-9 && t < 10) { // 10^-9 to 1×10^-3 s
+        return 4.0e-6 * corrections.C1; // J
+      } else if (t >= 10 && t < 1000) { // 1×10^-3 to 10 s
+        return 4.0e-2; // J
+      } else if (t >= 1000 && t < 3e4) { // 10 to 3×10⁴ s
+        return 4.0e-5; // W
+      }
+      return 0;
+    } else if (wavelength >= 400 && wavelength < 700) {
+      if (t < 1e-11) { // 10^-13 to 10^-11 s
+        return 1.9e-7; // J
+      } else if (t >= 1e-11 && t < 5e-6) { // 10^-11 to 5×10^-6 s
+        return 3.8e-7; // J
+      } else if (t >= 5e-6 && t < 0.25) { // 5×10^-6 to 0.25 s
+        return 3.5e-3 * Math.pow(t, 0.75); // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10⁴ s
+        return 5.0e-3; // W
+      }
+      return 0;
+    } else if (wavelength >= 700 && wavelength < 1050) {
+      if (t < 1e-11) { // 10^-13 to 10^-11 s
+        return 1.9e-7; // J
+      } else if (t >= 1e-11 && t < 5e-6) { // 10^-11 to 5×10^-6 s
+        return 3.8e-7 * corrections.C4; // J
+      } else if (t >= 5e-6 && t < 10) { // 5×10^-6 to 0.25 s
+        return 3.5e-3 * Math.pow(t, 0.75) * corrections.C4; // J
+      } else if (t >= 10 && t < 3e4) { // 0.25 to 3×10⁴ s
+        return 2.0e-3 * corrections.C4 * corrections.C7; // W
+      }
+      return 0;
+    } else if (wavelength >= 1050 && wavelength < 1400) {
+      if (t < 1e-11) { // 10^-13 to 10^-11 s
+        return 1.9e-6 * corrections.C7; // J
+      } else if (t >= 1e-11 && t < 1.3e-5) { // 10^-11 to 1.3×10^-5 s
+        return 3.8e-6 * corrections.C7; // J
+      } else if (t >= 1.3e-5 && t < 10) { // 1.3×10^-5 to 0.25 s
+        return 1.8e-2 * Math.pow(t, 0.75) * corrections.C7; // J
+      } else if (t >= 10 && t < 3e4) { // 0.25 to 3×10⁴ s
+        return 2.0e-3 * corrections.C4 * corrections.C7; // W
+      }
+      return 0;
+    } else if (wavelength >= 1400 && wavelength < 1500) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 4e6; // W
+      } else if (t >= 1e-9 && t < 1e-3) { // 10^-9 to 1×10^-3 s
+        return 4e-3; // J
+      } else if (t >= 1e-3 && t < 0.35) { // 1×10^-3 to 0.35 s
+        return 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) { // 0.35 to 10 s
+        return 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) { // 10 to 3×10⁴ s
+        return 5e-2 * t; // J
+      }
+      return 0;
+    } else if (wavelength >= 1500 && wavelength < 1800) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 4e7; // W
+      } else if (t >= 1e-9 && t < 0.35) { // 10^-9 to 1×10^-3 s
+        return 4e-2; // J
+      } else if (t >= 0.35 && t < 10) { // 1×10^-3 to 0.35 s
+        return 9e-2 * Math.pow(t, 0.75); // J
+      } else if (t >= 10 && t < 3e4) { // 0.35 to 3×10⁴ s
+        return 5.0e-2; // W
+      }
+      return 0;
+    } else if (wavelength >= 1800 && wavelength < 2600) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 4e6; // W
+      } else if (t >= 1e-9 && t < 1e-3) { // 10^-9 to 1×10^-3 s
+        return 4e-3; // J
+      } else if (t >= 1e-3 && t < 0.35) { // 1×10^-3 to 0.35 s
+        return 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) { // 0.35 to 10 s
+        return 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) { // 10 to 3×10⁴ s
+        return 5.0e-2; // W
+      }
+      return 0;
+    } else if (wavelength >= 2600 && wavelength < 4000) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 4e5; // W
+      } else if (t >= 1e-9 && t < 1e-7) { // 10^-9 to 10^-7 s
+        return 4e-4; // J
+      } else if (t >= 1e-7 && t < 0.35) { // 10^-7 to 0.35 s
+        return 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) { // 0.35 to 10 s
+        return 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) { // 10 to 3×10⁴ s
+        return 5e-2 * t; // J
+      }
+      return 0;
+    } else if (wavelength >= 4000 && wavelength <= 1e6) {
+      if (t < 1e-9) { // 10^-13 to 10^-9 s
+        return 5e11; // W/m²
+      } else if (t >= 1e-9 && t < 1e-7) { // 10^-9 to 10^-7 s
+        return 500; // J/m²
+      } else if (t >= 1e-7 && t < 10) { // 10^-7 to 10 s
+        return 2.8e4 * Math.pow(t, 0.25); // J/m²
+      } else if (t >= 10 && t < 3e4) { // 10 to 3×10⁴ s
+        return 5000; // W/m²
+      }
+      return 0;
     }
+    
+    return 0; // Wavelength or time not covered
   },
 
+
   // Table 8: Class 3B AEL values
-  getClass3BAEL: (wavelength: number, exposureTime: number): number => {
+    getClass3BAEL: (wavelength: number, exposureTime: number): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+
     if (wavelength >= 180 && wavelength < 302.5) {
-      return 3.8e-2; // W
+      if (t < 1e-9) { // < 10^-9 s
+        return 3.8e5; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        return 3.8e-4; // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 1.5e-3; // W
+      }
+      return 0;
     } else if (wavelength >= 302.5 && wavelength < 315) {
-      return 1.25e-1; // W
+      if (t < 1e-9) { // < 10^-9 s
+        return 1.25e4 * corrections.C2; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        return 1.25e-5 * corrections.C2; // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 5e-5 * corrections.C2; // W
+      }
+      return 0;
     } else if (wavelength >= 315 && wavelength < 400) {
-      return 1.25e-1; // W
-    } else if (wavelength >= 400 && wavelength <= 700) {
-      if (exposureTime < 1e-3) {
-        return 3e-2; // W
-      } else if (exposureTime >= 1e-3 && exposureTime <= 0.25) {
-        return 0.05; // J or W based on duration (This might be W if time-dependent formula, or J. IEC states W/J limits. This looks like a simplified value. Assuming power limit for simplicity if not pulsed energy)
-                     // Table 8 states 0.05 J for t from 1ms to 0.25s. If continuous, it's compared to power. This needs clarity based on pulsed/CW for that specific line.
-                     // The provided code treats AELs as power (W) or energy (J) based on context, which is okay.
-      } else { // exposureTime > 0.25s
+      if (t < 1e-9) { // < 10^-9 s
+        return 1.25e3; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        return 0.125; // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
         return 0.5; // W
       }
+      return 0;
+    } else if (wavelength >= 400 && wavelength <= 700) {
+      if (t < 1e-9) { // < 10^-9 s
+        return 3e5; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        // Dual limits: 0.03 J for t < 0.06 s OR 0.5 W for t ≥ 0.06 s
+        if (t < 0.06) {
+          return 0.03; // J
+        } else {
+          return 0.5; // W (converted to energy: 0.5 * t for comparison)
+        }
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 0.5; // W
+      }
+      return 0;
     } else if (wavelength > 700 && wavelength <= 1050) {
-      return 0.5; // W
+      if (t < 1e-9) { // < 10^-9 s
+        return 3e7 * corrections.C4; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        // Dual limits: 0.03 C₄ J for t < 0.06 C₄ s OR 0.5 W for t ≥ 0.06 C₄ s
+        const timeLimit = 0.06 * corrections.C4;
+        if (t < timeLimit) {
+          return 0.03 * corrections.C4; // J
+        } else {
+          return 0.5; // W (converted to energy: 0.5 * t for comparison)
+        }
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 0.5; // W
+      }
+      return 0;
     } else if (wavelength > 1050 && wavelength <= 1400) {
-      return 1.5e-2; // W
-    } else { // For far IR (wavelength > 1400 nm)
-      return 1.25e-2; // W
+      if (t < 1e-9) { // < 10^-9 s
+        return 1.5e6; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        return 0.15; // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 0.5; // W
+      }
+      return 0;
+    } else if (wavelength > 1400 && wavelength <= 1e5) { // 1400 to 10^5 nm
+      if (t < 1e-9) { // < 10^-9 s
+        return 1.25e6; // W
+      } else if (t >= 1e-9 && t < 0.25) { // 10^-9 to 0.25 s
+        return 0.125; // J
+      } else if (t >= 0.25 && t < 3e4) { // 0.25 to 3×10^4 s
+        return 0.5; // W
+      }
+      return 0;
     }
+    
+    return 0; // Wavelength or time not covered
   }
 };
 
