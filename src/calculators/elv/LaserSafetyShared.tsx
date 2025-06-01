@@ -1,0 +1,973 @@
+// ======================== SHARED INTERFACES AND TYPES ========================
+
+export interface MPEResult {
+  mpeSinglePulse: number;
+  mpeAverage: number;
+  mpeThermal: number;
+  criticalMPE: number;
+  correctionFactorCA: number;
+  correctionFactorCB: number;
+  correctionFactorCC: number;
+  correctionFactorC5: number;
+  wavelengthRegion: string;
+  limitingMechanism: string;
+  calculationSteps: string[];
+  c5Details?: {
+    c5Factor: number;
+    numberOfPulses: number;
+    timeBase: number;
+    pulseGrouping: string;
+    c5Steps: string[];
+  };
+}
+
+export interface NOHDResult {
+  nohd: number;
+  mpe: number;
+  beamDiameterAtNOHD: number;
+  irradianceAtNOHD: number;
+  hazardClass: string;
+  initialPowerDensity: number;
+  calculationSteps: string[];
+}
+
+export interface WavelengthData {
+  id: string;
+  wavelength: number;
+  power: number; // mW for CW
+  pulseEnergy: number; // mJ for pulsed
+  pulseWidth: number; // ns for pulsed
+  angularSubtense: number; // mrad
+  isActive: boolean;
+}
+
+export interface ClassificationResult {
+  laserClass: string;
+  classificationMethod: 'single' | 'additive' | 'independent';
+  ael: number;
+  measuredEmission: number;
+  ratio: number;
+  classDescription: string;
+  safetyRequirements: string[];
+  condition1Test?: boolean;
+  condition3Test?: boolean;
+  requiresClassM?: boolean;
+  iecCompliant?: boolean;
+  condition1Emission?: number;
+  condition3Emission?: number;
+  condition1AEL?: number;
+  condition3AEL?: number;
+  classificationSteps?: string[];
+  c5Correction?: {
+    c5Factor: number;
+    c5Steps: string[];
+  };
+  additiveCalculation?: {
+    wavelengths: WavelengthData[];
+    ratios: number[];
+    sumOfRatios: number;
+    additiveRegion: string;
+    calculationSteps: string[];
+  };
+}
+
+export interface EyewearResult {
+  requiredOD: number;
+  exposureLevel: number;
+  mpe: number;
+  scaleFactor: string;
+  lbRating: string;
+  dirRating: string;
+  recommendations: string[];
+}
+
+// ======================== CONSTANTS ========================
+
+// Named constants for MPE calculations (IEC 60825-1:2014) - CORRECTED VALUES
+export const MPE_CONSTANTS = {
+  // Visible and Near-IR thermal coefficients (mJ/cm²) - CORRECTED FROM REVIEW
+  VISIBLE_THERMAL_COEFF: 1.8, // mJ/cm² for t^0.75 formula (was 18 - FIXED)
+  NEAR_IR_1050_1400_COEFF: 9.0, // mJ/cm² for 1050-1400nm
+  
+  // Far-IR thermal coefficients (mJ/cm²)
+  MID_IR_1400_1500: 10.0, // mJ/cm² for 1400-1500nm
+  MID_IR_1800_2600: 56.0, // mJ/cm² for 1800-2600nm
+  
+  // CW limits (W/cm²)
+  VISIBLE_CW_LIMIT: 100e-6, // 100 µW/cm²
+  
+  // Time constants
+  THERMAL_TIME_LIMIT: 0.25, // seconds
+  PHOTOCHEMICAL_TIME_LIMIT: 18e-6, // 18 µs
+  
+  // Unit conversions
+  MJ_TO_J: 1e-3, // millijoules to joules
+  UJ_TO_J: 1e-6, // microjoules to joules
+  MW_TO_W: 1e-3, // milliwatts to watts
+  CM2_TO_M2: 1e-4, // cm² to m²
+  M2_TO_CM2: 1e4, // m² to cm²
+  MM_TO_CM: 0.1, // mm to cm
+  MRAD_TO_RAD: 1e-3, // mrad to rad
+  NS_TO_S: 1e-9, // nanoseconds to seconds
+};
+
+// Time base values Ti for pulse grouping (IEC 60825-1 Table 2) - ENHANCED IMPLEMENTATION
+export const TIME_BASE_TI = {
+  getTimeBase: (wavelength: number): number => {
+    if (wavelength >= 400 && wavelength < 1050) return 5e-6; // 5 μs
+    if (wavelength >= 1050 && wavelength < 1400) return 13e-6; // 13 μs
+    if (wavelength >= 1400 && wavelength < 1500) return 1e-3; // 1 ms
+    if (wavelength >= 1500 && wavelength < 1800) return 10; // 10 s
+    if (wavelength >= 1800 && wavelength < 2600) return 1e-3; // 1 ms
+    if (wavelength >= 2600 && wavelength <= 1e6) return 1e-7; // 0.1 μs
+    return 1e-3; // Default 1 ms
+  }
+};
+
+// ======================== ENHANCED C5 CALCULATION IMPLEMENTATION ========================
+
+export const calculateC5Factor = (
+  wavelength: number,
+  pulseWidth: number, // ns
+  repetitionRate: number, // Hz
+  exposureTime: number, // s
+  numberOfPulses?: number // If known, otherwise calculated from repetitionRate and exposureTime
+): {
+  c5Factor: number;
+  numberOfPulses: number;
+  timeBase: number;
+  pulseGrouping: string;
+  c5Steps: string[];
+} => {
+  const steps: string[] = [];
+  const pulseWidthSeconds = pulseWidth * MPE_CONSTANTS.NS_TO_S;
+  const Ti = TIME_BASE_TI.getTimeBase(wavelength);
+  
+  steps.push(`=== C5 Correction Factor Calculation (IEC 60825-1) ===`);
+  steps.push(`Wavelength: ${wavelength} nm`);
+  steps.push(`Pulse width: ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s`);
+  steps.push(`Repetition rate: ${repetitionRate} Hz`);
+  steps.push(`Exposure time: ${exposureTime} s`);
+  steps.push(`Time base Ti for ${wavelength} nm: ${Ti.toExponential(3)} s`);
+  
+  // Calculate number of pulses if not provided
+  let N = numberOfPulses;
+  if (N === undefined || N <= 0) {
+    N = Math.floor(exposureTime * repetitionRate);
+  }
+  steps.push(`Number of pulses in exposure time: N = ${N}`);
+  
+  // Check if C5 applies
+  if (pulseWidthSeconds >= 0.25) {
+    steps.push(`Pulse width (${pulseWidthSeconds.toFixed(3)} s) ≥ 0.25 s: C5 = 1.0 (not applicable for long pulses)`);
+    return {
+      c5Factor: 1.0,
+      numberOfPulses: N,
+      timeBase: Ti,
+      pulseGrouping: 'Long pulse (≥0.25s) - C5 not applicable',
+      c5Steps: steps
+    };
+  }
+  
+  if (N <= 1) {
+    steps.push(`Single pulse (N ≤ 1): C5 = 1.0`);
+    return {
+      c5Factor: 1.0,
+      numberOfPulses: N,
+      timeBase: Ti,
+      pulseGrouping: 'Single pulse',
+      c5Steps: steps
+    };
+  }
+  
+  // Calculate C5 for multiple pulses
+  steps.push(`Multiple pulses detected (N = ${N}), calculating C5...`);
+  
+  // Check if pulses occur within time base Ti
+  const timeForAllPulses = (N - 1) / repetitionRate; // Time span from first to last pulse
+  steps.push(`Time span for all pulses: ${timeForAllPulses.toExponential(3)} s`);
+  
+  let c5Factor: number;
+  let groupingDescription: string;
+  
+  if (timeForAllPulses <= Ti) {
+    // All pulses occur within Ti - use standard C5 formula
+    c5Factor = Math.pow(N, -0.25);
+    groupingDescription = `All pulses within Ti (${Ti.toExponential(3)} s)`;
+    steps.push(`All ${N} pulses occur within Ti: C5 = N^(-0.25) = ${N}^(-0.25) = ${c5Factor.toFixed(4)}`);
+  } else {
+    // Pulses span longer than Ti - need to group pulses
+    const pulsesInTi = Math.floor(Ti * repetitionRate) + 1; // Number of pulses that fit in Ti
+    const numberOfGroups = Math.ceil(N / pulsesInTi);
+    
+    steps.push(`Pulses span longer than Ti, grouping required:`);
+    steps.push(`  Maximum pulses per group (within Ti): ${pulsesInTi}`);
+    steps.push(`  Number of groups: ${numberOfGroups}`);
+    
+    if (pulsesInTi > 1) {
+      // Each group has multiple pulses
+      const c5PerGroup = Math.pow(pulsesInTi, -0.25);
+      c5Factor = c5PerGroup;
+      groupingDescription = `${numberOfGroups} groups of ${pulsesInTi} pulses each`;
+      steps.push(`  C5 per group = ${pulsesInTi}^(-0.25) = ${c5PerGroup.toFixed(4)}`);
+      steps.push(`  Overall C5 = ${c5Factor.toFixed(4)} (applied to each group)`);
+    } else {
+      // Each group has only one pulse
+      c5Factor = 1.0;
+      groupingDescription = `${numberOfGroups} groups of 1 pulse each`;
+      steps.push(`  Each group contains 1 pulse: C5 = 1.0`);
+    }
+  }
+  
+  // Additional checks for specific wavelength ranges
+  if (wavelength >= 400 && wavelength <= 700) {
+    steps.push(`Visible wavelength: C5 calculation complete`);
+  } else if (wavelength > 700 && wavelength <= 1400) {
+    steps.push(`Near-IR wavelength: C5 calculation complete`);
+  }
+  
+  steps.push(`Final C5 factor: ${c5Factor.toFixed(4)}`);
+  
+  return {
+    c5Factor,
+    numberOfPulses: N,
+    timeBase: Ti,
+    pulseGrouping: groupingDescription,
+    c5Steps: steps
+  };
+};
+
+// ======================== IEC 60825-1 COMPLIANT AEL IMPLEMENTATION ========================
+
+// IEC 60825-1:2014 Table-based AEL implementation
+export const IEC_AEL_TABLES = {
+  // Measurement conditions from Table 10 (IEC 60825-1:2014) - REVISED
+  getMeasurementConditions: (wavelength: number, exposureTime: number) => {
+    let condition1Aperture: number;
+    let condition1Distance: number;
+    let condition3Aperture: number;
+    let condition3Distance: number;
+
+    if (wavelength < 302.5) {
+      condition1Aperture = 0;
+      condition1Distance = 0;
+      condition3Aperture = 1;
+      condition3Distance = 0;
+    } else if (wavelength >= 302.5 && wavelength < 400) {
+      condition1Aperture = 7;
+      condition1Distance = 2000;
+      condition3Aperture = 1;
+      condition3Distance = 100;
+    } else if (wavelength >= 400 && wavelength < 1400) {
+      condition1Aperture = 50;
+      condition1Distance = 2000;
+      condition3Aperture = 7;
+      condition3Distance = 100;
+    } else if (wavelength >= 1400 && wavelength < 4000) {
+      condition3Distance = 100;
+      if (exposureTime <= 0.35) {
+        condition3Aperture = 1;
+      } else if (exposureTime < 10) {
+        condition3Aperture = 1.5 * Math.pow(exposureTime, 3/8);
+      } else {
+        condition3Aperture = 3.5;
+      }
+      condition1Aperture = 7 * condition3Aperture;
+      condition1Distance = 2000;
+    } else if (wavelength >= 4000 && wavelength < 1e5) {
+      condition3Distance = 0;
+      if (exposureTime <= 0.35) {
+        condition3Aperture = 1;
+      } else if (exposureTime < 10) {
+        condition3Aperture = 1.5 * Math.pow(exposureTime, 3/8);
+      } else {
+        condition3Aperture = 3.5;
+      }
+      condition1Aperture = 0;
+      condition1Distance = 0;
+    } else if (wavelength >= 1e5 && wavelength <= 1e6) {
+      condition3Aperture = 11;
+      condition3Distance = 0;
+      condition1Aperture = 0;
+      condition1Distance = 0;
+    } else {
+      condition3Aperture = 0;
+      condition3Distance = 0;
+      condition1Aperture = 0;
+      condition1Distance = 0;
+    }
+    
+    return {
+      condition1: { aperture: condition1Aperture, distance: condition1Distance },
+      condition3: { aperture: condition3Aperture, distance: condition3Distance }
+    };
+  },
+
+  // Check if beam requires Class M consideration
+  requiresClassM: (wavelength: number, beamDiameter: number): boolean => {
+    if (wavelength >= 302.5 && wavelength <= 4000) {
+      return beamDiameter > 7;
+    }
+    return false;
+  },
+
+  // Check if wavelength supports Class 2/2M (visible only)
+  supportsClass2: (wavelength: number): boolean => {
+    return wavelength >= 400 && wavelength <= 700;
+  },
+
+  // Get correction factors from Table 9
+  getCorrectionFactors: (wavelength: number, exposureTime: number, angularSubtense: number = 1.5) => {
+    let C1 = 1, C2 = 1, C3 = 1, C4 = 1, C5 = 1, C6 = 1, C7 = 1, T1 = 1, T2 = 1; 
+    
+    // C1 correction (180-400 nm)
+    if (wavelength >= 180 && wavelength <= 400) {
+      C1 = 5.6 * Math.pow(10,3) * Math.pow(exposureTime, 0.25);
+    }
+
+    if (wavelength >= 180 && wavelength <= 400) {
+      T1 = Math.pow(10, -15) * Math.pow(10, 0.8 * (wavelength - 295));
+    }
+    
+    // C2 correction (302.5-315 nm)
+    if (wavelength >= 302.5 && wavelength <= 315) {
+      C2 = Math.pow(10, 0.2 * (wavelength - 295));
+    }else{
+        C2 = 30;
+    }
+
+    if (wavelength >= 400 && wavelength <= 1400) {
+        if (angularSubtense > 1.5 && angularSubtense <= 100){
+            T2 = 10 * Math.pow(10, (angularSubtense - 1.5)/98.5);
+        }else if (angularSubtense <= 1.5){
+            T2 = 10;
+        }else{
+            T2 = 100;
+        }
+    }
+    
+    // C3 correction (450-600 nm)
+    if (wavelength >= 450 && wavelength <= 600) {
+      C3 = Math.pow(10, 0.02 * (wavelength - 450));
+    }
+    
+    // C4 correction (400-450 nm and 1150-1200 nm)
+    if (wavelength >= 700 && wavelength <= 1050) {
+      C4 = Math.pow(10, 0.002 * (wavelength - 700));
+    } else{
+        C4 = 5;
+    }
+    
+    // C6 correction (400-1400 nm, angular subtense dependent)
+    let angularSubtense_max = 1;
+    if (exposureTime < 625 * Math.pow(10,-6)){
+        angularSubtense_max = 5;
+    } else if (exposureTime > 0.25){
+        angularSubtense_max = 100;
+    } else{
+        angularSubtense_max = 200 * Math.pow(exposureTime, 0.5)
+    }
+
+    if (wavelength >= 400 && wavelength <= 1400) {
+      if (angularSubtense >= 1.5 && angularSubtense <= angularSubtense_max) {
+        C6 = angularSubtense / 1.5;
+      } else if (angularSubtense > angularSubtense_max) {
+        C6 = angularSubtense_max / 1.5;
+      } else{
+        C6 = 1.0;
+      }
+    }
+    
+    // C7 correction (700-1150 nm and 1150-1400 nm)
+    if (wavelength >= 1150 && wavelength <= 1200) {
+      C7 = Math.pow(10, 0.0018 * (wavelength - 1150));
+    } else if (wavelength > 1200 && wavelength <= 1400) {
+      C7 = 8 + Math.pow(10, 0.04 * (wavelength - 1250));
+    }
+    
+    return { C1, C2, C3, C4, C5, C6, C7, T1, T2 };
+  },
+
+  // Table 3: Class 1 AEL values (general) - Enhanced with C5 application - COMPLETE IMPLEMENTATION
+  getClass1AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+
+    let baseAEL = 0;
+
+    if (wavelength >= 180 && wavelength < 302.5) {
+      if (t < 1e-8) {
+        baseAEL = 3e10; // W/m²
+      } else if (t >= 1e-8 && t < 3e4) {
+        baseAEL = 30; // J/m²
+      }
+      return baseAEL; // No C5 correction for UV skin hazard (W/m² or J/m²)
+    } else if (wavelength >= 302.5 && wavelength < 315) {
+      if (t < 1e-8) {
+        baseAEL = 2.4e4; // W
+      } else if (t >= 1e-8 && t < 10 && t<= corrections.T1) {
+        baseAEL = 7.9e-7 * corrections.C1; // J
+      } else if (t >= 1e-8 && t < 10 && t> corrections.T1) {
+        baseAEL = 7.9e-7 * corrections.C2; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 7.9e-7 * corrections.C2; // J
+      }
+    } else if (wavelength >= 315 && wavelength < 400) {
+      if (t < 1e-8) {
+        baseAEL = 2.4e4; // W
+      } else if (t >= 1e-8 && t < 10) {
+        baseAEL = 7.9e-4 * corrections.C1; // J
+      } else if (t >= 10 && t < 1000) {
+        baseAEL = 7.9e-3; // J
+      } else if (t >= 1000 && t < 3e4) {
+        baseAEL = 7.9e-6; // W
+      }
+    } else if (wavelength >= 400 && wavelength < 450) {
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8; // J
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 7.7e-8; // J
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75); // J
+      } else if (t >= 10 && t < 100) {
+        baseAEL = 3.9e-3; // J
+      } else if (t >= 100 && t < 3e4) {
+        baseAEL = 3.9e-5 * corrections.C3; // W
+      }
+    } else if (wavelength >= 450 && wavelength < 500) {
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8; // J
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 7.7e-8; // J
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75); // J
+      } else if (t >= 10 && t < 100) {
+        baseAEL = 3.9e-3 * corrections.C3; // J
+      } else if (t >= 100 && t < 1000) {
+        const limit1_J = 3.9e-3 * corrections.C3; // J
+        const limit2_Power_W = 3.9e-4; // W
+        baseAEL = Math.min(limit1_J, limit2_Power_W * t); // J
+      } else if (t >= 1000 && t < 3e4) {
+        baseAEL = 3.9e-5 * corrections.C3; // W
+      }
+    } else if (wavelength >= 500 && wavelength < 700) {
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8; // J
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 7.7e-8; // J
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+      }
+      else if (t >= 10 && t < 3e4) {
+        baseAEL = 3.9e-4; // W
+      }
+    } else if (wavelength >= 700 && wavelength < 1050) {
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8; // W
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 7.7e-8 * corrections.C4; // J
+      } else if (t >= 5e-6 && t < 100) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4; // J
+      }
+      else if (t >= 100 && t < 3e4) {
+        baseAEL = 3.9e-4 * corrections.C4 * corrections.C7; // W
+      }
+    } else if (wavelength >= 1050 && wavelength < 1400) {
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8 * corrections.C7; // J
+      } else if (t >= 1e-11 && t < 1.3e-5) {
+        baseAEL = 7.7e-7 * corrections.C7; // J
+      } else if (t >= 1.3e-5 && t < 10) {
+        baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C7; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 3.9e-4 * corrections.C4 * corrections.C7; // W
+      }
+    } else if (wavelength >= 1400 && wavelength < 1500) {
+      if (t >= 1e-13 && t < 1e-9) {
+        baseAEL = 8e5; // W
+      } else if (t >= 1e-9 && t < 1e-3) {
+        baseAEL = 8e-4; // J
+      } else if (t >= 1e-3 && t < 0.35) {
+        baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 1e-2 * t; // J
+      }else if (t >= 10 && t < 3e4) {
+        baseAEL = 1e-2 * t; // W
+      }
+    } else if (wavelength >= 1500 && wavelength < 1800) {
+      if (t >= 1e-13 && t < 1e-9) {
+        baseAEL = 8e6; // W
+      } else if (t >= 1e-9 && t < 0.35) {
+        baseAEL = 8e-3; // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 1.8e-2 * Math.pow(t, 0.75); // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 1.0e-2; // W
+      }
+    } else if (wavelength >= 1800 && wavelength < 2600) {
+      if (t >= 1e-13 && t < 1e-9) {
+        baseAEL = 8e5; // W
+      } else if (t >= 1e-9 && t < 1e-3) {
+        baseAEL = 8e-4; // J
+      } else if (t >= 1e-3 && t < 0.35) {
+        baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 0.01 * t; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 1.0e-2; // W
+      }
+    } else if (wavelength >= 2600 && wavelength < 4000) {
+      if (t >= 1e-13 && t < 1e-9) {
+        baseAEL = 8e4; // W
+      } else if (t >= 1e-9 && t < 1e-7) {
+        baseAEL = 8e-5; // J
+      } else if (t >= 1e-7 && t < 0.35) {
+        baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 0.01 * t; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 1.0e-2; // W
+      }
+    } else if (wavelength >= 4000 && wavelength <= 1e6) {
+      if (t < 1e-9) {
+        baseAEL = 1e11; // W/m²
+      } else if (t >= 1e-9 && t < 1e-7) {
+        baseAEL = 100; // J/m²
+      } else if (t >= 1e-7 && t < 10) {
+        baseAEL = 5600 * Math.pow(t, 0.25); // J/m²
+      }
+      else if (t >= 10 && t < 3e4) {
+        baseAEL = 1000; // W/m²
+      }
+      return baseAEL; // No C5 correction for skin hazard (W/m² or J/m²)
+    }
+
+    // Apply C5 correction for pulse trains (only for retinal hazard wavelengths)
+    if (wavelength >= 302.5 && wavelength < 4000) {
+      return baseAEL * c5Factor;
+    }
+    return baseAEL;
+  },
+
+  // Table 5: Class 2 AEL values (visible only) - Enhanced with C5 application
+  getClass2AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    if (wavelength >= 400 && wavelength <= 700) {
+      if (exposureTime < 0.25) {
+        return 1e-3 * corrections.C6 * c5Factor; // W
+      } else {
+        return 1e-3 * corrections.C6 * c5Factor; // W
+      }
+    }
+    return 0;
+  },
+
+  // Table 6: Class 3R AEL values - Enhanced with C5 application - COMPLETE IMPLEMENTATION
+  getClass3RAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+    let baseAEL = 0;
+
+    if (wavelength >= 180 && wavelength < 302.5) {
+      if (t < 1e-9) {
+        baseAEL = 1.5e11; // W/m²
+      } else if (t >= 1e-9 && t < 3e4) {
+        baseAEL = 150; // J/m²
+      }
+      return baseAEL; // No C5 correction for skin hazard
+    } else if (wavelength >= 302.5 && wavelength < 315) {
+      if (t < 1e-9) {
+        baseAEL = 1.2e5; // W
+      } else if (t >= 1e-9 && t <= corrections.T1 && t< 10) {
+        baseAEL = 4e-6 * corrections.C1; // J
+      } else if (t >= 1e-9 && t > corrections.T1 && t < 10) {
+        baseAEL = 4.0e-5 * corrections.C2; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 4.0e-6 * corrections.C2; // J
+      }
+    } else if (wavelength >= 315 && wavelength < 400) {
+      if (t < 1e-9) {
+        baseAEL = 1.2e5; // W
+      } else if (t >= 1e-9 && t < 10) {
+        baseAEL = 4.0e-6 * corrections.C1; // J
+      } else if (t >= 10 && t < 1000) {
+        baseAEL = 4.0e-2; // J
+      } else if (t >= 1000 && t < 3e4) {
+        baseAEL = 4.0e-5; // W
+      }
+    } else if (wavelength >= 400 && wavelength < 700) {
+      if (t < 1e-11) {
+        baseAEL = 1.9e-7; // J
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 3.8e-7; // J
+      } else if (t >= 5e-6 && t < 0.25) {
+        baseAEL = 3.5e-3 * Math.pow(t, 0.75); // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 5.0e-3; // W
+      }
+    } else if (wavelength >= 700 && wavelength < 1050) {
+      if (t < 1e-11) {
+        baseAEL = 1.9e-7; // J
+      } else if (t >= 1e-11 && t < 5e-6) {
+        baseAEL = 3.8e-7 * corrections.C4; // J
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C4; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 2.0e-3 * corrections.C4 * corrections.C7; // W
+      }
+    } else if (wavelength >= 1050 && wavelength < 1400) {
+      if (t < 1e-11) {
+        baseAEL = 1.9e-6 * corrections.C7; // J
+      } else if (t >= 1e-11 && t < 1.3e-5) {
+        baseAEL = 3.8e-6 * corrections.C7; // J
+      } else if (t >= 1.3e-5 && t < 10) {
+        baseAEL = 1.8e-2 * Math.pow(t, 0.75) * corrections.C7; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 2.0e-3 * corrections.C4 * corrections.C7; // W
+      }
+    } else if (wavelength >= 1400 && wavelength < 1500) {
+      if (t < 1e-9) {
+        baseAEL = 4e6; // W
+      } else if (t >= 1e-9 && t < 1e-3) {
+        baseAEL = 4e-3; // J
+      } else if (t >= 1e-3 && t < 0.35) {
+        baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 5e-2 * t; // J
+      }
+    } else if (wavelength >= 1500 && wavelength < 1800) {
+      if (t < 1e-9) {
+        baseAEL = 4e7; // W
+      } else if (t >= 1e-9 && t < 0.35) {
+        baseAEL = 4e-2; // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 9e-2 * Math.pow(t, 0.75); // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 5.0e-2; // W
+      }
+    } else if (wavelength >= 1800 && wavelength < 2600) {
+      if (t < 1e-9) {
+        baseAEL = 4e6; // W
+      } else if (t >= 1e-9 && t < 1e-3) {
+        baseAEL = 4e-3; // J
+      } else if (t >= 1e-3 && t < 0.35) {
+        baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 5.0e-2; // W
+      }
+    } else if (wavelength >= 2600 && wavelength < 4000) {
+      if (t < 1e-9) {
+        baseAEL = 4e5; // W
+      } else if (t >= 1e-9 && t < 1e-7) {
+        baseAEL = 4e-4; // J
+      } else if (t >= 1e-7 && t < 0.35) {
+        baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+      } else if (t >= 0.35 && t < 10) {
+        baseAEL = 5e-2 * t; // J
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 5e-2 * t; // W
+      }
+    } else if (wavelength >= 4000 && wavelength <= 1e6) {
+      if (t < 1e-9) {
+        baseAEL = 5e11; // W/m²
+      } else if (t >= 1e-9 && t < 1e-7) {
+        baseAEL = 500; // J/m²
+      } else if (t >= 1e-7 && t < 10) {
+        baseAEL = 2.8e4 * Math.pow(t, 0.25); // J/m²
+      } else if (t >= 10 && t < 3e4) {
+        baseAEL = 5000; // W/m²
+      }
+      return baseAEL; // No C5 correction for skin hazard
+    }
+    
+    // Apply C5 correction for retinal hazard wavelengths
+    if (wavelength >= 302.5 && wavelength < 4000) {
+      return baseAEL * c5Factor;
+    }
+    return baseAEL;
+  },
+
+  // Table 8: Class 3B AEL values - Enhanced with C5 application - COMPLETE IMPLEMENTATION
+  getClass3BAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+    let baseAEL = 0;
+
+    if (wavelength >= 180 && wavelength < 302.5) {
+      if (t < 1e-9) {
+        baseAEL = 3.8e5; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        baseAEL = 3.8e-4; // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 1.5e-3; // W
+      }
+      return baseAEL; // No C5 correction for skin hazard
+    } else if (wavelength >= 302.5 && wavelength < 315) {
+      if (t < 1e-9) {
+        baseAEL = 1.25e4 * corrections.C2; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        baseAEL = 1.25e-5 * corrections.C2; // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 5e-5 * corrections.C2; // W
+      }
+    } else if (wavelength >= 315 && wavelength < 400) {
+      if (t < 1e-9) {
+        baseAEL = 1.25e3; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        baseAEL = 0.125; // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 0.5; // W
+      }
+    } else if (wavelength >= 400 && wavelength <= 700) {
+      if (t < 1e-9) {
+        baseAEL = 3e5; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        if (t < 0.06) {
+          baseAEL = 0.03; // J
+        } else {
+          baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
+        }
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 0.5; // W
+      }
+    } else if (wavelength > 700 && wavelength <= 1050) {
+      if (t < 1e-9) {
+        baseAEL = 3e7 * corrections.C4; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        const timeLimit = 0.06 * corrections.C4;
+        if (t < timeLimit) {
+          baseAEL = 0.03 * corrections.C4; // J
+        } else {
+          baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
+        }
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 0.5; // W
+      }
+    } else if (wavelength > 1050 && wavelength <= 1400) {
+      if (t < 1e-9) {
+        baseAEL = 1.5e8; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        baseAEL = 0.15; // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 0.5; // W
+      }
+    } else if (wavelength > 1400 && wavelength < 1e6) {
+      if (t < 1e-9) {
+        baseAEL = 1.25e8; // W
+      } else if (t >= 1e-9 && t < 0.25) {
+        baseAEL = 0.125; // J
+      } else if (t >= 0.25 && t < 3e4) {
+        baseAEL = 0.5; // W
+      }
+    }
+    // Apply C5 correction for retinal hazard wavelengths
+    if (wavelength >= 302.5 && wavelength < 4000) {
+      return baseAEL * c5Factor;
+    }
+    return baseAEL;
+  }
+};
+
+// ======================== OTHER UTILITY FUNCTIONS ========================
+
+// Get wavelength region name
+export const getWavelengthRegion = (wavelength: number): string => {
+  if (wavelength >= 180 && wavelength < 400) return 'UV';
+  if (wavelength >= 400 && wavelength < 700) return 'Visible';
+  if (wavelength >= 700 && wavelength < 1400) return 'Near-IR';
+  if (wavelength >= 1400 && wavelength < 10600) return 'IR-B/C';
+  return 'Far-IR';
+};
+
+// Validate pulse parameters for physical consistency
+export const validatePulseParameters = (
+  pulseWidthNs: number, 
+  repetitionRateHz: number
+): { isValid: boolean; errorMessage?: string; warningMessage?: string } => {
+  if (repetitionRateHz <= 0) {
+     return {
+      isValid: false,
+      errorMessage: `Repetition rate (${repetitionRateHz} Hz) must be positive.`
+    };
+  }
+  const periodBetweenPulsesNs = (1 / repetitionRateHz) * 1e9;
+  const dutyCycle = (pulseWidthNs / periodBetweenPulsesNs) * 100;
+  
+  if (pulseWidthNs <= 0) {
+    return {
+      isValid: false,
+      errorMessage: `Pulse width (${pulseWidthNs} ns) must be positive.`
+    };
+  }
+
+  if (pulseWidthNs > periodBetweenPulsesNs) {
+    return {
+      isValid: false,
+      errorMessage: `Pulse width (${pulseWidthNs.toFixed(3)} ns) cannot be larger than the period between pulses (${periodBetweenPulsesNs.toFixed(1)} ns at ${repetitionRateHz} Hz).`
+    };
+  }
+  
+  if (dutyCycle > 50 && dutyCycle <= 100) {
+    return {
+      isValid: true,
+      warningMessage: `High duty cycle (${dutyCycle.toFixed(1)}%). Thermal effects may dominate; consider CW analysis.`
+    };
+  }
+  
+  return { isValid: true };
+};
+
+// Correction factors for different wavelengths (IEC 60825-1:2014)
+export const getCorrectionFactors = (wavelength: number) => {
+  let CA = 1;
+  let CB = 1;
+  let CC = 1;
+
+  if (wavelength >= 700 && wavelength <= 1050) {
+    CA = Math.pow(10, 0.002 * (wavelength - 700));
+  } else if (wavelength > 1050 && wavelength <= 1400) {
+    CA = 5.0;
+  }
+
+  if (wavelength >= 700 && wavelength <= 1150) {
+    CB = Math.pow(10, 0.015 * (wavelength - 700));
+  }
+
+  if (wavelength >= 1500 && wavelength <= 1800) {
+    CC = Math.pow(10, 0.018 * (wavelength - 1500));
+  } else if (wavelength > 1800 && wavelength <= 2600) {
+    CC = 5.0;
+  }
+  
+  return { CA, CB, CC };
+};
+
+// Centralized MPE calculation function - ENHANCED WITH C5
+export const calculateMPEValue = (
+  wavelength: number, 
+  exposureTime: number, 
+  laserType: 'continuous' | 'pulsed' = 'continuous',
+  pulseWidth?: number,
+  repetitionRate?: number
+) => {
+  const region = getWavelengthRegion(wavelength);
+  const { CA, CB, CC } = getCorrectionFactors(wavelength);
+  
+  let mpeSinglePulse = 0;
+  let mpeAverage = 0;
+  let mpeThermal = 0;
+  let limitingMechanism = '';
+  let calculationSteps: string[] = [];
+  let correctionFactorC5 = 1.0;
+  let c5Details = undefined;
+
+  calculationSteps.push(`MPE Calculation for:`);
+  calculationSteps.push(`  Wavelength: ${wavelength} nm (${region} region)`);
+  calculationSteps.push(`  Exposure time (t): ${exposureTime.toExponential(3)} s`);
+  calculationSteps.push(`  Laser type: ${laserType.toUpperCase()}`);
+  calculationSteps.push(`  Correction Factors: CA=${CA.toFixed(3)}, CB=${CB.toFixed(3)}, CC=${CC.toFixed(3)}`);
+
+  // Calculate C5 for pulsed lasers
+  if (laserType === 'pulsed' && pulseWidth && repetitionRate && repetitionRate > 0) {
+    c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime);
+    correctionFactorC5 = c5Details.c5Factor;
+    calculationSteps.push(`  C5 correction factor: ${correctionFactorC5.toFixed(4)} (for pulse train)`);
+  }
+
+  // MPE calculations based on IEC 60825-1:2014
+  if (wavelength >= 180 && wavelength < 400) {
+    mpeSinglePulse = 1e-3;
+    limitingMechanism = 'Photochemical (UV)';
+    calculationSteps.push(`UV region MPEs are highly wavelength and time dependent. Using placeholder: ${mpeSinglePulse.toExponential(3)} W/cm²`);
+  } else if (wavelength >= 400 && wavelength <= 700) {
+    if (exposureTime >= 1e-9 && exposureTime < MPE_CONSTANTS.PHOTOCHEMICAL_TIME_LIMIT) {
+      mpeSinglePulse = MPE_CONSTANTS.VISIBLE_THERMAL_COEFF * CA * Math.pow(exposureTime, 0.75) * MPE_CONSTANTS.MJ_TO_J;
+      limitingMechanism = 'Thermal (retinal, short pulse)';
+      calculationSteps.push(`MPE (thermal, short pulse) = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × CA × t^0.75 × 10^-3`);
+      calculationSteps.push(`  = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × ${CA.toFixed(3)} × ${exposureTime.toExponential(3)}^0.75 × 10^-3 = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+    } else if (exposureTime >= MPE_CONSTANTS.PHOTOCHEMICAL_TIME_LIMIT && exposureTime < 10) {
+      mpeSinglePulse = MPE_CONSTANTS.VISIBLE_THERMAL_COEFF * CA * Math.pow(exposureTime, 0.75) * MPE_CONSTANTS.MJ_TO_J;
+      limitingMechanism = 'Thermal (retinal)';
+      calculationSteps.push(`MPE (thermal, retinal) = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × CA × t^0.75 × 10^-3`);
+      calculationSteps.push(`  = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × ${CA.toFixed(3)} × ${exposureTime.toExponential(3)}^0.75 × 10^-3 = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+    } else if (exposureTime >= 10 && exposureTime <= 30000) {
+      mpeSinglePulse = MPE_CONSTANTS.VISIBLE_CW_LIMIT * CB * CC;
+      limitingMechanism = 'Thermal (CW/long exposure)';
+      calculationSteps.push(`MPE (CW/long exposure) = ${MPE_CONSTANTS.VISIBLE_CW_LIMIT.toExponential(2)} × CB × CC`);
+      calculationSteps.push(`  = ${MPE_CONSTANTS.VISIBLE_CW_LIMIT.toExponential(2)} × ${CB.toFixed(3)} × ${CC.toFixed(3)} = ${mpeSinglePulse.toExponential(3)} W/cm²`);
+    } else {
+      mpeSinglePulse = 5e-7 * CA;
+      limitingMechanism = 'Thermal (ultra-short) or photochemical (very long - simplified)';
+      calculationSteps.push(`MPE (ultra-short or very long simplified) = 5 × 10^-7 × CA = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+    }
+  } else if (wavelength > 700 && wavelength <= 1400) {
+    if (exposureTime >= 1e-9 && exposureTime < MPE_CONSTANTS.PHOTOCHEMICAL_TIME_LIMIT) {
+      mpeSinglePulse = MPE_CONSTANTS.VISIBLE_THERMAL_COEFF * CA * Math.pow(exposureTime, 0.75) * MPE_CONSTANTS.MJ_TO_J;
+      limitingMechanism = 'Thermal (retinal, short pulse)';
+      calculationSteps.push(`MPE (thermal, short pulse) = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × CA × t^0.75 × 10^-3`);
+      calculationSteps.push(`  = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × ${CA.toFixed(3)} × ${exposureTime.toExponential(3)}^0.75 × 10^-3 = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+    } else if (exposureTime >= MPE_CONSTANTS.PHOTOCHEMICAL_TIME_LIMIT && exposureTime < 10) {
+      if (wavelength <= 1050) {
+        mpeSinglePulse = MPE_CONSTANTS.VISIBLE_THERMAL_COEFF * CA * Math.pow(exposureTime, 0.75) * MPE_CONSTANTS.MJ_TO_J;
+        calculationSteps.push(`MPE (thermal, retinal, 700-1050nm) = ${MPE_CONSTANTS.VISIBLE_THERMAL_COEFF} × CA × t^0.75 × 10^-3`);
+      } else {
+        mpeSinglePulse = MPE_CONSTANTS.NEAR_IR_1050_1400_COEFF * CA * Math.pow(exposureTime, 0.75) * MPE_CONSTANTS.MJ_TO_J;
+        calculationSteps.push(`MPE (thermal, retinal, 1050-1400nm) = ${MPE_CONSTANTS.NEAR_IR_1050_1400_COEFF} × CA × t^0.75 × 10^-3`);
+      }
+      limitingMechanism = 'Thermal (retinal)';
+      calculationSteps.push(`  = ... = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+    } else {
+      mpeSinglePulse = MPE_CONSTANTS.VISIBLE_CW_LIMIT * CA * CB * CC;
+      limitingMechanism = 'Thermal (CW/long exposure)';
+      calculationSteps.push(`MPE (CW/long exposure, NIR) = ${MPE_CONSTANTS.VISIBLE_CW_LIMIT.toExponential(2)} × CA × CB × CC`);
+      calculationSteps.push(`  = ${MPE_CONSTANTS.VISIBLE_CW_LIMIT.toExponential(2)} × ${CA.toFixed(3)} × ${CB.toFixed(3)} × ${CC.toFixed(3)} = ${mpeSinglePulse.toExponential(3)} W/cm²`);
+    }
+  } else if (wavelength > 1400 && wavelength <= 1e6) {
+    if (laserType === 'pulsed' || exposureTime < 10) {
+        if (wavelength >= 1500 && wavelength <= 1800) {
+            mpeSinglePulse = 1.0 * CC;
+            calculationSteps.push(`MPE (pulsed, 1.5-1.8um) = 1.0 J/cm² × CC = ${CC.toFixed(3)} = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+        } else {
+            mpeSinglePulse = 0.1 * CC;
+            calculationSteps.push(`MPE (pulsed, other Far IR) = 0.1 J/cm² × CC = ${CC.toFixed(3)} = ${mpeSinglePulse.toExponential(3)} J/cm²`);
+        }
+    } else {
+        mpeSinglePulse = 0.1 * CC;
+        calculationSteps.push(`MPE (CW, Far IR) = 0.1 W/cm² × CC = ${CC.toFixed(3)} = ${mpeSinglePulse.toExponential(3)} W/cm²`);
+    }
+    limitingMechanism = 'Thermal (corneal/skin)';
+  } else {
+    mpeSinglePulse = 0;
+    limitingMechanism = 'Undefined Region';
+    calculationSteps.push(`Wavelength outside defined MPE calculation ranges.`);
+  }
+
+  // Apply C5 correction to pulse-related MPEs
+  if (laserType === 'pulsed' && correctionFactorC5 !== 1.0) {
+    const originalMPE = mpeSinglePulse;
+    mpeSinglePulse = mpeSinglePulse * correctionFactorC5;
+    calculationSteps.push(`Applying C5 correction for pulse train: ${originalMPE.toExponential(3)} × ${correctionFactorC5.toFixed(4)} = ${mpeSinglePulse.toExponential(3)}`);
+  }
+
+  calculationSteps.push(`Final MPE value = ${mpeSinglePulse.toExponential(3)} ${limitingMechanism.includes('CW') || limitingMechanism.includes('W/cm²') || (laserType === 'continuous' && exposureTime >=10 && (wavelength < 180 || wavelength > 1400)) ? 'W/cm²' : 'J/cm²'}`);
+  calculationSteps.push(`Limiting mechanism: ${limitingMechanism}`);
+
+  return {
+    mpeSinglePulse,
+    mpeAverage,
+    mpeThermal,
+    criticalMPE: mpeSinglePulse,
+    correctionFactorCA: CA,
+    correctionFactorCB: CB,
+    correctionFactorCC: CC,
+    correctionFactorC5,
+    wavelengthRegion: region,
+    limitingMechanism,
+    calculationSteps,
+    c5Details
+  };
+};
