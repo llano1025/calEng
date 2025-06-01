@@ -7,7 +7,9 @@ import {
   calculateC5Factor,
   validatePulseParameters,
   calculateIrradiance,
-  AELResult
+  AELResult,
+  getClassificationTimeBase,
+  assessPulsedLaserAELs
 } from './LaserSafetyShared';
 
 interface LaserClassificationProps {
@@ -454,6 +456,8 @@ const getClassNumeric = (laserClass: string): number => {
 
 // ======================== SINGLE WAVELENGTH CLASSIFICATION ========================
 
+// ======================== ENHANCED SINGLE WAVELENGTH CLASSIFICATION (IEC 60825-1 COMPLIANT) ========================
+
 const classifyLaserIECSingle = (
   wavelength: number,
   emission: number,
@@ -496,8 +500,8 @@ const classifyLaserIECSingle = (
   }
   steps.push(`Wavelength within IEC 60825-1 scope: 180 nm - 1,000,000 nm ✓`);
 
-  // Step 2: Determine if pulsed or CW
-  steps.push(`\n--- Step 2: Laser Type Determination ---`);
+  // Step 2: Calculate C5 for pulsed lasers
+  steps.push(`\n--- Step 2: Laser Type and C5 Calculation ---`);
   let c5Factor = 1.0;
   let c5Details = null;
 
@@ -511,9 +515,11 @@ const classifyLaserIECSingle = (
         steps.push(`Single pulse operation (N=${numberOfPulses})`);
       } else {
         steps.push(`Repetitively pulsed operation (N=${numberOfPulses})`);
-        c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime);
+        c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime, beamDivergence);
         c5Factor = c5Details.c5Factor;
         steps.push(`C5 correction factor calculated: ${c5Factor.toFixed(4)}`);
+        steps.push(`C5 calculation details:`);
+        c5Details.c5Steps.forEach(step => steps.push(`  ${step}`));
       }
     }
   } else {
@@ -528,13 +534,12 @@ const classifyLaserIECSingle = (
   steps.push(`Condition 1: ${isC1Applied ? `Aperture ${conditions.condition1.aperture.toFixed(1)}mm at ${conditions.condition1.distance}mm` : 'NOT APPLIED (wavelength exemption)'}`);
   steps.push(`Condition 3: Aperture ${conditions.condition3.aperture.toFixed(1)}mm at ${conditions.condition3.distance}mm`);
 
-  // Step 4: Sequential classification
-  steps.push(`\n--- Step 4: Sequential Classification ---`);
+  // Step 4: Sequential classification with proper time bases and multiple AEL assessment
+  steps.push(`\n--- Step 4: Sequential Classification with Multiple AEL Assessment ---`);
   
-  const testClass = (className: string, getAEL: (wl: number, t: number, c5: number) => AELResult) => {
-    const aelResult = getAEL(wavelength, exposureTime, c5Factor);
-    steps.push(`\nTesting ${className}:`);
-    steps.push(`  AEL = ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+  const testClassWithMultipleAELs = (className: 'Class 1' | 'Class 2' | 'Class 3R' | 'Class 3B', testTimeBase: number) => {
+    steps.push(`\n=== Testing ${className} ===`);
+    steps.push(`Time base for ${className}: ${testTimeBase} s`);
     
     let condition1Pass = true;
     let condition3Pass = true;
@@ -550,48 +555,111 @@ const classifyLaserIECSingle = (
       condition1EmissionUnit = 'W';
       condition3EmissionUnit = 'W';
     }
-    
-    // Perform comparisons with irradiance calculations if needed
-    if (isC1Applied) {
-      condition1Compare = compareEmissionWithAEL(
-        condition1Emission, condition1EmissionUnit, aelResult, conditions.condition1.aperture, []
+
+    // For pulsed lasers, use multiple AEL assessment
+    if (laserType === 'pulsed' && repetitionRate && repetitionRate > 0) {
+      const aelAssessment = assessPulsedLaserAELs(className, wavelength, testTimeBase, repetitionRate, c5Factor);
+      
+      steps.push(`Multiple AEL Assessment for ${className}:`);
+      aelAssessment.calculationSteps.forEach(step => steps.push(`  ${step}`));
+      
+      const mostRestrictiveAEL = aelAssessment.mostRestrictiveAEL;
+      const aelResult: AELResult = { value: mostRestrictiveAEL, unit: 'J' };
+      
+      // Compare with both conditions
+      if (isC1Applied) {
+        condition1Compare = compareEmissionWithAEL(
+          condition1Emission, condition1EmissionUnit, aelResult, conditions.condition1.aperture, []
+        );
+        condition1Pass = condition1Compare.passes;
+        steps.push(`Condition 1: ${condition1Compare.comparisonDetails.join(', ')} - ${condition1Pass ? 'PASS' : 'FAIL'}`);
+      } else {
+        steps.push(`Condition 1: NOT APPLIED (wavelength exemption)`);
+      }
+      
+      const condition3Compare = compareEmissionWithAEL(
+        condition3Emission, condition3EmissionUnit, aelResult, conditions.condition3.aperture, []
       );
-      condition1Pass = condition1Compare.passes;
-      steps.push(`  Condition 1: ${condition1Compare.comparisonDetails.join(', ')} - ${condition1Pass ? 'PASS' : 'FAIL'}`);
+      condition3Pass = condition3Compare.passes;
+      steps.push(`Condition 3: ${condition3Compare.comparisonDetails.join(', ')} - ${condition3Pass ? 'PASS' : 'FAIL'}`);
+      
+      return { 
+        aelResult, 
+        condition1Pass, 
+        condition3Pass, 
+        bothPass: condition1Pass && condition3Pass,
+        condition1Ratio: isC1Applied ? condition1Compare.ratio : 0,
+        condition3Ratio: condition3Compare.ratio,
+        aelAssessment
+      };
     } else {
-      steps.push(`  Condition 1: NOT APPLIED (wavelength exemption)`);
+      // For CW lasers, use single AEL calculation
+      let getAEL: (wl: number, t: number, c5: number) => AELResult;
+      switch (className) {
+        case 'Class 1':
+          getAEL = IEC_AEL_TABLES.getClass1AEL;
+          break;
+        case 'Class 2':
+          getAEL = IEC_AEL_TABLES.getClass2AEL;
+          break;
+        case 'Class 3R':
+          getAEL = IEC_AEL_TABLES.getClass3RAEL;
+          break;
+        case 'Class 3B':
+          getAEL = IEC_AEL_TABLES.getClass3BAEL;
+          break;
+      }
+      
+      const aelResult = getAEL(wavelength, testTimeBase, c5Factor);
+      steps.push(`${className} AEL = ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+      
+      // Compare with both conditions
+      if (isC1Applied) {
+        condition1Compare = compareEmissionWithAEL(
+          condition1Emission, condition1EmissionUnit, aelResult, conditions.condition1.aperture, []
+        );
+        condition1Pass = condition1Compare.passes;
+        steps.push(`Condition 1: ${condition1Compare.comparisonDetails.join(', ')} - ${condition1Pass ? 'PASS' : 'FAIL'}`);
+      } else {
+        steps.push(`Condition 1: NOT APPLIED (wavelength exemption)`);
+      }
+      
+      const condition3Compare = compareEmissionWithAEL(
+        condition3Emission, condition3EmissionUnit, aelResult, conditions.condition3.aperture, []
+      );
+      condition3Pass = condition3Compare.passes;
+      steps.push(`Condition 3: ${condition3Compare.comparisonDetails.join(', ')} - ${condition3Pass ? 'PASS' : 'FAIL'}`);
+      
+      return { 
+        aelResult, 
+        condition1Pass, 
+        condition3Pass, 
+        bothPass: condition1Pass && condition3Pass,
+        condition1Ratio: isC1Applied ? condition1Compare.ratio : 0,
+        condition3Ratio: condition3Compare.ratio
+      };
     }
-    
-    const condition3Compare = compareEmissionWithAEL(
-      condition3Emission, condition3EmissionUnit, aelResult, conditions.condition3.aperture, []
-    );
-    condition3Pass = condition3Compare.passes;
-    steps.push(`  Condition 3: ${condition3Compare.comparisonDetails.join(', ')} - ${condition3Pass ? 'PASS' : 'FAIL'}`);
-    
-    return { 
-      aelResult, 
-      condition1Pass, 
-      condition3Pass, 
-      bothPass: condition1Pass && condition3Pass,
-      condition1Ratio: isC1Applied ? condition1Compare.ratio : 0,
-      condition3Ratio: condition3Compare.ratio
-    };
   };
 
-  // Test Class 1
-  const class1Test = testClass('Class 1', IEC_AEL_TABLES.getClass1AEL);
+  // Sequential class testing with proper time bases
+  
+  // Test Class 1 with general time base
+  const generalTimeBase = getClassificationTimeBase(wavelength);
+  const class1Test = testClassWithMultipleAELs('Class 1', generalTimeBase);
   
   if (class1Test.bothPass) {
-    steps.push(`\nResult: Class 1 (both conditions satisfied)`);
+    steps.push(`\n=== RESULT: Class 1 ===`);
+    steps.push(`Both conditions satisfied for Class 1`);
     return createSingleResult('Class 1', class1Test.aelResult, emission, emissionUnit, steps, 
       class1Test.condition1Pass, class1Test.condition3Pass, false, c5Details);
   }
 
-  // Check for Class 1M (only if within 302.5-4000 nm range)
+  // Check for Class 1M (only if within 302.5-4000 nm range and large beam)
   if (wavelength >= 302.5 && wavelength <= 4000 && 
       IEC_AEL_TABLES.requiresClassM(wavelength, beamDiameter) && isC1Applied) {
-    steps.push(`\n--- Checking Class 1M (302.5-4000 nm, beam >7mm) ---`);
-    const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
+    steps.push(`\n=== Checking Class 1M ===`);
+    steps.push(`Wavelength in range 302.5-4000 nm and beam diameter > 7mm`);
+    const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, generalTimeBase, c5Factor);
     
     const class3BCompare = compareEmissionWithAEL(emission, emissionUnit, class3BAELResult, conditions.condition1.aperture, []);
     
@@ -600,8 +668,7 @@ const classifyLaserIECSingle = (
       steps.push(`  - Condition 1 > Class 1 AEL: YES ✓`);
       steps.push(`  - Condition 3 ≤ Class 1 AEL: YES ✓`);
       steps.push(`  - Condition 1 ≤ Class 3B AEL: YES ✓`);
-      steps.push(`  - Wavelength in range 302.5-4000 nm: YES ✓`);
-      steps.push(`\nResult: Class 1M`);
+      steps.push(`\n=== RESULT: Class 1M ===`);
       return createSingleResult('Class 1M', class1Test.aelResult, emission, emissionUnit, steps, 
         false, true, true, c5Details);
     }
@@ -610,59 +677,62 @@ const classifyLaserIECSingle = (
   // Test Class 2 (only for visible wavelengths 400-700 nm)
   let class2Test = null;
   if (IEC_AEL_TABLES.supportsClass2(wavelength)) {
-    class2Test = testClass('Class 2', IEC_AEL_TABLES.getClass2AEL);
+    // CORRECTED: Use 0.25s time base for Class 2 testing in visible range
+    const visibleTimeBase = 0.25;
+    class2Test = testClassWithMultipleAELs('Class 2', visibleTimeBase);
     
     if (class2Test.bothPass) {
-      steps.push(`\nResult: Class 2 (visible wavelength, conditions satisfied)`);
+      steps.push(`\n=== RESULT: Class 2 ===`);
+      steps.push(`Visible wavelength, both conditions satisfied for Class 2`);
       return createSingleResult('Class 2', class2Test.aelResult, emission, emissionUnit, steps, 
         class2Test.condition1Pass, class2Test.condition3Pass, false, c5Details);
     }
 
     // Check for Class 2M
     if (IEC_AEL_TABLES.requiresClassM(wavelength, beamDiameter) && isC1Applied) {
-      steps.push(`\n--- Checking Class 2M (400-700 nm, beam >7mm) ---`);
-      const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
+      steps.push(`\n=== Checking Class 2M ===`);
+      const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, generalTimeBase, c5Factor);
       const class3BCompare = compareEmissionWithAEL(emission, emissionUnit, class3BAELResult, conditions.condition1.aperture, []);
       
       if (!class2Test.condition1Pass && class2Test.condition3Pass && class3BCompare.passes) {
         steps.push(`Class 2M conditions satisfied:`);
-        steps.push(`  - Condition 1 > Class 2 AEL: YES ✓`);
-        steps.push(`  - Condition 3 ≤ Class 2 AEL: YES ✓`);
-        steps.push(`  - Condition 1 ≤ Class 3B AEL: YES ✓`);
-        steps.push(`\nResult: Class 2M`);
+        steps.push(`\n=== RESULT: Class 2M ===`);
         return createSingleResult('Class 2M', class2Test.aelResult, emission, emissionUnit, steps, 
           false, true, true, c5Details);
       }
     }
   }
 
-  // Test Class 3R
-  const class3RTest = testClass('Class 3R', IEC_AEL_TABLES.getClass3RAEL);
+  // Test Class 3R with appropriate time base
+  // CORRECTED: Use 0.25s time base for Class 3R in visible range per IEC 60825-1
+  const timeBase3R = (wavelength >= 400 && wavelength <= 700) ? 0.25 : generalTimeBase;
+  const class3RTest = testClassWithMultipleAELs('Class 3R', timeBase3R);
   
   if (class3RTest.bothPass) {
     // Check prerequisites: must exceed Class 1 and Class 2 (if applicable) for Condition 3
-    steps.push(`\n--- Verifying Class 3R Prerequisites ---`);
+    steps.push(`\n=== Verifying Class 3R Prerequisites ===`);
     
     let prerequisitesMet = true;
     
     // Must exceed Class 1 for Condition 3
     if (class1Test.condition3Pass) {
-      steps.push(`  ERROR: Does not exceed Class 1 AEL for Condition 3`);
+      steps.push(`ERROR: Does not exceed Class 1 AEL for Condition 3`);
       prerequisitesMet = false;
     } else {
-      steps.push(`  Exceeds Class 1 AEL for Condition 3: YES ✓`);
+      steps.push(`Exceeds Class 1 AEL for Condition 3: YES ✓`);
     }
     
     // Must exceed Class 2 for Condition 3 (if applicable for visible wavelengths)
     if (class2Test && class2Test.condition3Pass) {
-      steps.push(`  ERROR: Does not exceed Class 2 AEL for Condition 3 (visible wavelength)`);
+      steps.push(`ERROR: Does not exceed Class 2 AEL for Condition 3 (visible wavelength)`);
       prerequisitesMet = false;
     } else if (class2Test) {
-      steps.push(`  Exceeds Class 2 AEL for Condition 3: YES ✓`);
+      steps.push(`Exceeds Class 2 AEL for Condition 3: YES ✓`);
     }
     
     if (prerequisitesMet) {
-      steps.push(`\nResult: Class 3R (conditions and prerequisites satisfied)`);
+      steps.push(`\n=== RESULT: Class 3R ===`);
+      steps.push(`Both conditions and prerequisites satisfied for Class 3R`);
       return createSingleResult('Class 3R', class3RTest.aelResult, emission, emissionUnit, steps, 
         class3RTest.condition1Pass, class3RTest.condition3Pass, false, c5Details);
     } else {
@@ -670,39 +740,40 @@ const classifyLaserIECSingle = (
     }
   }
 
-  // Test Class 3B
-  const class3BTest = testClass('Class 3B', IEC_AEL_TABLES.getClass3BAEL);
+  // Test Class 3B - CORRECTED: Use general time base (100s), not 0.25s
+  const class3BTest = testClassWithMultipleAELs('Class 3B', generalTimeBase);
   
   if (class3BTest.bothPass) {
-    steps.push(`\n--- Verifying Class 3B Prerequisites ---`);
+    steps.push(`\n=== Verifying Class 3B Prerequisites ===`);
     
     let prerequisitesMet = true;
     
     // Must exceed Class 3R for Condition 1 OR Condition 3
     if (!class3RTest.condition1Pass || !class3RTest.condition3Pass) {
-      steps.push(`  Exceeds Class 3R AEL for at least one condition: YES ✓`);
+      steps.push(`Exceeds Class 3R AEL for at least one condition: YES ✓`);
     } else {
-      steps.push(`  ERROR: Does not exceed Class 3R AEL for either condition`);
+      steps.push(`ERROR: Does not exceed Class 3R AEL for either condition`);
       prerequisitesMet = false;
     }
     
     // Must exceed Class 1 and Class 2 for Condition 3
     if (class1Test.condition3Pass) {
-      steps.push(`  ERROR: Does not exceed Class 1 AEL for Condition 3`);
+      steps.push(`ERROR: Does not exceed Class 1 AEL for Condition 3`);
       prerequisitesMet = false;
     } else {
-      steps.push(`  Exceeds Class 1 AEL for Condition 3: YES ✓`);
+      steps.push(`Exceeds Class 1 AEL for Condition 3: YES ✓`);
     }
     
     if (class2Test && class2Test.condition3Pass) {
-      steps.push(`  ERROR: Does not exceed Class 2 AEL for Condition 3`);
+      steps.push(`ERROR: Does not exceed Class 2 AEL for Condition 3`);
       prerequisitesMet = false;
     } else if (class2Test) {
-      steps.push(`  Exceeds Class 2 AEL for Condition 3: YES ✓`);
+      steps.push(`Exceeds Class 2 AEL for Condition 3: YES ✓`);
     }
     
     if (prerequisitesMet) {
-      steps.push(`\nResult: Class 3B (conditions and prerequisites satisfied)`);
+      steps.push(`\n=== RESULT: Class 3B ===`);
+      steps.push(`Both conditions and prerequisites satisfied for Class 3B`);
       return createSingleResult('Class 3B', class3BTest.aelResult, emission, emissionUnit, steps, 
         class3BTest.condition1Pass, class3BTest.condition3Pass, false, c5Details);
     } else {
@@ -711,13 +782,12 @@ const classifyLaserIECSingle = (
   }
 
   // Class 4 (exceeds Class 3B or prerequisites not met)
-  steps.push(`\n--- Class 4 Assignment ---`);
+  steps.push(`\n=== RESULT: Class 4 ===`);
   if (!class3BTest.bothPass) {
     steps.push(`Emission exceeds Class 3B AEL limits`);
   } else {
     steps.push(`Lower class prerequisites not satisfied`);
   }
-  steps.push(`Result: Class 4`);
   
   return createSingleResult('Class 4', class3BTest.aelResult, emission, emissionUnit, steps, 
     false, false, false, c5Details);
@@ -939,15 +1009,21 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
     const activeWls = wavelengths.filter(w => w.isActive);
     if (activeWls.length === 0) return 0.25;
     
-    let timeBase = 100; // Default
-    
-    for (const wl of activeWls) {
-      if (wl.wavelength >= 400 && wl.wavelength <= 700) timeBase = Math.min(timeBase, 0.25);
-      if (wl.wavelength <= 400) timeBase = Math.min(timeBase, 30000);
-      if (wl.wavelength > 1400) timeBase = Math.min(timeBase, 30000);
+    // Use the new IEC-compliant time base selection
+    if (activeWls.length === 1) {
+      return getClassificationTimeBase(activeWls[0].wavelength);
+    } else {
+      // For multiple wavelengths, use conservative approach
+      let timeBase = 100; // Default for general classification
+      
+      for (const wl of activeWls) {
+        // Get general classification time base for each wavelength
+        const wlTimeBase = getClassificationTimeBase(wl.wavelength);
+        timeBase = Math.min(timeBase, wlTimeBase);
+      }
+      
+      return timeBase;
     }
-    
-    return timeBase;
   };
 
   useEffect(() => {
@@ -1098,16 +1174,16 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Laser Classification</h2>
-        {/* {onShowTutorial && (
-          // <button 
-          //   onClick={onShowTutorial} 
-          //   className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          // >
-          //   <span className="mr-1">Tutorial</span>
-          //   <Icons.InfoInline />
-          // </button>
-        )} */}
+        <h2 className="text-xl font-semibold">IEC 60825-1:2014 Laser Classification</h2>
+        {onShowTutorial && (
+          <button 
+            onClick={onShowTutorial} 
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            <span className="mr-1">Tutorial</span>
+            <Icons.InfoInline />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

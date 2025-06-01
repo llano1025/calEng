@@ -136,13 +136,44 @@ export const TIME_BASE_TI = {
   }
 };
 
-// ======================== ENHANCED C5 CALCULATION IMPLEMENTATION ========================
+// ======================== TIME BASE SELECTION (IEC 60825-1:2014 Section e) ========================
+
+export const getClassificationTimeBase = (
+  wavelength: number,
+  specificClassTest?: '2' | '2M' | '3R',
+  hasIntentionalLongTermViewing: boolean = false
+): number => {
+  // Rule 3: 30,000s for UV or intentional long-term viewing
+  if (wavelength <= 400) {
+    return 30000; // UV wavelengths
+  }
+  
+  if (wavelength > 400 && hasIntentionalLongTermViewing) {
+    return 30000; // Intentional long-term viewing
+  }
+  
+  // Rule 1: 0.25s for Class 2/2M/3R in visible range
+  if (wavelength >= 400 && wavelength <= 700 && 
+      (specificClassTest === '2' || specificClassTest === '2M' || specificClassTest === '3R')) {
+    return 0.25; // Blink reflex time
+  }
+  
+  // Rule 2: 100s for all other wavelengths > 400 nm
+  if (wavelength > 400) {
+    return 100; // General classification
+  }
+  
+  return 100; // Default fallback
+};
+
+// ======================== ENHANCED C5 CALCULATION (IEC 60825-1 COMPLIANT) ========================
 
 export const calculateC5Factor = (
   wavelength: number,
   pulseWidth: number, // ns
   repetitionRate: number, // Hz
   exposureTime: number, // s
+  angularSubtense: number = 1.5, // mrad
   numberOfPulses?: number // If known, otherwise calculated from repetitionRate and exposureTime
 ): {
   c5Factor: number;
@@ -160,6 +191,7 @@ export const calculateC5Factor = (
   steps.push(`Pulse width: ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s`);
   steps.push(`Repetition rate: ${repetitionRate} Hz`);
   steps.push(`Exposure time: ${exposureTime} s`);
+  steps.push(`Angular subtense: ${angularSubtense} mrad`);
   steps.push(`Time base Ti for ${wavelength} nm: ${Ti.toExponential(3)} s`);
   
   // Calculate number of pulses if not provided
@@ -192,50 +224,58 @@ export const calculateC5Factor = (
     };
   }
   
-  // Calculate C5 for multiple pulses
+  // Calculate C5 for multiple pulses using IEC 60825-1 rules
   steps.push(`Multiple pulses detected (N = ${N}), calculating C5...`);
-  
-  // Check if pulses occur within time base Ti
-  const timeForAllPulses = (N - 1) / repetitionRate; // Time span from first to last pulse
-  steps.push(`Time span for all pulses: ${timeForAllPulses.toExponential(3)} s`);
   
   let c5Factor: number;
   let groupingDescription: string;
   
-  if (timeForAllPulses <= Ti) {
-    // All pulses occur within Ti - use standard C5 formula
-    c5Factor = Math.pow(N, -0.25);
-    groupingDescription = `All pulses within Ti (${Ti.toExponential(3)} s)`;
-    steps.push(`All ${N} pulses occur within Ti: C5 = N^(-0.25) = ${N}^(-0.25) = ${c5Factor.toFixed(4)}`);
-  } else {
-    // Pulses span longer than Ti - need to group pulses
-    const pulsesInTi = Math.floor(Ti * repetitionRate) + 1; // Number of pulses that fit in Ti
-    const numberOfGroups = Math.ceil(N / pulsesInTi);
+  // Check if pulse duration ≤ Ti
+  if (pulseWidthSeconds <= Ti) {
+    steps.push(`Pulse duration (${pulseWidthSeconds.toExponential(3)} s) ≤ Ti (${Ti.toExponential(3)} s)`);
     
-    steps.push(`Pulses span longer than Ti, grouping required:`);
-    steps.push(`  Maximum pulses per group (within Ti): ${pulsesInTi}`);
-    steps.push(`  Number of groups: ${numberOfGroups}`);
-    
-    if (pulsesInTi > 1) {
-      // Each group has multiple pulses
-      const c5PerGroup = Math.pow(pulsesInTi, -0.25);
-      c5Factor = c5PerGroup;
-      groupingDescription = `${numberOfGroups} groups of ${pulsesInTi} pulses each`;
-      steps.push(`  C5 per group = ${pulsesInTi}^(-0.25) = ${c5PerGroup.toFixed(4)}`);
-      steps.push(`  Overall C5 = ${c5Factor.toFixed(4)} (applied to each group)`);
-    } else {
-      // Each group has only one pulse
+    if (exposureTime <= 0.25) {
+      steps.push(`Exposure time (${exposureTime} s) ≤ 0.25 s: C5 = 1.0`);
       c5Factor = 1.0;
-      groupingDescription = `${numberOfGroups} groups of 1 pulse each`;
-      steps.push(`  Each group contains 1 pulse: C5 = 1.0`);
+      groupingDescription = 'Short exposure time (≤0.25s)';
+    } else {
+      if (N <= 600) {
+        steps.push(`N (${N}) ≤ 600: C5 = 1.0`);
+        c5Factor = 1.0;
+        groupingDescription = 'Few pulses (N≤600)';
+      } else {
+        const rawC5 = 5 * Math.pow(N, -0.25);
+        c5Factor = Math.max(0.4, rawC5);
+        steps.push(`N (${N}) > 600: C5 = max(0.4, 5 × N^(-0.25)) = max(0.4, ${rawC5.toFixed(4)}) = ${c5Factor.toFixed(4)}`);
+        groupingDescription = `Many pulses (N>600) with C5 = 5×N^(-0.25)`;
+      }
     }
-  }
-  
-  // Additional checks for specific wavelength ranges
-  if (wavelength >= 400 && wavelength <= 700) {
-    steps.push(`Visible wavelength: C5 calculation complete`);
-  } else if (wavelength > 700 && wavelength <= 1400) {
-    steps.push(`Near-IR wavelength: C5 calculation complete`);
+  } else {
+    // Pulse duration > Ti - use angular subtense dependent rules
+    steps.push(`Pulse duration (${pulseWidthSeconds.toExponential(3)} s) > Ti (${Ti.toExponential(3)} s)`);
+    steps.push(`Using angular subtense dependent C5 calculation...`);
+    
+    if (angularSubtense <= 1.5) {
+      c5Factor = 1.0;
+      steps.push(`Angular subtense (${angularSubtense} mrad) ≤ 1.5 mrad: C5 = 1.0`);
+      groupingDescription = 'Small angular subtense (≤1.5 mrad)';
+    } else if (angularSubtense <= 100) {
+      if (N <= 40) {
+        c5Factor = 1.0;
+        steps.push(`5 mrad < α ≤ 100 mrad, N ≤ 40: C5 = 1.0`);
+        groupingDescription = 'Medium angular subtense, few pulses';
+      } else {
+        const rawC5 = Math.pow(N, -0.25);
+        c5Factor = Math.max(0.4, rawC5);
+        steps.push(`5 mrad < α ≤ 100 mrad, N > 40: C5 = max(0.4, N^(-0.25)) = ${c5Factor.toFixed(4)}`);
+        groupingDescription = 'Medium angular subtense, many pulses';
+      }
+    } else {
+      // Angular subtense > 100 mrad
+      c5Factor = 1.0;
+      steps.push(`Angular subtense (${angularSubtense} mrad) > 100 mrad: C5 = 1.0`);
+      groupingDescription = 'Large angular subtense (>100 mrad)';
+    }
   }
   
   steps.push(`Final C5 factor: ${c5Factor.toFixed(4)}`);
@@ -246,6 +286,102 @@ export const calculateC5Factor = (
     timeBase: Ti,
     pulseGrouping: groupingDescription,
     c5Steps: steps
+  };
+};
+
+// ======================== MULTIPLE AEL ASSESSMENT FOR PULSED LASERS ========================
+
+export interface PulsedAELAssessment {
+  singlePulseAEL: number;
+  averagePowerAEL: number;
+  pulseTrainAEL: number;
+  mostRestrictiveAEL: number;
+  breakdown: {
+    singlePulse: { value: number; unit: string };
+    averagePower: { value: number; unit: string };
+    pulseTrain: { value: number; unit: string };
+  };
+  calculationSteps: string[];
+}
+
+export const assessPulsedLaserAELs = (
+  className: 'Class 1' | 'Class 2' | 'Class 3R' | 'Class 3B',
+  wavelength: number,
+  exposureTime: number,
+  repetitionRate: number,
+  c5Factor: number
+): PulsedAELAssessment => {
+  const steps: string[] = [];
+  
+  steps.push(`=== Multiple AEL Assessment for ${className} (Pulsed Laser) ===`);
+  steps.push(`Wavelength: ${wavelength} nm`);
+  steps.push(`Exposure time: ${exposureTime} s`);
+  steps.push(`Repetition rate: ${repetitionRate} Hz`);
+  steps.push(`C5 factor: ${c5Factor.toFixed(4)}`);
+  
+  // Get appropriate AEL function
+  let getAEL: (wl: number, t: number, c5: number) => AELResult;
+  switch (className) {
+    case 'Class 1':
+      getAEL = IEC_AEL_TABLES.getClass1AEL;
+      break;
+    case 'Class 2':
+      getAEL = IEC_AEL_TABLES.getClass2AEL;
+      break;
+    case 'Class 3R':
+      getAEL = IEC_AEL_TABLES.getClass3RAEL;
+      break;
+    case 'Class 3B':
+      getAEL = IEC_AEL_TABLES.getClass3BAEL;
+      break;
+  }
+  
+  // 1. Single pulse AEL (Table 3 for Class 1, etc.)
+  const singlePulseAELResult = getAEL(wavelength, 1e-6, 1.0); // Use 1μs as reference single pulse time
+  steps.push(`\n1. Single pulse AEL:`);
+  steps.push(`   AEL_single = ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
+  
+  // 2. Average power AEL (converted to pulse energy)
+  const avgPowerAELResult = getAEL(wavelength, exposureTime, 1.0);
+  let avgPowerAsPulseEnergy: number;
+  let avgPowerUnit: string;
+  
+  if (avgPowerAELResult.unit === 'W') {
+    // Convert average power limit to pulse energy limit
+    avgPowerAsPulseEnergy = avgPowerAELResult.value / repetitionRate;
+    avgPowerUnit = 'J';
+    steps.push(`\n2. Average power AEL (converted to pulse energy):`);
+    steps.push(`   AEL_T = ${avgPowerAELResult.value.toExponential(3)} W`);
+    steps.push(`   AEL_pulse = AEL_T / PRF = ${avgPowerAELResult.value.toExponential(3)} / ${repetitionRate} = ${avgPowerAsPulseEnergy.toExponential(3)} J/pulse`);
+  } else {
+    // Already in energy units
+    avgPowerAsPulseEnergy = avgPowerAELResult.value;
+    avgPowerUnit = avgPowerAELResult.unit;
+    steps.push(`\n2. Average power AEL (already in energy units):`);
+    steps.push(`   AEL_pulse = ${avgPowerAsPulseEnergy.toExponential(3)} ${avgPowerUnit}`);
+  }
+  
+  // 3. Pulse train AEL (single pulse × C5)
+  const pulseTrainAEL = singlePulseAELResult.value * c5Factor;
+  steps.push(`\n3. Pulse train AEL (single pulse × C5):`);
+  steps.push(`   AEL_s,p,train = AEL_single × C5 = ${singlePulseAELResult.value.toExponential(3)} × ${c5Factor.toFixed(4)} = ${pulseTrainAEL.toExponential(3)} J`);
+  
+  // 4. Most restrictive AEL
+  const mostRestrictiveAEL = Math.min(singlePulseAELResult.value, avgPowerAsPulseEnergy, pulseTrainAEL);
+  steps.push(`\n4. Most restrictive AEL:`);
+  steps.push(`   AEL_most_restrictive = min(${singlePulseAELResult.value.toExponential(3)}, ${avgPowerAsPulseEnergy.toExponential(3)}, ${pulseTrainAEL.toExponential(3)}) = ${mostRestrictiveAEL.toExponential(3)} J`);
+  
+  return {
+    singlePulseAEL: singlePulseAELResult.value,
+    averagePowerAEL: avgPowerAsPulseEnergy,
+    pulseTrainAEL,
+    mostRestrictiveAEL,
+    breakdown: {
+      singlePulse: { value: singlePulseAELResult.value, unit: singlePulseAELResult.unit },
+      averagePower: { value: avgPowerAsPulseEnergy, unit: avgPowerUnit },
+      pulseTrain: { value: pulseTrainAEL, unit: 'J' }
+    },
+    calculationSteps: steps
   };
 };
 
@@ -817,10 +953,10 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 3.8e5; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         baseAEL = 3.8e-4; // J
         unit = 'J';
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 1.5e-3; // W
         unit = 'W';
       }
@@ -829,10 +965,10 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 1.25e4 * corrections.C2; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         baseAEL = 1.25e-5 * corrections.C2; // J
         unit = 'J';
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 5e-5 * corrections.C2; // W
         unit = 'W';
       }
@@ -840,10 +976,10 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 1.25e3; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         baseAEL = 0.125; // J
         unit = 'J';
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
         unit = 'W';
       }
@@ -851,7 +987,7 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 3e5; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         if (t < 0.06) {
           baseAEL = 0.03; // J
           unit = 'J';
@@ -859,7 +995,7 @@ export const IEC_AEL_TABLES = {
           baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
           unit = 'W';
         }
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
         unit = 'W';
       }
@@ -867,7 +1003,7 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 3e7 * corrections.C4; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         const timeLimit = 0.06 * corrections.C4;
         if (t < timeLimit) {
           baseAEL = 0.03 * corrections.C4; // J
@@ -876,7 +1012,7 @@ export const IEC_AEL_TABLES = {
           baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
           unit = 'W';
         }
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
         unit = 'W';
       }
@@ -884,10 +1020,10 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         baseAEL = 1.5e8; // W
         unit = 'W';
-      } else if (t >= 1e-9 && t < 0.25) {
+      } else if (t >= 1e-9 && t <= 0.25) {
         baseAEL = 0.15; // J
         unit = 'J';
-      } else if (t >= 0.25 && t < 3e4) {
+      } else if (t > 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
         unit = 'W';
       }
