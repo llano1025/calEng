@@ -5,19 +5,22 @@ import {
   MPE_CONSTANTS, 
   IEC_AEL_TABLES,
   calculateC5Factor,
-  validatePulseParameters
+  validatePulseParameters,
+  calculateIrradiance,
+  AELResult
 } from './LaserSafetyShared';
 
 interface LaserClassificationProps {
   onShowTutorial?: () => void;
 }
 
-// Enhanced wavelength data interface
+// Enhanced wavelength data interface with power unit support
 interface WavelengthData {
   id: string;
   wavelength: number;
   laserType: 'continuous' | 'pulsed';
-  power: number; // mW for CW
+  power: number; // Value in selected unit
+  powerUnit: 'mW' | 'J'; // Unit selection
   pulseEnergy: number; // mJ for pulsed
   pulseWidth: number; // ns for pulsed
   repetitionRate: number; // Hz for pulsed
@@ -41,6 +44,148 @@ const determineAdditiveGroup = (wavelengths: number[]): string | null => {
     }
   }
   return null;
+};
+
+// ======================== ENHANCED EMISSION CALCULATION WITH IRRADIANCE ========================
+
+const calculateEmissionWithIrradiance = (
+  wl: WavelengthData,
+  condition1Aperture: number,
+  condition3Aperture: number,
+  useManualPowers: boolean = false,
+  condition1Power?: number,
+  condition3Power?: number
+): {
+  emission: number;
+  emissionUnit: string;
+  condition1Emission: number;
+  condition3Emission: number;
+  condition1EmissionUnit: string;
+  condition3EmissionUnit: string;
+  calculations: string[];
+} => {
+  const calculations: string[] = [];
+  let emission = 0;
+  let emissionUnit = '';
+  let condition1Emission = 0;
+  let condition3Emission = 0;
+  let condition1EmissionUnit = '';
+  let condition3EmissionUnit = '';
+
+  if (useManualPowers && condition1Power !== undefined && condition3Power !== undefined) {
+    // Manual power input mode
+    emission = Math.max(condition1Power, condition3Power);
+    emissionUnit = 'W';
+    condition1Emission = condition1Power;
+    condition3Emission = condition3Power;
+    condition1EmissionUnit = 'W';
+    condition3EmissionUnit = 'W';
+    
+    calculations.push(`Manual power input mode:`);
+    calculations.push(`Condition 1 emission: ${condition1Power.toExponential(3)} W`);
+    calculations.push(`Condition 3 emission: ${condition3Power.toExponential(3)} W`);
+  } else {
+    // Calculate emission from laser parameters
+    if (wl.laserType === 'continuous') {
+      if (wl.powerUnit === 'mW') {
+        emission = wl.power * MPE_CONSTANTS.MW_TO_W;
+        emissionUnit = 'W';
+      } else { // J unit selected for CW - treat as energy per time base
+        emission = wl.power; // Assuming J as energy value
+        emissionUnit = 'J';
+      }
+    } else {
+      if (wl.powerUnit === 'J') {
+        emission = wl.power;
+        emissionUnit = 'J';
+      } else { // mW unit selected for pulsed - convert to energy
+        emission = wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
+        emissionUnit = 'J';
+      }
+    }
+
+    calculations.push(`Laser emission calculation:`);
+    calculations.push(`Laser type: ${wl.laserType.toUpperCase()}`);
+    calculations.push(`Input: ${wl.power} ${wl.powerUnit}`);
+    calculations.push(`Calculated emission: ${emission.toExponential(3)} ${emissionUnit}`);
+
+    // Use same emission for both conditions unless irradiance calculation needed
+    condition1Emission = emission;
+    condition3Emission = emission;
+    condition1EmissionUnit = emissionUnit;
+    condition3EmissionUnit = emissionUnit;
+  }
+
+  return {
+    emission,
+    emissionUnit,
+    condition1Emission,
+    condition3Emission,
+    condition1EmissionUnit,
+    condition3EmissionUnit,
+    calculations
+  };
+};
+
+// ======================== ENHANCED CLASSIFICATION WITH IRRADIANCE SUPPORT ========================
+
+const compareEmissionWithAEL = (
+  emission: number,
+  emissionUnit: string,
+  aelResult: AELResult,
+  apertureDiameterMm: number,
+  calculations: string[]
+): { passes: boolean; ratio: number; comparisonDetails: string[] } => {
+  const comparisonDetails: string[] = [];
+  let passes = false;
+  let ratio = 0;
+
+  if (aelResult.unit.includes('/m²') && apertureDiameterMm > 0) {
+    // AEL has area units (J/m² or W/m²), need to calculate irradiance
+    const isEnergy = aelResult.unit.includes('J');
+    const irradianceCalc = calculateIrradiance(emission, apertureDiameterMm, isEnergy);
+    
+    comparisonDetails.push(`AEL requires irradiance calculation (${aelResult.unit}):`);
+    comparisonDetails.push(`Aperture diameter: ${apertureDiameterMm} mm`);
+    comparisonDetails.push(`Aperture area: ${(irradianceCalc.apertureArea * 1e6).toFixed(3)} mm² = ${irradianceCalc.apertureArea.toExponential(3)} m²`);
+    comparisonDetails.push(`Emission: ${emission.toExponential(3)} ${emissionUnit}`);
+    comparisonDetails.push(`Calculated irradiance: ${irradianceCalc.irradiance.toExponential(3)} ${irradianceCalc.unit}`);
+    comparisonDetails.push(`AEL: ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+    
+    ratio = irradianceCalc.irradiance / aelResult.value;
+    passes = irradianceCalc.irradiance <= aelResult.value;
+    
+    comparisonDetails.push(`Comparison: ${irradianceCalc.irradiance.toExponential(3)} ${passes ? '≤' : '>'} ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+    comparisonDetails.push(`Ratio: ${ratio.toFixed(4)}`);
+  } else if (aelResult.unit.includes('/m²') && apertureDiameterMm === 0) {
+    // AEL requires irradiance but aperture is zero - cannot compare
+    comparisonDetails.push(`ERROR: AEL has irradiance units (${aelResult.unit}) but aperture diameter is 0 mm`);
+    comparisonDetails.push(`Cannot perform irradiance comparison`);
+    passes = false;
+    ratio = Infinity;
+  } else {
+    // Direct power/energy comparison
+    comparisonDetails.push(`Direct comparison:`);
+    comparisonDetails.push(`Emission: ${emission.toExponential(3)} ${emissionUnit}`);
+    comparisonDetails.push(`AEL: ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+    
+    // Check if units are compatible
+    const emissionIsEnergy = emissionUnit.includes('J');
+    const aelIsEnergy = aelResult.unit.includes('J');
+    
+    if (emissionIsEnergy === aelIsEnergy) {
+      ratio = emission / aelResult.value;
+      passes = emission <= aelResult.value;
+      comparisonDetails.push(`Comparison: ${emission.toExponential(3)} ${passes ? '≤' : '>'} ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+      comparisonDetails.push(`Ratio: ${ratio.toFixed(4)}`);
+    } else {
+      comparisonDetails.push(`ERROR: Unit mismatch - emission (${emissionUnit}) vs AEL (${aelResult.unit})`);
+      passes = false;
+      ratio = NaN;
+    }
+  }
+
+  return { passes, ratio, comparisonDetails };
 };
 
 // ======================== MULTIPLE WAVELENGTH CLASSIFICATION ========================
@@ -70,9 +215,8 @@ const classifyMultipleWavelengths = (
   steps.push(`\n--- Wavelength Details ---`);
   activeWavelengths.forEach((wl, index) => {
     steps.push(`Wavelength ${index + 1}: ${wl.wavelength} nm (${wl.laserType.toUpperCase()})`);
-    if (wl.laserType === 'continuous') {
-      steps.push(`  Power: ${wl.power} mW`);
-    } else {
+    steps.push(`  Power/Energy: ${wl.power} ${wl.powerUnit}`);
+    if (wl.laserType === 'pulsed') {
       steps.push(`  Pulse Energy: ${wl.pulseEnergy} mJ`);
       steps.push(`  Pulse Width: ${wl.pulseWidth} ns`);
       steps.push(`  Repetition Rate: ${wl.repetitionRate} Hz`);
@@ -125,9 +269,7 @@ const classifyAdditiveWavelengths = (
   steps.push(`Additive region: ${additiveGroup}`);
   steps.push(`Number of wavelengths: ${wavelengths.length}`);
   
-  const calculationSteps: string[] = [];
-  let finalSumCondition1 = 0;
-  let finalRatios: number[] = [];
+  const conditions = IEC_AEL_TABLES.getMeasurementConditions(wavelengths[0].wavelength, exposureTime);
   
   const classesToTest = ['Class 1', 'Class 2', 'Class 3R', 'Class 3B'];
   
@@ -142,12 +284,11 @@ const classifyAdditiveWavelengths = (
     for (let i = 0; i < wavelengths.length; i++) {
       const wl = wavelengths[i];
       
-      let emission = 0;
-      if (wl.laserType === 'continuous') {
-        emission = wl.power * MPE_CONSTANTS.MW_TO_W;
-      } else {
-        emission = wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-      }
+      // Calculate emission for this wavelength
+      const emissionCalc = calculateEmissionWithIrradiance(
+        wl, conditions.condition1.aperture, conditions.condition3.aperture,
+        useManualPowers, condition1Power, condition3Power
+      );
       
       // Calculate C5 for pulsed lasers
       let c5Factor = 1.0;
@@ -161,52 +302,60 @@ const classifyAdditiveWavelengths = (
       }
       
       // Get AEL for this class and wavelength
-      let ael = 0;
+      let aelResult: AELResult;
       switch (testClass) {
         case 'Class 1':
-          ael = IEC_AEL_TABLES.getClass1AEL(wl.wavelength, exposureTime, c5Factor);
+          aelResult = IEC_AEL_TABLES.getClass1AEL(wl.wavelength, exposureTime, c5Factor);
           break;
         case 'Class 2':
           if (IEC_AEL_TABLES.supportsClass2(wl.wavelength)) {
-            ael = IEC_AEL_TABLES.getClass2AEL(wl.wavelength, exposureTime, c5Factor);
+            aelResult = IEC_AEL_TABLES.getClass2AEL(wl.wavelength, exposureTime, c5Factor);
           } else {
-            ael = IEC_AEL_TABLES.getClass1AEL(wl.wavelength, exposureTime, c5Factor);
+            aelResult = IEC_AEL_TABLES.getClass1AEL(wl.wavelength, exposureTime, c5Factor);
           }
           break;
         case 'Class 3R':
-          ael = IEC_AEL_TABLES.getClass3RAEL(wl.wavelength, exposureTime, c5Factor);
+          aelResult = IEC_AEL_TABLES.getClass3RAEL(wl.wavelength, exposureTime, c5Factor);
           break;
         case 'Class 3B':
-          ael = IEC_AEL_TABLES.getClass3BAEL(wl.wavelength, exposureTime, c5Factor);
+          aelResult = IEC_AEL_TABLES.getClass3BAEL(wl.wavelength, exposureTime, c5Factor);
           break;
+        default:
+          aelResult = { value: 0, unit: 'W' };
       }
       
-      const ratio = emission / ael;
-      currentRatios.push(ratio);
-      sumCondition1 += ratio;
-      sumCondition3 += ratio;
+      // Compare with both conditions
+      const condition1Compare = compareEmissionWithAEL(
+        emissionCalc.condition1Emission, emissionCalc.condition1EmissionUnit, 
+        aelResult, conditions.condition1.aperture, []
+      );
+      const condition3Compare = compareEmissionWithAEL(
+        emissionCalc.condition3Emission, emissionCalc.condition3EmissionUnit, 
+        aelResult, conditions.condition3.aperture, []
+      );
       
-      steps.push(`  λ${i+1} (${wl.wavelength}nm, ${wl.laserType.toUpperCase()}): ${emission.toExponential(3)} / ${ael.toExponential(3)} = ${ratio.toFixed(4)}`);
+      currentRatios.push(Math.max(condition1Compare.ratio, condition3Compare.ratio));
+      sumCondition1 += condition1Compare.ratio;
+      sumCondition3 += condition3Compare.ratio;
+      
+      steps.push(`  λ${i+1} (${wl.wavelength}nm): Emission=${emissionCalc.emission.toExponential(3)} ${emissionCalc.emissionUnit}, AEL=${aelResult.value.toExponential(3)} ${aelResult.unit}`);
+      steps.push(`    Ratios: C1=${condition1Compare.ratio.toFixed(4)}, C3=${condition3Compare.ratio.toFixed(4)}`);
     }
     
     steps.push(`  Sum of ratios (Condition 1): ${sumCondition1.toFixed(4)}`);
     steps.push(`  Sum of ratios (Condition 3): ${sumCondition3.toFixed(4)}`);
     steps.push(`  Required: Sum ≤ 1.0 for both conditions`);
     
-    finalSumCondition1 = sumCondition1;
-    finalRatios = [...currentRatios];
-    
     if (sumCondition1 <= 1.0 && sumCondition3 <= 1.0) {
       steps.push(`  ${testClass} additive test: PASS ✓ (sum ≤ 1.0)`);
       steps.push(`\nResult: ${testClass} (additive classification)`);
       
       const totalEmission = wavelengths.reduce((sum, wl) => {
-        if (wl.laserType === 'continuous') return sum + wl.power * MPE_CONSTANTS.MW_TO_W;
-        if (wl.laserType === 'pulsed') return sum + wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-        return sum;
+        const emissionCalc = calculateEmissionWithIrradiance(wl, 0, 0);
+        return sum + emissionCalc.emission;
       }, 0);
       
-      return createAdditiveResult(testClass, totalEmission, sumCondition1, wavelengths, currentRatios, additiveGroup, steps);
+      return createAdditiveResult(testClass, totalEmission, Math.max(sumCondition1, sumCondition3), wavelengths, currentRatios, additiveGroup, steps);
     } else {
       steps.push(`  ${testClass} additive test: FAIL ✗ (sum > 1.0)`);
     }
@@ -216,12 +365,11 @@ const classifyAdditiveWavelengths = (
   steps.push(`Result: Class 4 (additive classification)`);
   
   const totalEmission = wavelengths.reduce((sum, wl) => {
-    if (wl.laserType === 'continuous') return sum + wl.power * MPE_CONSTANTS.MW_TO_W;
-    if (wl.laserType === 'pulsed') return sum + wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-    return sum;
+    const emissionCalc = calculateEmissionWithIrradiance(wl, 0, 0);
+    return sum + emissionCalc.emission;
   }, 0);
   
-  return createAdditiveResult('Class 4', totalEmission, finalSumCondition1, wavelengths, finalRatios, additiveGroup, steps);
+  return createAdditiveResult('Class 4', totalEmission, 999, wavelengths, [], additiveGroup, steps);
 };
 
 // Independent wavelength classification (highest individual class)
@@ -246,19 +394,15 @@ const classifyIndependentWavelengths = (
   for (let i = 0; i < wavelengths.length; i++) {
     const wl = wavelengths[i];
     
-    let emission = 0;
-    if (wl.laserType === 'continuous') {
-      emission = wl.power * MPE_CONSTANTS.MW_TO_W;
-    } else {
-      emission = wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-    }
+    const emissionCalc = calculateEmissionWithIrradiance(wl, 0, 0, useManualPowers, condition1Power, condition3Power);
     
     steps.push(`\n--- Individual Classification ${i+1}: ${wl.wavelength} nm (${wl.laserType.toUpperCase()}) ---`);
-    steps.push(`Emission: ${emission.toExponential(3)} ${wl.laserType === 'continuous' ? 'W' : 'J'}`);
+    steps.push(`Emission: ${emissionCalc.emission.toExponential(3)} ${emissionCalc.emissionUnit}`);
     
     const result = classifyLaserIECSingle(
       wl.wavelength,
-      emission,
+      emissionCalc.emission,
+      emissionCalc.emissionUnit,
       exposureTime,
       beamDiameter,
       wl.laserType,
@@ -292,12 +436,11 @@ const classifyIndependentWavelengths = (
   steps.push(`\nResult: ${highestClass} (independent classification - highest individual class)`);
   
   const totalEmission = wavelengths.reduce((sum, wl) => {
-    if (wl.laserType === 'continuous') return sum + wl.power * MPE_CONSTANTS.MW_TO_W;
-    if (wl.laserType === 'pulsed') return sum + wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-    return sum;
+    const emissionCalc = calculateEmissionWithIrradiance(wl, 0, 0);
+    return sum + emissionCalc.emission;
   }, 0);
   
-  return createIndependentResult(highestClass, totalEmission, wavelengths, individualResults, steps);
+  return createIndependentResult(highestClass, totalEmission, 'W', wavelengths, individualResults, steps);
 };
 
 const getClassNumeric = (laserClass: string): number => {
@@ -314,6 +457,7 @@ const getClassNumeric = (laserClass: string): number => {
 const classifyLaserIECSingle = (
   wavelength: number,
   emission: number,
+  emissionUnit: string,
   exposureTime: number,
   beamDiameter: number = 7,
   laserType: 'continuous' | 'pulsed' = 'continuous',
@@ -335,7 +479,7 @@ const classifyLaserIECSingle = (
     steps.push(`Condition 1 received power: ${condition1Power.toExponential(3)} W`);
     steps.push(`Condition 3 received power: ${condition3Power.toExponential(3)} W`);
   } else {
-    steps.push(`Emission: ${emission.toExponential(3)} ${laserType === 'continuous' ? 'W' : 'J'}`);
+    steps.push(`Emission: ${emission.toExponential(3)} ${emissionUnit}`);
     steps.push(`Beam diameter: ${beamDiameter} mm`);
   }
   
@@ -354,7 +498,6 @@ const classifyLaserIECSingle = (
 
   // Step 2: Determine if pulsed or CW
   steps.push(`\n--- Step 2: Laser Type Determination ---`);
-  let effectiveEmission = emission;
   let c5Factor = 1.0;
   let c5Details = null;
 
@@ -388,35 +531,51 @@ const classifyLaserIECSingle = (
   // Step 4: Sequential classification
   steps.push(`\n--- Step 4: Sequential Classification ---`);
   
-  const testClass = (className: string, getAEL: (wl: number, t: number, c5: number) => number) => {
-    const ael = getAEL(wavelength, exposureTime, c5Factor);
+  const testClass = (className: string, getAEL: (wl: number, t: number, c5: number) => AELResult) => {
+    const aelResult = getAEL(wavelength, exposureTime, c5Factor);
     steps.push(`\nTesting ${className}:`);
-    steps.push(`  AEL = ${ael.toExponential(3)} ${laserType === 'continuous' ? 'W' : 'J'}`);
+    steps.push(`  AEL = ${aelResult.value.toExponential(3)} ${aelResult.unit}`);
     
     let condition1Pass = true;
     let condition3Pass = true;
-    let condition1Emission = effectiveEmission;
-    let condition3Emission = effectiveEmission;
+    let condition1Emission = emission;
+    let condition3Emission = emission;
+    let condition1EmissionUnit = emissionUnit;
+    let condition3EmissionUnit = emissionUnit;
+    let condition1Compare: { passes: boolean; ratio: number; comparisonDetails: string[] } = { passes: true, ratio: 0, comparisonDetails: [] };
     
     if (useManualPowers && condition1Power !== undefined && condition3Power !== undefined) {
       condition1Emission = condition1Power;
       condition3Emission = condition3Power;
-      condition1Pass = condition1Power <= ael;
-      condition3Pass = condition3Power <= ael;
-    } else {
-      condition1Pass = isC1Applied ? effectiveEmission <= ael : true;
-      condition3Pass = effectiveEmission <= ael;
+      condition1EmissionUnit = 'W';
+      condition3EmissionUnit = 'W';
     }
     
+    // Perform comparisons with irradiance calculations if needed
     if (isC1Applied) {
-      steps.push(`  Condition 1: ${condition1Emission.toExponential(3)} ${condition1Pass ? '≤' : '>'} ${ael.toExponential(3)} - ${condition1Pass ? 'PASS' : 'FAIL'}`);
+      condition1Compare = compareEmissionWithAEL(
+        condition1Emission, condition1EmissionUnit, aelResult, conditions.condition1.aperture, []
+      );
+      condition1Pass = condition1Compare.passes;
+      steps.push(`  Condition 1: ${condition1Compare.comparisonDetails.join(', ')} - ${condition1Pass ? 'PASS' : 'FAIL'}`);
     } else {
       steps.push(`  Condition 1: NOT APPLIED (wavelength exemption)`);
     }
     
-    steps.push(`  Condition 3: ${condition3Emission.toExponential(3)} ${condition3Pass ? '≤' : '>'} ${ael.toExponential(3)} - ${condition3Pass ? 'PASS' : 'FAIL'}`);
+    const condition3Compare = compareEmissionWithAEL(
+      condition3Emission, condition3EmissionUnit, aelResult, conditions.condition3.aperture, []
+    );
+    condition3Pass = condition3Compare.passes;
+    steps.push(`  Condition 3: ${condition3Compare.comparisonDetails.join(', ')} - ${condition3Pass ? 'PASS' : 'FAIL'}`);
     
-    return { ael, condition1Pass, condition3Pass, bothPass: condition1Pass && condition3Pass };
+    return { 
+      aelResult, 
+      condition1Pass, 
+      condition3Pass, 
+      bothPass: condition1Pass && condition3Pass,
+      condition1Ratio: isC1Applied ? condition1Compare.ratio : 0,
+      condition3Ratio: condition3Compare.ratio
+    };
   };
 
   // Test Class 1
@@ -424,7 +583,7 @@ const classifyLaserIECSingle = (
   
   if (class1Test.bothPass) {
     steps.push(`\nResult: Class 1 (both conditions satisfied)`);
-    return createSingleResult('Class 1', class1Test.ael, effectiveEmission, steps, 
+    return createSingleResult('Class 1', class1Test.aelResult, emission, emissionUnit, steps, 
       class1Test.condition1Pass, class1Test.condition3Pass, false, c5Details);
   }
 
@@ -432,16 +591,18 @@ const classifyLaserIECSingle = (
   if (wavelength >= 302.5 && wavelength <= 4000 && 
       IEC_AEL_TABLES.requiresClassM(wavelength, beamDiameter) && isC1Applied) {
     steps.push(`\n--- Checking Class 1M (302.5-4000 nm, beam >7mm) ---`);
-    const class3BAEL = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
+    const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
     
-    if (!class1Test.condition1Pass && class1Test.condition3Pass && effectiveEmission <= class3BAEL) {
+    const class3BCompare = compareEmissionWithAEL(emission, emissionUnit, class3BAELResult, conditions.condition1.aperture, []);
+    
+    if (!class1Test.condition1Pass && class1Test.condition3Pass && class3BCompare.passes) {
       steps.push(`Class 1M conditions satisfied:`);
       steps.push(`  - Condition 1 > Class 1 AEL: YES ✓`);
       steps.push(`  - Condition 3 ≤ Class 1 AEL: YES ✓`);
-      steps.push(`  - Condition 1 ≤ Class 3B AEL: ${effectiveEmission.toExponential(3)} ≤ ${class3BAEL.toExponential(3)} ✓`);
+      steps.push(`  - Condition 1 ≤ Class 3B AEL: YES ✓`);
       steps.push(`  - Wavelength in range 302.5-4000 nm: YES ✓`);
       steps.push(`\nResult: Class 1M`);
-      return createSingleResult('Class 1M', class1Test.ael, effectiveEmission, steps, 
+      return createSingleResult('Class 1M', class1Test.aelResult, emission, emissionUnit, steps, 
         false, true, true, c5Details);
     }
   }
@@ -453,28 +614,29 @@ const classifyLaserIECSingle = (
     
     if (class2Test.bothPass) {
       steps.push(`\nResult: Class 2 (visible wavelength, conditions satisfied)`);
-      return createSingleResult('Class 2', class2Test.ael, effectiveEmission, steps, 
+      return createSingleResult('Class 2', class2Test.aelResult, emission, emissionUnit, steps, 
         class2Test.condition1Pass, class2Test.condition3Pass, false, c5Details);
     }
 
     // Check for Class 2M
     if (IEC_AEL_TABLES.requiresClassM(wavelength, beamDiameter) && isC1Applied) {
       steps.push(`\n--- Checking Class 2M (400-700 nm, beam >7mm) ---`);
-      const class3BAEL = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
+      const class3BAELResult = IEC_AEL_TABLES.getClass3BAEL(wavelength, exposureTime, c5Factor);
+      const class3BCompare = compareEmissionWithAEL(emission, emissionUnit, class3BAELResult, conditions.condition1.aperture, []);
       
-      if (!class2Test.condition1Pass && class2Test.condition3Pass && effectiveEmission <= class3BAEL) {
+      if (!class2Test.condition1Pass && class2Test.condition3Pass && class3BCompare.passes) {
         steps.push(`Class 2M conditions satisfied:`);
         steps.push(`  - Condition 1 > Class 2 AEL: YES ✓`);
         steps.push(`  - Condition 3 ≤ Class 2 AEL: YES ✓`);
-        steps.push(`  - Condition 1 ≤ Class 3B AEL: ${effectiveEmission.toExponential(3)} ≤ ${class3BAEL.toExponential(3)} ✓`);
+        steps.push(`  - Condition 1 ≤ Class 3B AEL: YES ✓`);
         steps.push(`\nResult: Class 2M`);
-        return createSingleResult('Class 2M', class2Test.ael, effectiveEmission, steps, 
+        return createSingleResult('Class 2M', class2Test.aelResult, emission, emissionUnit, steps, 
           false, true, true, c5Details);
       }
     }
   }
 
-  // Test Class 3R (with proper prerequisites per IEC 60825-1 Section 5.3.d)
+  // Test Class 3R
   const class3RTest = testClass('Class 3R', IEC_AEL_TABLES.getClass3RAEL);
   
   if (class3RTest.bothPass) {
@@ -501,29 +663,24 @@ const classifyLaserIECSingle = (
     
     if (prerequisitesMet) {
       steps.push(`\nResult: Class 3R (conditions and prerequisites satisfied)`);
-      return createSingleResult('Class 3R', class3RTest.ael, effectiveEmission, steps, 
+      return createSingleResult('Class 3R', class3RTest.aelResult, emission, emissionUnit, steps, 
         class3RTest.condition1Pass, class3RTest.condition3Pass, false, c5Details);
     } else {
       steps.push(`Class 3R prerequisites not met, continuing to Class 3B...`);
     }
   }
 
-  // Test Class 3B (with proper prerequisites per IEC 60825-1 Section 5.3.e)
+  // Test Class 3B
   const class3BTest = testClass('Class 3B', IEC_AEL_TABLES.getClass3BAEL);
   
   if (class3BTest.bothPass) {
-    // Check prerequisites per IEC 60825-1 Section 5.3.e
     steps.push(`\n--- Verifying Class 3B Prerequisites ---`);
     
     let prerequisitesMet = true;
     
     // Must exceed Class 3R for Condition 1 OR Condition 3
-    const class3RAEL = IEC_AEL_TABLES.getClass3RAEL(wavelength, exposureTime, c5Factor);
-    const exceedsClass3RC1 = !isC1Applied || effectiveEmission > class3RAEL;
-    const exceedsClass3RC3 = effectiveEmission > class3RAEL;
-    
-    if (exceedsClass3RC1 || exceedsClass3RC3) {
-      steps.push(`  Exceeds Class 3R AEL for Condition 1 or 3: YES ✓`);
+    if (!class3RTest.condition1Pass || !class3RTest.condition3Pass) {
+      steps.push(`  Exceeds Class 3R AEL for at least one condition: YES ✓`);
     } else {
       steps.push(`  ERROR: Does not exceed Class 3R AEL for either condition`);
       prerequisitesMet = false;
@@ -546,7 +703,7 @@ const classifyLaserIECSingle = (
     
     if (prerequisitesMet) {
       steps.push(`\nResult: Class 3B (conditions and prerequisites satisfied)`);
-      return createSingleResult('Class 3B', class3BTest.ael, effectiveEmission, steps, 
+      return createSingleResult('Class 3B', class3BTest.aelResult, emission, emissionUnit, steps, 
         class3BTest.condition1Pass, class3BTest.condition3Pass, false, c5Details);
     } else {
       steps.push(`Class 3B prerequisites not met, assigning Class 4...`);
@@ -562,15 +719,16 @@ const classifyLaserIECSingle = (
   }
   steps.push(`Result: Class 4`);
   
-  return createSingleResult('Class 4', class3BTest.ael, effectiveEmission, steps, 
+  return createSingleResult('Class 4', class3BTest.aelResult, emission, emissionUnit, steps, 
     false, false, false, c5Details);
 };
 
 // Helper functions for creating results
 const createSingleResult = (
   laserClass: string,
-  ael: number,
+  aelResult: AELResult,
   emission: number,
+  emissionUnit: string,
   steps: string[],
   condition1Test: boolean,
   condition3Test: boolean,
@@ -580,9 +738,11 @@ const createSingleResult = (
   return {
     laserClass,
     classificationMethod: 'single',
-    ael,
+    ael: aelResult.value,
+    aelUnit: aelResult.unit,
     measuredEmission: emission,
-    ratio: emission / ael,
+    emissionUnit,
+    ratio: emission / aelResult.value,
     classDescription: getClassDescription(laserClass),
     safetyRequirements: getSafetyRequirements(laserClass),
     condition1Test,
@@ -591,8 +751,10 @@ const createSingleResult = (
     iecCompliant: true,
     condition1Emission: emission,
     condition3Emission: emission,
-    condition1AEL: ael,
-    condition3AEL: ael,
+    condition1AEL: aelResult.value,
+    condition3AEL: aelResult.value,
+    condition1AELUnit: aelResult.unit,
+    condition3AELUnit: aelResult.unit,
     classificationSteps: steps,
     c5Correction: c5Details ? {
       c5Factor: c5Details.c5Factor,
@@ -614,7 +776,9 @@ const createAdditiveResult = (
     laserClass,
     classificationMethod: 'additive',
     ael: 1.0,
+    aelUnit: 'dimensionless',
     measuredEmission: totalEmission,
+    emissionUnit: 'W',
     ratio: sumOfRatios,
     classDescription: getClassDescription(laserClass),
     safetyRequirements: getSafetyRequirements(laserClass),
@@ -626,6 +790,8 @@ const createAdditiveResult = (
     condition3Emission: totalEmission,
     condition1AEL: 1.0,
     condition3AEL: 1.0,
+    condition1AELUnit: 'dimensionless',
+    condition3AELUnit: 'dimensionless',
     classificationSteps: steps,
     additiveCalculation: {
       wavelengths: wavelengths.map(wl => ({
@@ -648,15 +814,18 @@ const createAdditiveResult = (
 const createIndependentResult = (
   laserClass: string,
   totalEmission: number,
+  emissionUnit: string,
   wavelengths: WavelengthData[],
   individualResults: any[],
   steps: string[]
 ): ClassificationResult => {
   return {
     laserClass,
-    classificationMethod: 'single', // Use 'single' instead of 'independent' to match interface
+    classificationMethod: 'single',
     ael: 0,
+    aelUnit: 'W',
     measuredEmission: totalEmission,
+    emissionUnit,
     ratio: 0,
     classDescription: getClassDescription(laserClass),
     safetyRequirements: getSafetyRequirements(laserClass),
@@ -668,6 +837,8 @@ const createIndependentResult = (
     condition3Emission: totalEmission,
     condition1AEL: 0,
     condition3AEL: 0,
+    condition1AELUnit: 'W',
+    condition3AELUnit: 'W',
     classificationSteps: steps
   };
 };
@@ -677,7 +848,9 @@ const createErrorResult = (errorType: string, steps: string[]): ClassificationRe
     laserClass: `ERROR: ${errorType}`,
     classificationMethod: 'single',
     ael: 0,
+    aelUnit: 'W',
     measuredEmission: 0,
+    emissionUnit: 'W',
     ratio: 0,
     classDescription: 'Classification cannot be completed',
     safetyRequirements: ['Correct input parameters and retry'],
@@ -689,6 +862,8 @@ const createErrorResult = (errorType: string, steps: string[]): ClassificationRe
     condition3Emission: 0,
     condition1AEL: 0,
     condition3AEL: 0,
+    condition1AELUnit: 'W',
+    condition3AELUnit: 'W',
     classificationSteps: steps
   };
 };
@@ -729,6 +904,7 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
       wavelength: 532,
       laserType: 'continuous',
       power: 5,
+      powerUnit: 'mW',
       pulseEnergy: 1,
       pulseWidth: 10,
       repetitionRate: 1000,
@@ -825,17 +1001,12 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
       if (activeWavelengths.length === 1) {
         // Single wavelength classification
         const wl = activeWavelengths[0];
-        let emission = 0;
-        
-        if (wl.laserType === 'continuous') {
-          emission = wl.power * MPE_CONSTANTS.MW_TO_W;
-        } else {
-          emission = wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
-        }
+        const emissionCalc = calculateEmissionWithIrradiance(wl, 0, 0);
 
         results = classifyLaserIECSingle(
           wl.wavelength,
-          emission,
+          emissionCalc.emission,
+          emissionCalc.emissionUnit,
           exposureTime,
           beamDiameter,
           wl.laserType,
@@ -878,6 +1049,7 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
         wavelength: 800,
         laserType: 'continuous',
         power: 1,
+        powerUnit: 'mW',
         pulseEnergy: 1,
         pulseWidth: 10,
         repetitionRate: 1000,
@@ -907,6 +1079,7 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
       wavelength: 532,
       laserType: 'continuous',
       power: 5,
+      powerUnit: 'mW',
       pulseEnergy: 1,
       pulseWidth: 10,
       repetitionRate: 1000,
@@ -925,16 +1098,16 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">IEC 60825-1:2014 Laser Classification</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
+        <h2 className="text-xl font-semibold">Laser Classification</h2>
+        {/* {onShowTutorial && (
+          // <button 
+          //   onClick={onShowTutorial} 
+          //   className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          // >
+          //   <span className="mr-1">Tutorial</span>
+          //   <Icons.InfoInline />
+          // </button>
+        )} */}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1008,15 +1181,15 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                 />
               </div>
 
-              {/* Power/Energy Parameters */}
-              {wl.laserType === 'continuous' ? (
-                <div className="mb-3">
+              {/* Power/Energy Parameters with Unit Selection */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Laser Power (mW)
+                    Power/Energy Value
                   </label>
                   <input
                     type="number"
-                    min="1e-9"
+                    min="1e-12"
                     max="1e9"
                     step="any"
                     value={wl.power}
@@ -1024,7 +1197,22 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                     className="w-full p-2 border rounded-md"
                   />
                 </div>
-              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Unit
+                  </label>
+                  <select
+                    value={wl.powerUnit}
+                    onChange={(e) => updateWavelength(wl.id, 'powerUnit', e.target.value as 'mW' | 'J')}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="mW">mW (milliwatts)</option>
+                    <option value="J">J (joules)</option>
+                  </select>
+                </div>
+              </div>
+              
+              {wl.laserType === 'pulsed' && (
                 <>
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
@@ -1315,6 +1503,18 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                           </td>
                         </tr>
                         <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">Emission</td>
+                          <td className="px-3 py-2">
+                            {classificationResults.measuredEmission.toExponential(3)} {classificationResults.emissionUnit}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium">AEL</td>
+                          <td className="px-3 py-2">
+                            {classificationResults.ael.toExponential(3)} {classificationResults.aelUnit}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-200">
                           <td className="px-3 py-2 font-medium">
                             {classificationResults.classificationMethod === 'additive' ? 'Sum of Ratios' : 'Emission/AEL Ratio'}
                           </td>
@@ -1410,7 +1610,8 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                   This calculator supports both single and multiple wavelength classification per IEC 60825-1:2014, 
                   including additive rules for wavelengths affecting the same biological endpoint and independent 
                   classification for non-additive wavelengths. Each wavelength can be configured as CW or pulsed 
-                  with full parameter control.
+                  with full parameter control. Irradiance calculations are automatically performed when AEL units 
+                  require area-based comparisons (J/m² or W/m²).
                 </p>
               </div>
             </>

@@ -45,7 +45,9 @@ export interface ClassificationResult {
   laserClass: string;
   classificationMethod: 'single' | 'additive' | 'independent';
   ael: number;
+  aelUnit: string;
   measuredEmission: number;
+  emissionUnit: string;
   ratio: number;
   classDescription: string;
   safetyRequirements: string[];
@@ -57,6 +59,8 @@ export interface ClassificationResult {
   condition3Emission?: number;
   condition1AEL?: number;
   condition3AEL?: number;
+  condition1AELUnit?: string;
+  condition3AELUnit?: string;
   classificationSteps?: string[];
   c5Correction?: {
     c5Factor: number;
@@ -79,6 +83,12 @@ export interface EyewearResult {
   lbRating: string;
   dirRating: string;
   recommendations: string[];
+}
+
+// AEL Result interface with unit information
+export interface AELResult {
+  value: number;
+  unit: string;
 }
 
 // ======================== CONSTANTS ========================
@@ -107,6 +117,8 @@ export const MPE_CONSTANTS = {
   CM2_TO_M2: 1e-4, // cm² to m²
   M2_TO_CM2: 1e4, // m² to cm²
   MM_TO_CM: 0.1, // mm to cm
+  MM_TO_M: 1e-3, // mm to m
+  MM2_TO_M2: 1e-6, // mm² to m²
   MRAD_TO_RAD: 1e-3, // mrad to rad
   NS_TO_S: 1e-9, // nanoseconds to seconds
 };
@@ -388,388 +400,546 @@ export const IEC_AEL_TABLES = {
     return { C1, C2, C3, C4, C5, C6, C7, T1, T2 };
   },
 
-  // Table 3: Class 1 AEL values (general) - Enhanced with C5 application - COMPLETE IMPLEMENTATION
-  getClass1AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+  // Table 3: Class 1 AEL values (general) - Enhanced with C5 application and units
+  getClass1AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     const t = exposureTime;
 
     let baseAEL = 0;
+    let unit = 'W';
 
     if (wavelength >= 180 && wavelength < 302.5) {
       if (t < 1e-8) {
         baseAEL = 3e10; // W/m²
+        unit = 'W/m²';
       } else if (t >= 1e-8 && t < 3e4) {
         baseAEL = 30; // J/m²
+        unit = 'J/m²';
       }
-      return baseAEL; // No C5 correction for UV skin hazard (W/m² or J/m²)
+      return { value: baseAEL, unit }; // No C5 correction for UV skin hazard
     } else if (wavelength >= 302.5 && wavelength < 315) {
       if (t < 1e-8) {
         baseAEL = 2.4e4; // W
+        unit = 'W';
       } else if (t >= 1e-8 && t < 10 && t<= corrections.T1) {
         baseAEL = 7.9e-7 * corrections.C1; // J
+        unit = 'J';
       } else if (t >= 1e-8 && t < 10 && t> corrections.T1) {
         baseAEL = 7.9e-7 * corrections.C2; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 7.9e-7 * corrections.C2; // J
+        unit = 'J';
       }
     } else if (wavelength >= 315 && wavelength < 400) {
       if (t < 1e-8) {
         baseAEL = 2.4e4; // W
+        unit = 'W';
       } else if (t >= 1e-8 && t < 10) {
         baseAEL = 7.9e-4 * corrections.C1; // J
+        unit = 'J';
       } else if (t >= 10 && t < 1000) {
         baseAEL = 7.9e-3; // J
+        unit = 'J';
       } else if (t >= 1000 && t < 3e4) {
         baseAEL = 7.9e-6; // W
+        unit = 'W';
       }
     } else if (wavelength >= 400 && wavelength < 450) {
       if (t < 1e-11) {
         baseAEL = 3.8e-8; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 7.7e-8; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 10) {
         baseAEL = 7e-4 * Math.pow(t, 0.75); // J
+        unit = 'J';
       } else if (t >= 10 && t < 100) {
         baseAEL = 3.9e-3; // J
+        unit = 'J';
       } else if (t >= 100 && t < 3e4) {
         baseAEL = 3.9e-5 * corrections.C3; // W
+        unit = 'W';
       }
     } else if (wavelength >= 450 && wavelength < 500) {
       if (t < 1e-11) {
         baseAEL = 3.8e-8; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 7.7e-8; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 10) {
         baseAEL = 7e-4 * Math.pow(t, 0.75); // J
+        unit = 'J';
       } else if (t >= 10 && t < 100) {
         baseAEL = 3.9e-3 * corrections.C3; // J
+        unit = 'J';
       } else if (t >= 100 && t < 1000) {
         const limit1_J = 3.9e-3 * corrections.C3; // J
         const limit2_Power_W = 3.9e-4; // W
         baseAEL = Math.min(limit1_J, limit2_Power_W * t); // J
+        unit = 'J';
       } else if (t >= 1000 && t < 3e4) {
         baseAEL = 3.9e-5 * corrections.C3; // W
+        unit = 'W';
       }
     } else if (wavelength >= 500 && wavelength < 700) {
       if (t < 1e-11) {
         baseAEL = 3.8e-8; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 7.7e-8; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 10) {
         baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+        unit = 'J';
       }
       else if (t >= 10 && t < 3e4) {
         baseAEL = 3.9e-4; // W
+        unit = 'W';
       }
     } else if (wavelength >= 700 && wavelength < 1050) {
       if (t < 1e-11) {
-        baseAEL = 3.8e-8; // W
+        baseAEL = 3.8e-8; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 7.7e-8 * corrections.C4; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 100) {
         baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4; // J
+        unit = 'J';
       }
       else if (t >= 100 && t < 3e4) {
         baseAEL = 3.9e-4 * corrections.C4 * corrections.C7; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1050 && wavelength < 1400) {
       if (t < 1e-11) {
         baseAEL = 3.8e-8 * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 1.3e-5) {
         baseAEL = 7.7e-7 * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 1.3e-5 && t < 10) {
         baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 3.9e-4 * corrections.C4 * corrections.C7; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1400 && wavelength < 1500) {
       if (t >= 1e-13 && t < 1e-9) {
         baseAEL = 8e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-3) {
         baseAEL = 8e-4; // J
+        unit = 'J';
       } else if (t >= 1e-3 && t < 0.35) {
         baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 1e-2 * t; // J
+        unit = 'J';
       }else if (t >= 10 && t < 3e4) {
-        baseAEL = 1e-2 * t; // W
+        baseAEL = 1e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1500 && wavelength < 1800) {
       if (t >= 1e-13 && t < 1e-9) {
         baseAEL = 8e6; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.35) {
         baseAEL = 8e-3; // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 1.8e-2 * Math.pow(t, 0.75); // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 1.0e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1800 && wavelength < 2600) {
       if (t >= 1e-13 && t < 1e-9) {
         baseAEL = 8e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-3) {
         baseAEL = 8e-4; // J
+        unit = 'J';
       } else if (t >= 1e-3 && t < 0.35) {
         baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 0.01 * t; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 1.0e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 2600 && wavelength < 4000) {
       if (t >= 1e-13 && t < 1e-9) {
         baseAEL = 8e4; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-7) {
         baseAEL = 8e-5; // J
+        unit = 'J';
       } else if (t >= 1e-7 && t < 0.35) {
         baseAEL = 4.4e-3 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 0.01 * t; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 1.0e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 4000 && wavelength <= 1e6) {
       if (t < 1e-9) {
         baseAEL = 1e11; // W/m²
+        unit = 'W/m²';
       } else if (t >= 1e-9 && t < 1e-7) {
         baseAEL = 100; // J/m²
+        unit = 'J/m²';
       } else if (t >= 1e-7 && t < 10) {
         baseAEL = 5600 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
       }
       else if (t >= 10 && t < 3e4) {
         baseAEL = 1000; // W/m²
+        unit = 'W/m²';
       }
-      return baseAEL; // No C5 correction for skin hazard (W/m² or J/m²)
+      return { value: baseAEL, unit }; // No C5 correction for skin hazard
     }
 
     // Apply C5 correction for pulse trains (only for retinal hazard wavelengths)
     if (wavelength >= 302.5 && wavelength < 4000) {
-      return baseAEL * c5Factor;
+      return { value: baseAEL * c5Factor, unit };
     }
-    return baseAEL;
+    return { value: baseAEL, unit };
   },
 
-  // Table 5: Class 2 AEL values (visible only) - Enhanced with C5 application
-  getClass2AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+  // Table 5: Class 2 AEL values (visible only) - Enhanced with C5 application and units
+  getClass2AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     if (wavelength >= 400 && wavelength <= 700) {
       if (exposureTime < 0.25) {
-        return 1e-3 * corrections.C6 * c5Factor; // W
+        return { value: 1e-3 * corrections.C6 * c5Factor, unit: 'W' };
       } else {
-        return 1e-3 * corrections.C6 * c5Factor; // W
+        return { value: 1e-3 * corrections.C6 * c5Factor, unit: 'W' };
       }
     }
-    return 0;
+    return { value: 0, unit: 'W' };
   },
 
-  // Table 6: Class 3R AEL values - Enhanced with C5 application - COMPLETE IMPLEMENTATION
-  getClass3RAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+  // Table 6: Class 3R AEL values - Enhanced with C5 application and units
+  getClass3RAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     const t = exposureTime;
     let baseAEL = 0;
+    let unit = 'W';
 
     if (wavelength >= 180 && wavelength < 302.5) {
       if (t < 1e-9) {
         baseAEL = 1.5e11; // W/m²
+        unit = 'W/m²';
       } else if (t >= 1e-9 && t < 3e4) {
         baseAEL = 150; // J/m²
+        unit = 'J/m²';
       }
-      return baseAEL; // No C5 correction for skin hazard
+      return { value: baseAEL, unit }; // No C5 correction for skin hazard
     } else if (wavelength >= 302.5 && wavelength < 315) {
       if (t < 1e-9) {
         baseAEL = 1.2e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t <= corrections.T1 && t< 10) {
         baseAEL = 4e-6 * corrections.C1; // J
+        unit = 'J';
       } else if (t >= 1e-9 && t > corrections.T1 && t < 10) {
         baseAEL = 4.0e-5 * corrections.C2; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 4.0e-6 * corrections.C2; // J
+        unit = 'J';
       }
     } else if (wavelength >= 315 && wavelength < 400) {
       if (t < 1e-9) {
         baseAEL = 1.2e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 10) {
         baseAEL = 4.0e-6 * corrections.C1; // J
+        unit = 'J';
       } else if (t >= 10 && t < 1000) {
         baseAEL = 4.0e-2; // J
+        unit = 'J';
       } else if (t >= 1000 && t < 3e4) {
         baseAEL = 4.0e-5; // W
+        unit = 'W';
       }
     } else if (wavelength >= 400 && wavelength < 700) {
       if (t < 1e-11) {
         baseAEL = 1.9e-7; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 3.8e-7; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 0.25) {
         baseAEL = 3.5e-3 * Math.pow(t, 0.75); // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 5.0e-3; // W
+        unit = 'W';
       }
     } else if (wavelength >= 700 && wavelength < 1050) {
       if (t < 1e-11) {
         baseAEL = 1.9e-7; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 5e-6) {
         baseAEL = 3.8e-7 * corrections.C4; // J
+        unit = 'J';
       } else if (t >= 5e-6 && t < 10) {
         baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C4; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 2.0e-3 * corrections.C4 * corrections.C7; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1050 && wavelength < 1400) {
       if (t < 1e-11) {
         baseAEL = 1.9e-6 * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 1e-11 && t < 1.3e-5) {
         baseAEL = 3.8e-6 * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 1.3e-5 && t < 10) {
         baseAEL = 1.8e-2 * Math.pow(t, 0.75) * corrections.C7; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 2.0e-3 * corrections.C4 * corrections.C7; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1400 && wavelength < 1500) {
       if (t < 1e-9) {
         baseAEL = 4e6; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-3) {
         baseAEL = 4e-3; // J
+        unit = 'J';
       } else if (t >= 1e-3 && t < 0.35) {
         baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 5e-2 * t; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
-        baseAEL = 5e-2 * t; // J
+        baseAEL = 5e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1500 && wavelength < 1800) {
       if (t < 1e-9) {
         baseAEL = 4e7; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.35) {
         baseAEL = 4e-2; // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 9e-2 * Math.pow(t, 0.75); // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 5.0e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 1800 && wavelength < 2600) {
       if (t < 1e-9) {
         baseAEL = 4e6; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-3) {
         baseAEL = 4e-3; // J
+        unit = 'J';
       } else if (t >= 1e-3 && t < 0.35) {
         baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 5e-2 * t; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 5.0e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 2600 && wavelength < 4000) {
       if (t < 1e-9) {
         baseAEL = 4e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 1e-7) {
         baseAEL = 4e-4; // J
+        unit = 'J';
       } else if (t >= 1e-7 && t < 0.35) {
         baseAEL = 2.2e-2 * Math.pow(t, 0.25); // J
+        unit = 'J';
       } else if (t >= 0.35 && t < 10) {
         baseAEL = 5e-2 * t; // J
+        unit = 'J';
       } else if (t >= 10 && t < 3e4) {
-        baseAEL = 5e-2 * t; // W
+        baseAEL = 5e-2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 4000 && wavelength <= 1e6) {
       if (t < 1e-9) {
         baseAEL = 5e11; // W/m²
+        unit = 'W/m²';
       } else if (t >= 1e-9 && t < 1e-7) {
         baseAEL = 500; // J/m²
+        unit = 'J/m²';
       } else if (t >= 1e-7 && t < 10) {
         baseAEL = 2.8e4 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
       } else if (t >= 10 && t < 3e4) {
         baseAEL = 5000; // W/m²
+        unit = 'W/m²';
       }
-      return baseAEL; // No C5 correction for skin hazard
+      return { value: baseAEL, unit }; // No C5 correction for skin hazard
     }
     
     // Apply C5 correction for retinal hazard wavelengths
     if (wavelength >= 302.5 && wavelength < 4000) {
-      return baseAEL * c5Factor;
+      return { value: baseAEL * c5Factor, unit };
     }
-    return baseAEL;
+    return { value: baseAEL, unit };
   },
 
-  // Table 8: Class 3B AEL values - Enhanced with C5 application - COMPLETE IMPLEMENTATION
-  getClass3BAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): number => {
+  // Table 8: Class 3B AEL values - Enhanced with C5 application and units
+  getClass3BAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     const t = exposureTime;
     let baseAEL = 0;
+    let unit = 'W';
 
     if (wavelength >= 180 && wavelength < 302.5) {
       if (t < 1e-9) {
         baseAEL = 3.8e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         baseAEL = 3.8e-4; // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 1.5e-3; // W
+        unit = 'W';
       }
-      return baseAEL; // No C5 correction for skin hazard
+      return { value: baseAEL, unit }; // No C5 correction for skin hazard
     } else if (wavelength >= 302.5 && wavelength < 315) {
       if (t < 1e-9) {
         baseAEL = 1.25e4 * corrections.C2; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         baseAEL = 1.25e-5 * corrections.C2; // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 5e-5 * corrections.C2; // W
+        unit = 'W';
       }
     } else if (wavelength >= 315 && wavelength < 400) {
       if (t < 1e-9) {
         baseAEL = 1.25e3; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         baseAEL = 0.125; // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
+        unit = 'W';
       }
     } else if (wavelength >= 400 && wavelength <= 700) {
       if (t < 1e-9) {
         baseAEL = 3e5; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         if (t < 0.06) {
           baseAEL = 0.03; // J
+          unit = 'J';
         } else {
           baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
+          unit = 'W';
         }
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
+        unit = 'W';
       }
     } else if (wavelength > 700 && wavelength <= 1050) {
       if (t < 1e-9) {
         baseAEL = 3e7 * corrections.C4; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         const timeLimit = 0.06 * corrections.C4;
         if (t < timeLimit) {
           baseAEL = 0.03 * corrections.C4; // J
+          unit = 'J';
         } else {
           baseAEL = 0.5; // W (converted to energy: 0.5 * t for comparison)
+          unit = 'W';
         }
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
+        unit = 'W';
       }
     } else if (wavelength > 1050 && wavelength <= 1400) {
       if (t < 1e-9) {
         baseAEL = 1.5e8; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         baseAEL = 0.15; // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
+        unit = 'W';
       }
     } else if (wavelength > 1400 && wavelength < 1e6) {
       if (t < 1e-9) {
         baseAEL = 1.25e8; // W
+        unit = 'W';
       } else if (t >= 1e-9 && t < 0.25) {
         baseAEL = 0.125; // J
+        unit = 'J';
       } else if (t >= 0.25 && t < 3e4) {
         baseAEL = 0.5; // W
+        unit = 'W';
       }
     }
     // Apply C5 correction for retinal hazard wavelengths
     if (wavelength >= 302.5 && wavelength < 4000) {
-      return baseAEL * c5Factor;
+      return { value: baseAEL * c5Factor, unit };
     }
-    return baseAEL;
+    return { value: baseAEL, unit };
   }
+};
+
+// ======================== IRRADIANCE CALCULATION UTILITIES ========================
+
+// Calculate irradiance based on power/energy and aperture area
+export const calculateIrradiance = (
+  powerOrEnergy: number, // in W or J
+  apertureDiameterMm: number, // aperture diameter in mm
+  isEnergy: boolean = false // true for energy (J), false for power (W)
+): {
+  irradiance: number;
+  unit: string;
+  apertureArea: number;
+} => {
+  if (apertureDiameterMm <= 0) {
+    return { irradiance: 0, unit: isEnergy ? 'J/m²' : 'W/m²', apertureArea: 0 };
+  }
+
+  // Calculate aperture area in m²
+  const apertureRadiusM = (apertureDiameterMm * MPE_CONSTANTS.MM_TO_M) / 2;
+  const apertureAreaM2 = Math.PI * apertureRadiusM * apertureRadiusM;
+  
+  // Calculate irradiance
+  const irradiance = powerOrEnergy / apertureAreaM2;
+  const unit = isEnergy ? 'J/m²' : 'W/m²';
+  
+  return {
+    irradiance,
+    unit,
+    apertureArea: apertureAreaM2
+  };
 };
 
 // ======================== OTHER UTILITY FUNCTIONS ========================
