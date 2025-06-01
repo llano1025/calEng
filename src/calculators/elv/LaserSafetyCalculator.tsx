@@ -86,7 +86,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-semibold mb-4 text-blue-700">About Enhanced Laser Safety Calculations</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h4 className="font-medium text-blue-800 mb-2">Key Enhancements</h4>
             <ul className="list-disc pl-5 space-y-1 text-sm">
@@ -106,7 +106,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
               <li><strong>Protective Eyewear:</strong> Optical density requirements with EN 207 and ANSI Z136 marking guidance.</li>
             </ul>
           </div>
-        </div>
+        </div> */}
 
         <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
           <h4 className="font-medium text-blue-800 mb-2 flex items-center">
@@ -135,7 +135,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
           </div>
         </div>
 
-        <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+        {/* <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
           <h4 className="font-medium text-yellow-800 mb-2">C5 Correction Factor Implementation</h4>
           <p className="text-sm text-yellow-800 mb-2">
             This enhanced implementation properly calculates the C5 correction factor according to IEC 60825-1:2014, 
@@ -153,7 +153,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
               <li>Validation for physical consistency of pulse parameters</li>
             </ul>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

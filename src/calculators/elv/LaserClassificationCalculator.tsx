@@ -24,6 +24,8 @@ interface WavelengthData {
   power: number; // Value in selected unit
   powerUnit: 'mW' | 'J'; // Unit selection
   pulseEnergy: number; // mJ for pulsed
+  pulseEnergyMode: 'manual' | 'calculated'; // How pulse energy is determined
+  totalEnergy: number; // J for calculated mode
   pulseWidth: number; // ns for pulsed
   repetitionRate: number; // Hz for pulsed
   beamDivergence: number; // mrad
@@ -46,6 +48,22 @@ const determineAdditiveGroup = (wavelengths: number[]): string | null => {
     }
   }
   return null;
+};
+
+// Helper function to get actual pulse energy based on mode
+const getActualPulseEnergy = (wl: WavelengthData): number => {
+  if (wl.laserType !== 'pulsed') return 0;
+  
+  if (wl.pulseEnergyMode === 'manual') {
+    return wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J; // Convert mJ to J
+  } else {
+    // Calculated mode: Total Energy / Repetition Rate
+    if (wl.repetitionRate > 0) {
+      return wl.totalEnergy / wl.repetitionRate; // Already in J
+    } else {
+      return wl.totalEnergy; // Single pulse case
+    }
+  }
 };
 
 // ======================== ENHANCED EMISSION CALCULATION WITH IRRADIANCE ========================
@@ -96,20 +114,41 @@ const calculateEmissionWithIrradiance = (
         emission = wl.power; // Assuming J as energy value
         emissionUnit = 'J';
       }
+      calculations.push(`Continuous Wave (CW) laser:`);
+      calculations.push(`Input: ${wl.power} ${wl.powerUnit}`);
+      calculations.push(`Calculated emission: ${emission.toExponential(3)} ${emissionUnit}`);
     } else {
+      // Pulsed laser - calculate pulse energy based on mode
+      let pulseEnergyJ = getActualPulseEnergy(wl);
+      
+      if (wl.pulseEnergyMode === 'manual') {
+        calculations.push(`Pulsed laser (manual pulse energy mode):`);
+        calculations.push(`Pulse energy: ${wl.pulseEnergy} mJ = ${pulseEnergyJ.toExponential(3)} J`);
+      } else {
+        // Calculated mode: Total Energy / Repetition Rate
+        if (wl.repetitionRate > 0) {
+          calculations.push(`Pulsed laser (calculated pulse energy mode):`);
+          calculations.push(`Total energy: ${wl.totalEnergy} J`);
+          calculations.push(`Repetition rate: ${wl.repetitionRate} Hz`);
+          calculations.push(`Calculated pulse energy: ${wl.totalEnergy} J / ${wl.repetitionRate} Hz = ${pulseEnergyJ.toExponential(3)} J`);
+        } else {
+          calculations.push(`Pulsed laser (single pulse):`);
+          calculations.push(`Pulse energy: ${wl.totalEnergy} J = ${pulseEnergyJ.toExponential(3)} J`);
+        }
+      }
+      
       if (wl.powerUnit === 'J') {
         emission = wl.power;
         emissionUnit = 'J';
-      } else { // mW unit selected for pulsed - convert to energy
-        emission = wl.pulseEnergy * MPE_CONSTANTS.MJ_TO_J;
+        calculations.push(`Using power unit input: ${wl.power} J`);
+      } else {
+        emission = pulseEnergyJ;
         emissionUnit = 'J';
+        calculations.push(`Using calculated pulse energy: ${pulseEnergyJ.toExponential(3)} J`);
       }
     }
 
-    calculations.push(`Laser emission calculation:`);
-    calculations.push(`Laser type: ${wl.laserType.toUpperCase()}`);
-    calculations.push(`Input: ${wl.power} ${wl.powerUnit}`);
-    calculations.push(`Calculated emission: ${emission.toExponential(3)} ${emissionUnit}`);
+    calculations.push(`Final emission: ${emission.toExponential(3)} ${emissionUnit}`);
 
     // Use same emission for both conditions unless irradiance calculation needed
     condition1Emission = emission;
@@ -219,9 +258,19 @@ const classifyMultipleWavelengths = (
     steps.push(`Wavelength ${index + 1}: ${wl.wavelength} nm (${wl.laserType.toUpperCase()})`);
     steps.push(`  Power/Energy: ${wl.power} ${wl.powerUnit}`);
     if (wl.laserType === 'pulsed') {
-      steps.push(`  Pulse Energy: ${wl.pulseEnergy} mJ`);
+      if (wl.pulseEnergyMode === 'manual') {
+        steps.push(`  Pulse Energy (manual): ${wl.pulseEnergy} mJ`);
+      } else {
+        const calculatedPulseEnergy = wl.repetitionRate > 0 ? (wl.totalEnergy / wl.repetitionRate * 1000) : (wl.totalEnergy * 1000);
+        steps.push(`  Total Energy: ${wl.totalEnergy} J`);
+        if (wl.repetitionRate > 0) {
+          steps.push(`  Pulse Energy (calculated): ${calculatedPulseEnergy.toFixed(6)} mJ = ${wl.totalEnergy} J ÷ ${wl.repetitionRate} Hz`);
+        } else {
+          steps.push(`  Pulse Energy (single pulse): ${calculatedPulseEnergy.toFixed(6)} mJ = ${wl.totalEnergy} J (single pulse)`);
+        }
+      }
       steps.push(`  Pulse Width: ${wl.pulseWidth} ns`);
-      steps.push(`  Repetition Rate: ${wl.repetitionRate} Hz`);
+      steps.push(`  Repetition Rate: ${wl.repetitionRate} Hz ${wl.repetitionRate === 0 ? '(single pulse)' : ''}`);
     }
     steps.push(`  Beam Divergence: ${wl.beamDivergence} mrad`);
   });
@@ -294,12 +343,19 @@ const classifyAdditiveWavelengths = (
       
       // Calculate C5 for pulsed lasers
       let c5Factor = 1.0;
-      if (wl.laserType === 'pulsed' && wl.repetitionRate > 0) {
-        const numberOfPulses = Math.floor(exposureTime * wl.repetitionRate);
-        if (numberOfPulses > 1) {
-          const c5Details = calculateC5Factor(wl.wavelength, wl.pulseWidth, wl.repetitionRate, exposureTime);
-          c5Factor = c5Details.c5Factor;
-          steps.push(`  λ${i+1} C5 correction: ${c5Factor.toFixed(4)}`);
+      if (wl.laserType === 'pulsed') {
+        if (wl.repetitionRate === 0) {
+          // Single pulse operation
+          steps.push(`  λ${i+1} Single pulse operation: C5 = 1.0`);
+        } else if (wl.repetitionRate > 0) {
+          const numberOfPulses = Math.floor(exposureTime * wl.repetitionRate);
+          if (numberOfPulses > 1) {
+            const c5Details = calculateC5Factor(wl.wavelength, wl.pulseWidth, wl.repetitionRate, exposureTime);
+            c5Factor = c5Details.c5Factor;
+            steps.push(`  λ${i+1} C5 correction: ${c5Factor.toFixed(4)}`);
+          } else {
+            steps.push(`  λ${i+1} Single pulse in exposure window: C5 = 1.0`);
+          }
         }
       }
       
@@ -508,18 +564,23 @@ const classifyLaserIECSingle = (
   if (laserType === 'pulsed') {
     steps.push(`Pulsed laser detected`);
     
-    if (pulseWidth && repetitionRate && repetitionRate > 0) {
-      const numberOfPulses = Math.floor(exposureTime * repetitionRate);
-      
-      if (numberOfPulses <= 1) {
-        steps.push(`Single pulse operation (N=${numberOfPulses})`);
-      } else {
-        steps.push(`Repetitively pulsed operation (N=${numberOfPulses})`);
-        c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime, beamDivergence);
-        c5Factor = c5Details.c5Factor;
-        steps.push(`C5 correction factor calculated: ${c5Factor.toFixed(4)}`);
-        steps.push(`C5 calculation details:`);
-        c5Details.c5Steps.forEach(step => steps.push(`  ${step}`));
+    if (pulseWidth && repetitionRate !== undefined) {
+      if (repetitionRate === 0) {
+        steps.push(`Single pulse operation (repetition rate = 0 Hz)`);
+        steps.push(`C5 correction factor: 1.0 (single pulse)`);
+      } else if (repetitionRate > 0) {
+        const numberOfPulses = Math.floor(exposureTime * repetitionRate);
+        
+        if (numberOfPulses <= 1) {
+          steps.push(`Single pulse operation (N=${numberOfPulses})`);
+        } else {
+          steps.push(`Repetitively pulsed operation (N=${numberOfPulses})`);
+          c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime, beamDivergence);
+          c5Factor = c5Details.c5Factor;
+          steps.push(`C5 correction factor calculated: ${c5Factor.toFixed(4)}`);
+          steps.push(`C5 calculation details:`);
+          c5Details.c5Steps.forEach(step => steps.push(`  ${step}`));
+        }
       }
     }
   } else {
@@ -557,10 +618,15 @@ const classifyLaserIECSingle = (
     }
 
     // For pulsed lasers, use multiple AEL assessment
-    if (laserType === 'pulsed' && repetitionRate && repetitionRate > 0) {
-      const aelAssessment = assessPulsedLaserAELs(className, wavelength, testTimeBase, repetitionRate, c5Factor);
+    if (laserType === 'pulsed' && repetitionRate !== undefined && repetitionRate >= 0) {
+      // Handle both single pulse (repetitionRate = 0) and multi-pulse cases
+      const effectiveRepetitionRate = repetitionRate || 1; // Use 1 Hz for single pulse in assessment
+      const aelAssessment = assessPulsedLaserAELs(className, wavelength, testTimeBase, effectiveRepetitionRate, c5Factor);
       
       steps.push(`Multiple AEL Assessment for ${className}:`);
+      if (repetitionRate === 0) {
+        steps.push(`  Single pulse operation (treating as 1 Hz for AEL assessment)`);
+      }
       aelAssessment.calculationSteps.forEach(step => steps.push(`  ${step}`));
       
       const mostRestrictiveAEL = aelAssessment.mostRestrictiveAEL;
@@ -976,6 +1042,8 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
       power: 5,
       powerUnit: 'mW',
       pulseEnergy: 1,
+      pulseEnergyMode: 'manual',
+      totalEnergy: 1,
       pulseWidth: 10,
       repetitionRate: 1000,
       beamDivergence: 1.5,
@@ -1009,7 +1077,19 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
     const activeWls = wavelengths.filter(w => w.isActive);
     if (activeWls.length === 0) return 0.25;
     
-    // Use the new IEC-compliant time base selection
+    // Check for single pulse operation (repetition rate = 0)
+    const singlePulseWavelengths = activeWls.filter(w => 
+      w.laserType === 'pulsed' && w.repetitionRate === 0
+    );
+    
+    if (singlePulseWavelengths.length > 0) {
+      // For single pulse, use the pulse width as exposure time
+      // Convert from nanoseconds to seconds
+      const pulseWidthSeconds = singlePulseWavelengths[0].pulseWidth * MPE_CONSTANTS.NS_TO_S;
+      return pulseWidthSeconds;
+    }
+    
+    // Use the IEC-compliant time base selection for other cases
     if (activeWls.length === 1) {
       return getClassificationTimeBase(activeWls[0].wavelength);
     } else {
@@ -1040,11 +1120,42 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
     let errorMessage = '';
     
     for (const wl of pulsedWavelengths) {
-      const validation = validatePulseParameters(wl.pulseWidth, wl.repetitionRate);
-      if (!validation.isValid) {
+      // Custom validation that allows repetition rate = 0 for single pulse
+      if (wl.pulseWidth <= 0) {
         allValid = false;
-        errorMessage = `Wavelength ${wl.wavelength} nm: ${validation.errorMessage}`;
+        errorMessage = `Wavelength ${wl.wavelength} nm: Pulse width must be greater than 0 ns`;
         break;
+      }
+      
+      if (wl.repetitionRate < 0) {
+        allValid = false;
+        errorMessage = `Wavelength ${wl.wavelength} nm: Repetition rate cannot be negative. Use 0 for single pulse`;
+        break;
+      }
+      
+      // Check for physically realistic pulse parameters
+      if (wl.repetitionRate > 0) {
+        const periodBetweenPulsesNs = (1 / wl.repetitionRate) * 1e9;
+        if (wl.pulseWidth > periodBetweenPulsesNs) {
+          allValid = false;
+          errorMessage = `Wavelength ${wl.wavelength} nm: Pulse width (${wl.pulseWidth.toFixed(3)} ns) cannot be larger than the period between pulses (${periodBetweenPulsesNs.toFixed(1)} ns at ${wl.repetitionRate} Hz)`;
+          break;
+        }
+      }
+      
+      // Additional validation for calculated pulse energy mode
+      if (wl.pulseEnergyMode === 'calculated') {
+        if (wl.totalEnergy <= 0) {
+          allValid = false;
+          errorMessage = `Wavelength ${wl.wavelength} nm: Total energy must be greater than 0 J for calculated mode`;
+          break;
+        }
+        // For single pulse (repetition rate = 0), total energy = pulse energy, so no division by zero
+        if (wl.repetitionRate > 0 && wl.totalEnergy / wl.repetitionRate <= 0) {
+          allValid = false;
+          errorMessage = `Wavelength ${wl.wavelength} nm: Calculated pulse energy (${wl.totalEnergy} J ÷ ${wl.repetitionRate} Hz) must be greater than 0`;
+          break;
+        }
       }
     }
     
@@ -1127,6 +1238,8 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
         power: 1,
         powerUnit: 'mW',
         pulseEnergy: 1,
+        pulseEnergyMode: 'manual',
+        totalEnergy: 1,
         pulseWidth: 10,
         repetitionRate: 1000,
         beamDivergence: 1.5,
@@ -1157,6 +1270,8 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
       power: 5,
       powerUnit: 'mW',
       pulseEnergy: 1,
+      pulseEnergyMode: 'manual',
+      totalEnergy: 1,
       pulseWidth: 10,
       repetitionRate: 1000,
       beamDivergence: 1.5,
@@ -1260,7 +1375,7 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
               {/* Power/Energy Parameters with Unit Selection */}
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className={`block text-sm font-medium mb-1 ${useManualPowers ? 'text-gray-400' : 'text-gray-700'}`}>
                     Power/Energy Value
                   </label>
                   <input
@@ -1270,56 +1385,150 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                     step="any"
                     value={wl.power}
                     onChange={(e) => updateWavelength(wl.id, 'power', Number(e.target.value))}
-                    className="w-full p-2 border rounded-md"
+                    className={`w-full p-2 border rounded-md ${
+                      useManualPowers 
+                        ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed' 
+                        : 'bg-white text-gray-900 border-gray-300'
+                    }`}
+                    disabled={useManualPowers}
+                    readOnly={useManualPowers}
                   />
+                  {useManualPowers && (
+                    <p className="text-xs text-gray-400 mt-1 italic">Disabled - using manual power input</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className={`block text-sm font-medium mb-1 ${useManualPowers ? 'text-gray-400' : 'text-gray-700'}`}>
                     Unit
                   </label>
                   <select
                     value={wl.powerUnit}
                     onChange={(e) => updateWavelength(wl.id, 'powerUnit', e.target.value as 'mW' | 'J')}
-                    className="w-full p-2 border rounded-md"
+                    className={`w-full p-2 border rounded-md ${
+                      useManualPowers 
+                        ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed' 
+                        : 'bg-white text-gray-900 border-gray-300'
+                    }`}
+                    disabled={useManualPowers}
                   >
                     <option value="mW">mW (milliwatts)</option>
                     <option value="J">J (joules)</option>
                   </select>
+                  {useManualPowers && (
+                    <p className="text-xs text-gray-400 mt-1 italic">Disabled - using manual power input</p>
+                  )}
                 </div>
               </div>
               
               {wl.laserType === 'pulsed' && (
                 <>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Pulse Energy (mJ)
-                      </label>
-                      <input
-                        type="number"
-                        min="1e-12"
-                        max="100000"
-                        step="any"
-                        value={wl.pulseEnergy}
-                        onChange={(e) => updateWavelength(wl.id, 'pulseEnergy', Number(e.target.value))}
-                        className="w-full p-2 border rounded-md"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Pulse Width (ns)
-                      </label>
-                      <input
-                        type="number"
-                        min="0.001"
-                        max="1e9"
-                        step="any"
-                        value={wl.pulseWidth}
-                        onChange={(e) => updateWavelength(wl.id, 'pulseWidth', Number(e.target.value))}
-                        className="w-full p-2 border rounded-md"
-                      />
+                  {/* Pulse Energy Mode Selection */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Pulse Energy Input Mode
+                    </label>
+                    <select
+                      value={wl.pulseEnergyMode}
+                      onChange={(e) => updateWavelength(wl.id, 'pulseEnergyMode', e.target.value as 'manual' | 'calculated')}
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="manual">Manual Input</option>
+                      <option value="calculated">Calculate from Total Energy ÷ Hz</option>
+                    </select>
+                    <div className="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
+                      <p className="text-xs text-blue-800">
+                        <Icons.InfoInline />
+                        {wl.pulseEnergyMode === 'manual' 
+                          ? 'Enter the energy per pulse directly in mJ'
+                          : 'Pulse energy will be calculated as: Total Energy (J) ÷ Repetition Rate (Hz)'
+                        }
+                      </p>
                     </div>
                   </div>
+
+                  {wl.pulseEnergyMode === 'manual' ? (
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Pulse Energy (mJ)
+                        </label>
+                        <input
+                          type="number"
+                          min="1e-12"
+                          max="100000"
+                          step="any"
+                          value={wl.pulseEnergy}
+                          onChange={(e) => updateWavelength(wl.id, 'pulseEnergy', Number(e.target.value))}
+                          className="w-full p-2 border rounded-md"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Pulse Width (ns)
+                        </label>
+                        <input
+                          type="number"
+                          min="0.001"
+                          max="1e9"
+                          step="any"
+                          value={wl.pulseWidth}
+                          onChange={(e) => updateWavelength(wl.id, 'pulseWidth', Number(e.target.value))}
+                          className="w-full p-2 border rounded-md"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Total Energy (J)
+                        </label>
+                        <input
+                          type="number"
+                          min="1e-12"
+                          max="100000"
+                          step="any"
+                          value={wl.totalEnergy}
+                          onChange={(e) => updateWavelength(wl.id, 'totalEnergy', Number(e.target.value))}
+                          className="w-full p-2 border rounded-md"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pulse Width (ns)
+                          </label>
+                          <input
+                            type="number"
+                            min="0.001"
+                            max="1e9"
+                            step="any"
+                            value={wl.pulseWidth}
+                            onChange={(e) => updateWavelength(wl.id, 'pulseWidth', Number(e.target.value))}
+                            className="w-full p-2 border rounded-md"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Calculated Pulse Energy (mJ)
+                          </label>
+                          <input
+                            type="number"
+                            value={wl.repetitionRate > 0 ? ((wl.totalEnergy / wl.repetitionRate) * 1000).toFixed(6) : (wl.totalEnergy * 1000).toFixed(6)}
+                            className="w-full p-2 border rounded-md bg-gray-100"
+                            disabled
+                            readOnly
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            {wl.repetitionRate > 0 
+                              ? `= ${wl.totalEnergy} J ÷ ${wl.repetitionRate} Hz × 1000`
+                              : `= ${wl.totalEnergy} J × 1000 (single pulse)`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   
                   <div className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1334,7 +1543,15 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                       onChange={(e) => updateWavelength(wl.id, 'repetitionRate', Number(e.target.value))}
                       className="w-full p-2 border rounded-md"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Use 0 for single pulse</p>
+                    <p className="text-xs text-gray-500 mt-1">Use 0 for single pulse operation</p>
+                    {wl.repetitionRate === 0 && (
+                      <div className="mt-2 p-2 bg-yellow-50 rounded-md border border-yellow-200">
+                        <p className="text-xs text-yellow-800">
+                          <Icons.InfoInline />
+                          Single pulse mode: Exposure time will be set to pulse width ({wl.pulseWidth} ns)
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1457,6 +1674,24 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
               className={`w-full p-2 border rounded-md ${autoTimeBase ? 'bg-gray-100' : ''}`}
               disabled={autoTimeBase}
             />
+            {autoTimeBase && (
+              <div className="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
+                <p className="text-xs text-blue-800">
+                  <Icons.InfoInline />
+                  {(() => {
+                    const activeWls = wavelengths.filter(w => w.isActive);
+                    const singlePulseWls = activeWls.filter(w => w.laserType === 'pulsed' && w.repetitionRate === 0);
+                    if (singlePulseWls.length > 0) {
+                      return `Single pulse detected: Using pulse width (${singlePulseWls[0].pulseWidth} ns = ${(singlePulseWls[0].pulseWidth * MPE_CONSTANTS.NS_TO_S).toExponential(3)} s) as exposure time`;
+                    } else if (activeWls.length === 1) {
+                      return `Using IEC 60825-1 time base for ${activeWls[0].wavelength} nm wavelength`;
+                    } else {
+                      return 'Using conservative time base for multiple wavelengths';
+                    }
+                  })()}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Pulse Parameter Validation */}
