@@ -300,18 +300,21 @@ export interface PulsedAELAssessment {
   calculationSteps: string[];
 }
 
+// CORRECTED: Added pulseWidth parameter and use it instead of hardcoded 1e-6
 export const assessPulsedLaserAELs = (
   className: 'Class 1' | 'Class 2' | 'Class 3R' | 'Class 3B',
   wavelength: number,
   exposureTime: number,
   repetitionRate: number,
-  c5Factor: number
+  c5Factor: number,
+  pulseWidth: number // ADDED: Pulse width in nanoseconds
 ): PulsedAELAssessment => {
   const steps: string[] = [];
   
   steps.push(`Wavelength: ${wavelength} nm`);
   steps.push(`Exposure time: ${exposureTime} s`);
   steps.push(`Repetition rate: ${repetitionRate} Hz`);
+  steps.push(`Pulse width: ${pulseWidth} ns`);
   steps.push(`C5 factor: ${c5Factor.toFixed(4)}`);
   
   // Get appropriate AEL function
@@ -331,9 +334,10 @@ export const assessPulsedLaserAELs = (
       break;
   }
   
-  // Single pulse AEL (Table 3 for Class 1, etc.)
-  const singlePulseAELResult = getAEL(wavelength, 1e-6, 1.0); // Use 1μs as reference single pulse time
-  steps.push(`\nSingle pulse AEL: ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
+  // CORRECTED: Use actual pulse width instead of hardcoded 1e-6
+  const pulseWidthSeconds = pulseWidth * MPE_CONSTANTS.NS_TO_S;
+  const singlePulseAELResult = getAEL(wavelength, pulseWidthSeconds, 1.0);
+  steps.push(`\nSingle pulse AEL (using pulse width ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s): ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
   
   // Average power AEL (converted to pulse energy)
   const avgPowerAELResult = getAEL(wavelength, exposureTime, 1.0);
@@ -344,7 +348,7 @@ export const assessPulsedLaserAELs = (
     // Convert average power limit to pulse energy limit
     avgPowerAsPulseEnergy = avgPowerAELResult.value / repetitionRate;
     avgPowerUnit = 'J';
-    steps.push(`   AEL_T = ${avgPowerAELResult.value.toExponential(3)} W`);
+    steps.push(`Average power AEL: ${avgPowerAELResult.value.toExponential(3)} W`);
     steps.push(`\nAverage power AEL (converted to pulse energy): AEL_T / PRF = ${avgPowerAELResult.value.toExponential(3)} / ${repetitionRate} = ${avgPowerAsPulseEnergy.toExponential(3)} J/pulse`);
   } else {
     // Already in energy units
@@ -454,7 +458,7 @@ export const IEC_AEL_TABLES = {
     return wavelength >= 400 && wavelength <= 700;
   },
 
-  // Get correction factors from Table 9
+  // Get correction factors from Table 9 - CORRECTED: Return T2 value
   getCorrectionFactors: (wavelength: number, exposureTime: number, angularSubtense: number = 1.5) => {
     let C1 = 1, C2 = 1, C3 = 1, C4 = 1, C5 = 1, C6 = 1, C7 = 1, T1 = 1, T2 = 1; 
     
@@ -474,6 +478,7 @@ export const IEC_AEL_TABLES = {
         C2 = 30;
     }
 
+    // CORRECTED: T2 calculation for retinal hazard region (400-1400 nm)
     if (wavelength >= 400 && wavelength <= 1400) {
         if (angularSubtense > 1.5 && angularSubtense <= 100){
             T2 = 10 * Math.pow(10, (angularSubtense - 1.5)/98.5);
