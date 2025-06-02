@@ -549,7 +549,7 @@ const classifyLaserIECSingle = (
   }
 
   // Step 1: Wavelength range validation
-  steps.push(`\n--- Step 1: Wavelength Range Validation ---`);
+  steps.push(`\n=== Wavelength Range Validation ===`);
   if (wavelength < 180 || wavelength > 1e6) {
     steps.push(`ERROR: Wavelength ${wavelength} nm outside IEC 60825-1 scope (180 nm - 1 mm)`);
     return createErrorResult('Invalid Wavelength Range', steps);
@@ -557,7 +557,7 @@ const classifyLaserIECSingle = (
   steps.push(`Wavelength within IEC 60825-1 scope: 180 nm - 1,000,000 nm ✓`);
 
   // Step 2: Calculate C5 for pulsed lasers
-  steps.push(`\n--- Step 2: Laser Type and C5 Calculation ---`);
+  steps.push(`\n=== Laser Type and C5 Calculation ===`);
   let c5Factor = 1.0;
   let c5Details = null;
 
@@ -574,11 +574,11 @@ const classifyLaserIECSingle = (
         if (numberOfPulses <= 1) {
           steps.push(`Single pulse operation (N=${numberOfPulses})`);
         } else {
-          steps.push(`Repetitively pulsed operation (N=${numberOfPulses})`);
+          // steps.push(`Repetitively pulsed operation (N=${numberOfPulses})`);
           c5Details = calculateC5Factor(wavelength, pulseWidth, repetitionRate, exposureTime, beamDivergence);
           c5Factor = c5Details.c5Factor;
-          steps.push(`C5 correction factor calculated: ${c5Factor.toFixed(4)}`);
-          steps.push(`C5 calculation details:`);
+          // steps.push(`C5 correction factor calculated: ${c5Factor.toFixed(4)}`);
+          // steps.push(`C5 calculation details:`);
           c5Details.c5Steps.forEach(step => steps.push(`  ${step}`));
         }
       }
@@ -588,7 +588,7 @@ const classifyLaserIECSingle = (
   }
 
   // Step 3: Get measurement conditions
-  steps.push(`\n--- Step 3: Measurement Conditions (IEC Table 10) ---`);
+  steps.push(`\n=== Measurement Conditions ===`);
   const conditions = IEC_AEL_TABLES.getMeasurementConditions(wavelength, exposureTime);
   const isC1Applied = !((wavelength < 302.5) || (wavelength >= 4000 && wavelength <= 1e6));
   
@@ -596,7 +596,7 @@ const classifyLaserIECSingle = (
   steps.push(`Condition 3: Aperture ${conditions.condition3.aperture.toFixed(1)}mm at ${conditions.condition3.distance}mm`);
 
   // Step 4: Sequential classification with proper time bases and multiple AEL assessment
-  steps.push(`\n--- Step 4: Sequential Classification with Multiple AEL Assessment ---`);
+  steps.push(`\n=== Sequential Classification with Multiple AEL Assessment ===`);
   
   const testClassWithMultipleAELs = (className: 'Class 1' | 'Class 2' | 'Class 3R' | 'Class 3B', testTimeBase: number) => {
     steps.push(`\n=== Testing ${className} ===`);

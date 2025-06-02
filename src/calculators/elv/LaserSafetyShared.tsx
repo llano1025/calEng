@@ -186,7 +186,6 @@ export const calculateC5Factor = (
   const pulseWidthSeconds = pulseWidth * MPE_CONSTANTS.NS_TO_S;
   const Ti = TIME_BASE_TI.getTimeBase(wavelength);
   
-  steps.push(`=== C5 Correction Factor Calculation (IEC 60825-1) ===`);
   steps.push(`Wavelength: ${wavelength} nm`);
   steps.push(`Pulse width: ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s`);
   steps.push(`Repetition rate: ${repetitionRate} Hz`);
@@ -223,9 +222,6 @@ export const calculateC5Factor = (
       c5Steps: steps
     };
   }
-  
-  // Calculate C5 for multiple pulses using IEC 60825-1 rules
-  steps.push(`Multiple pulses detected (N = ${N}), calculating C5...`);
   
   let c5Factor: number;
   let groupingDescription: string;
@@ -313,7 +309,6 @@ export const assessPulsedLaserAELs = (
 ): PulsedAELAssessment => {
   const steps: string[] = [];
   
-  steps.push(`=== Multiple AEL Assessment for ${className} (Pulsed Laser) ===`);
   steps.push(`Wavelength: ${wavelength} nm`);
   steps.push(`Exposure time: ${exposureTime} s`);
   steps.push(`Repetition rate: ${repetitionRate} Hz`);
@@ -336,12 +331,11 @@ export const assessPulsedLaserAELs = (
       break;
   }
   
-  // 1. Single pulse AEL (Table 3 for Class 1, etc.)
+  // Single pulse AEL (Table 3 for Class 1, etc.)
   const singlePulseAELResult = getAEL(wavelength, 1e-6, 1.0); // Use 1μs as reference single pulse time
-  steps.push(`\n1. Single pulse AEL:`);
-  steps.push(`   AEL_single = ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
+  steps.push(`\nSingle pulse AEL: ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
   
-  // 2. Average power AEL (converted to pulse energy)
+  // Average power AEL (converted to pulse energy)
   const avgPowerAELResult = getAEL(wavelength, exposureTime, 1.0);
   let avgPowerAsPulseEnergy: number;
   let avgPowerUnit: string;
@@ -350,26 +344,22 @@ export const assessPulsedLaserAELs = (
     // Convert average power limit to pulse energy limit
     avgPowerAsPulseEnergy = avgPowerAELResult.value / repetitionRate;
     avgPowerUnit = 'J';
-    steps.push(`\n2. Average power AEL (converted to pulse energy):`);
     steps.push(`   AEL_T = ${avgPowerAELResult.value.toExponential(3)} W`);
-    steps.push(`   AEL_pulse = AEL_T / PRF = ${avgPowerAELResult.value.toExponential(3)} / ${repetitionRate} = ${avgPowerAsPulseEnergy.toExponential(3)} J/pulse`);
+    steps.push(`\nAverage power AEL (converted to pulse energy): AEL_T / PRF = ${avgPowerAELResult.value.toExponential(3)} / ${repetitionRate} = ${avgPowerAsPulseEnergy.toExponential(3)} J/pulse`);
   } else {
     // Already in energy units
     avgPowerAsPulseEnergy = avgPowerAELResult.value;
     avgPowerUnit = avgPowerAELResult.unit;
-    steps.push(`\n2. Average power AEL (already in energy units):`);
-    steps.push(`   AEL_pulse = ${avgPowerAsPulseEnergy.toExponential(3)} ${avgPowerUnit}`);
+    steps.push(`\nAverage power AEL (already in energy units): ${avgPowerAsPulseEnergy.toExponential(3)} ${avgPowerUnit}`);
   }
   
-  // 3. Pulse train AEL (single pulse × C5)
+  // Pulse train AEL (single pulse × C5)
   const pulseTrainAEL = singlePulseAELResult.value * c5Factor;
-  steps.push(`\n3. Pulse train AEL (single pulse × C5):`);
-  steps.push(`   AEL_s,p,train = AEL_single × C5 = ${singlePulseAELResult.value.toExponential(3)} × ${c5Factor.toFixed(4)} = ${pulseTrainAEL.toExponential(3)} J`);
+  steps.push(`\nPulse train AEL (single pulse × C5): AEL_single × C5 = ${singlePulseAELResult.value.toExponential(3)} × ${c5Factor.toFixed(4)} = ${pulseTrainAEL.toExponential(3)} J`);
   
-  // 4. Most restrictive AEL
+  // Most restrictive AEL
   const mostRestrictiveAEL = Math.min(singlePulseAELResult.value, avgPowerAsPulseEnergy, pulseTrainAEL);
-  steps.push(`\n4. Most restrictive AEL:`);
-  steps.push(`   AEL_most_restrictive = min(${singlePulseAELResult.value.toExponential(3)}, ${avgPowerAsPulseEnergy.toExponential(3)}, ${pulseTrainAEL.toExponential(3)}) = ${mostRestrictiveAEL.toExponential(3)} J`);
+  steps.push(`\nMost restrictive AEL: min(${singlePulseAELResult.value.toExponential(3)}, ${avgPowerAsPulseEnergy.toExponential(3)}, ${pulseTrainAEL.toExponential(3)}) = ${mostRestrictiveAEL.toExponential(3)} J`);
   
   return {
     singlePulseAEL: singlePulseAELResult.value,
