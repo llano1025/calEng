@@ -86,13 +86,7 @@ export const calculateTableA1MPE = (
       mpe = 18 * Math.pow(exposureTime, 0.75); // J·m⁻²
     } else if (exposureTime >= 10 && exposureTime < 100) {
       // Dual limits apply - photochemical and thermal
-      const photochemicalLimit = 100 * C3; // J·m⁻²
-      const thermalLimit = 18 * Math.pow(exposureTime, 0.75); // J·m⁻²
-      mpe = Math.min(photochemicalLimit, thermalLimit);
-    } else if (exposureTime >= 10 && exposureTime < 100) {
-      const powerLimit = 100 * C3; // W·m⁻²
-      mpe = powerLimit;
-      unit = 'W·m⁻²';
+      mpe = 100 * C3; // J·m⁻²
     } else {
       mpe = C3; // W·m⁻²
       unit = 'W·m⁻²';
@@ -100,50 +94,41 @@ export const calculateTableA1MPE = (
   }
   // 500 to 700 nm
   else if (wavelength >= 500 && wavelength <= 700) {
-    if (exposureTime < 1.8e-5) {
-      mpe = 2e-3 * exposureTime; // J·m⁻²
-      steps.push(`Range (500-700 nm, t < 18μs): MPE = 2×10⁻³ × t = ${mpe.toExponential(3)} J·m⁻²`);
-    } else if (exposureTime >= 1.8e-5 && exposureTime < 10) {
+    if (exposureTime < 1e-11) {
+      mpe = 1e-3; // J·m⁻²
+    } else if (exposureTime >= 1e-11 && exposureTime < 5e-6) {
+      mpe = 2e-3; // J·m⁻²
+    } else if (exposureTime >= 5e-6 && exposureTime < 10) {
       mpe = 18 * Math.pow(exposureTime, 0.75); // J·m⁻²
-      steps.push(`Range (500-700 nm, 18μs ≤ t < 10s): MPE = 18 × t⁰·⁷⁵ = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 10; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (500-700 nm, t ≥ 10s): MPE = 10 W·m⁻²`);
     }
   }
   // 700 to 1050 nm
   else if (wavelength > 700 && wavelength <= 1050) {
     if (exposureTime < 1e-11) {
-      mpe = 1e-3 * C4; // J·m⁻²
-      steps.push(`Range (700-1050 nm, t < 10ps): MPE = 1×10⁻³ × C4 = ${mpe.toExponential(3)} J·m⁻²`);
-    } else if (exposureTime >= 1e-11 && exposureTime < 1.8e-5 * C4) {
+      mpe = 1e-3; // J·m⁻²
+    } else if (exposureTime >= 1e-11 && exposureTime < 5e-6) {
       mpe = 2e-3 * C4 * exposureTime; // J·m⁻²
-      steps.push(`Range (700-1050 nm, 10ps ≤ t < ${(1.8e-5 * C4).toExponential(2)}s): MPE = 2×10⁻³ × C4 × t = ${mpe.toExponential(3)} J·m⁻²`);
     } else if (exposureTime >= 1.8e-5 * C4 && exposureTime < 10) {
       mpe = 18 * Math.pow(exposureTime, 0.75) * C4; // J·m⁻²
-      steps.push(`Range (700-1050 nm, ${(1.8e-5 * C4).toExponential(2)}s ≤ t < 10s): MPE = 18 × t⁰·⁷⁵ × C4 = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 10 * C4 * C7; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (700-1050 nm, t ≥ 10s): MPE = 10 × C4 × C7 = ${mpe.toExponential(3)} W·m⁻²`);
     }
   }
   // 1050 to 1400 nm
   else if (wavelength > 1050 && wavelength <= 1400) {
     if (exposureTime < 1e-11) {
-      mpe = 1e-2 * C7; // J·m⁻²
-      steps.push(`Range (1050-1400 nm, t < 10ps): MPE = 1×10⁻² × C7 = ${mpe.toExponential(3)} J·m⁻²`);
-    } else if (exposureTime >= 1e-11 && exposureTime < 5e-5 * C7) {
+      mpe = 1e-3 * C7; // J·m⁻²
+    } else if (exposureTime >= 1e-11 && exposureTime < 13e-6) {
       mpe = 2e-2 * C7 * exposureTime; // J·m⁻²
-      steps.push(`Range (1050-1400 nm, 10ps ≤ t < ${(5e-5 * C7).toExponential(2)}s): MPE = 2×10⁻² × C7 × t = ${mpe.toExponential(3)} J·m⁻²`);
-    } else if (exposureTime >= 5e-5 * C7 && exposureTime < 10) {
+    } else if (exposureTime >= 13e-6  && exposureTime < 10) {
       mpe = 90 * Math.pow(exposureTime, 0.75) * C7; // J·m⁻²
-      steps.push(`Range (1050-1400 nm, ${(5e-5 * C7).toExponential(2)}s ≤ t < 10s): MPE = 90 × t⁰·⁷⁵ × C7 = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 10 * C4 * C7; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1050-1400 nm, t ≥ 10s): MPE = 10 × C4 × C7 = ${mpe.toExponential(3)} W·m⁻²`);
     }
   }
   // 1400 to 1500 nm
@@ -151,17 +136,13 @@ export const calculateTableA1MPE = (
     if (exposureTime < 1e-9) {
       mpe = 1e12; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1400-1500 nm, t < 1ns): MPE = 10¹² W·m⁻²`);
     } else if (exposureTime >= 1e-9 && exposureTime < 1e-3) {
       mpe = 1e3; // J·m⁻²
-      steps.push(`Range (1400-1500 nm, 1ns ≤ t < 1ms): MPE = 10³ J·m⁻²`);
     } else if (exposureTime >= 1e-3 && exposureTime < 10) {
       mpe = 5600 * Math.pow(exposureTime, 0.25); // J·m⁻²
-      steps.push(`Range (1400-1500 nm, 1ms ≤ t < 10s): MPE = 5600 × t⁰·²⁵ = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 1000; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1400-1500 nm, t ≥ 10s): MPE = 1000 W·m⁻²`);
     }
   }
   // 1500 to 1800 nm
@@ -169,14 +150,11 @@ export const calculateTableA1MPE = (
     if (exposureTime < 1e-9) {
       mpe = 1e13; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1500-1800 nm, t < 1ns): MPE = 10¹³ W·m⁻²`);
     } else if (exposureTime >= 1e-9 && exposureTime < 10) {
       mpe = 1e4; // J·m⁻²
-      steps.push(`Range (1500-1800 nm, 1ns ≤ t < 10s): MPE = 10⁴ J·m⁻²`);
     } else {
       mpe = 1000; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1500-1800 nm, t ≥ 10s): MPE = 1000 W·m⁻²`);
     }
   }
   // 1800 to 2600 nm
@@ -184,17 +162,13 @@ export const calculateTableA1MPE = (
     if (exposureTime < 1e-9) {
       mpe = 1e12; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1800-2600 nm, t < 1ns): MPE = 10¹² W·m⁻²`);
     } else if (exposureTime >= 1e-9 && exposureTime < 1e-3) {
       mpe = 1e3; // J·m⁻²
-      steps.push(`Range (1800-2600 nm, 1ns ≤ t < 1ms): MPE = 10³ J·m⁻²`);
     } else if (exposureTime >= 1e-3 && exposureTime < 10) {
       mpe = 5600 * Math.pow(exposureTime, 0.25); // J·m⁻²
-      steps.push(`Range (1800-2600 nm, 1ms ≤ t < 10s): MPE = 5600 × t⁰·²⁵ = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 1000; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (1800-2600 nm, t ≥ 10s): MPE = 1000 W·m⁻²`);
     }
   }
   // 2600 nm to 10^6 nm
@@ -202,17 +176,13 @@ export const calculateTableA1MPE = (
     if (exposureTime < 1e-9) {
       mpe = 1e11; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (>2600 nm, t < 1ns): MPE = 10¹¹ W·m⁻²`);
     } else if (exposureTime >= 1e-9 && exposureTime < 1e-7) {
       mpe = 100; // J·m⁻²
-      steps.push(`Range (>2600 nm, 1ns ≤ t < 100ns): MPE = 100 J·m⁻²`);
     } else if (exposureTime >= 1e-7 && exposureTime < 10) {
       mpe = 5600 * Math.pow(exposureTime, 0.25); // J·m⁻²
-      steps.push(`Range (>2600 nm, 100ns ≤ t < 10s): MPE = 5600 × t⁰·²⁵ = ${mpe.toExponential(3)} J·m⁻²`);
     } else {
       mpe = 1000; // W·m⁻²
       unit = 'W·m⁻²';
-      steps.push(`Range (>2600 nm, t ≥ 10s): MPE = 1000 W·m⁻²`);
     }
   }
 
