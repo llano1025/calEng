@@ -191,7 +191,7 @@ export const calculateTableA1MPE = (
   return { mpe, unit, calculationSteps: steps };
 };
 
-// ======================== TABLE A.2 - EXTENDED SOURCE MPE ========================
+// ======================== TABLE A.2 - EXTENDED SOURCE MPE (CORRECTED) ========================
 
 export const calculateTableA2MPE = (
   wavelength: number,
@@ -217,69 +217,80 @@ export const calculateTableA2MPE = (
 
   // Only applies to retinal hazard region (400-1400 nm)
   if (wavelength >= 400 && wavelength <= 700) {
-    if (exposureTime < 10) {
-      if (angularSubtense <= 11) {
-        // Use point source values
-        return calculateTableA1MPE(wavelength, exposureTime, angularSubtense);
-      }
-      
-      // Dual limits apply
-      const limit1 = 100 * C3; // J·m⁻²
-      const limit2 = 1 * C3; // W·m⁻²
-      
-      if (exposureTime < 100) {
-        mpe = limit1;
-        steps.push(`Extended source (400-700 nm, t<100s): MPE = 100 × C3 = ${mpe.toExponential(3)} J·m⁻²`);
+    if (exposureTime >= 1e-13 && exposureTime < 1e-11) {
+      mpe = 1e-3 * C6;
+    }
+    else if (exposureTime >= 1e-11 && exposureTime < 5.0e-8) {
+      mpe = 2e-3 * C6;
+    }
+    else if (exposureTime >= 5.0e-8 && exposureTime < 10) {
+      mpe = 18 * Math.pow(exposureTime, 0.75) * C6;
+    }
+    else if (exposureTime >= 10 && exposureTime <= 3e4) {
+      // Thermal retinal hazard region
+      if (exposureTime <= T2) {
+        mpe = 18 * C6 * Math.pow(exposureTime, 0.75);
+        unit = 'J·m⁻²';
       } else {
-        mpe = limit2;
+        mpe = 18 * C6 * Math.pow(T2, -0.25);
         unit = 'W·m⁻²';
-        steps.push(`Extended source (400-700 nm, t≥100s): MPE = 1 × C3 = ${mpe.toExponential(3)} W·m⁻²`);
-      }
-    } else {
-      mpe = 1 * C3; // W·m⁻²
-      unit = 'W·m⁻²';
-      steps.push(`Extended source (400-700 nm, t≥10s): MPE = 1 × C3 = ${mpe.toExponential(3)} W·m⁻²`);
-    }
-    
-    // Check thermal limits if applicable
-    if (exposureTime < T2) {
-      const thermalLimit = 18 * C6 * Math.pow(exposureTime, 0.75); // J·m⁻²
-      if (unit === 'J·m⁻²' && thermalLimit < mpe) {
-        mpe = thermalLimit;
-        steps.push(`Thermal limit overrides: 18 × C6 × t^0.75 = ${mpe.toExponential(3)} J·m⁻²`);
-      }
-    } else {
-      const thermalLimitPower = 18 * C4 * C6 * Math.pow(T2, -0.25); // W·m⁻²
-      if (unit === 'W·m⁻²' && thermalLimitPower < mpe) {
-        mpe = thermalLimitPower;
-        steps.push(`Thermal limit overrides: 18 × C4 × C6 × T2^(-0.25) = ${mpe.toExponential(3)} W·m⁻²`);
       }
     }
-  }
   else if (wavelength > 700 && wavelength <= 1050) {
-    if (exposureTime < T2) {
-      mpe = 18 * C4 * C6 * Math.pow(exposureTime, 0.75); // J·m⁻²
-      steps.push(`Extended source (700-1050 nm, t<T2): 18 × C4 × C6 × t^0.75 = ${mpe.toExponential(3)} J·m⁻²`);
-    } else {
-      mpe = 18 * C4 * C6 * Math.pow(T2, -0.25); // W·m⁻²
-      unit = 'W·m⁻²';
-      steps.push(`Extended source (700-1050 nm, t≥T2): 18 × C4 × C6 × T2^(-0.25) = ${mpe.toExponential(3)} W·m⁻²`);
+    if (exposureTime >= 1e-13 && exposureTime < 1e-11) {
+      mpe = 1e-3 * C6;
+    }
+    else if (exposureTime >= 1e-11 && exposureTime < 5.0e-6) {
+      mpe = 2e-3 * C4 * C6; // Table shows C4 twice - following table exactly
+    }
+    else if (exposureTime >= 5.0e-6 && exposureTime < 1.3e-5) {
+      mpe = 18 * Math.pow(exposureTime, 0.75) * C4 * C6;
+    }
+    else if (exposureTime >= 10 && exposureTime <= 3e4) {
+      // Thermal retinal hazard region
+      if (exposureTime <= T2) {
+        mpe = 18 * C4 * C6 * Math.pow(exposureTime, 0.75);
+        unit = 'J·m⁻²';
+      } else {
+        mpe = 18 * C4 * C6 * Math.pow(T2, -0.25);
+        unit = 'W·m⁻²';
+      }
     }
   }
   else if (wavelength > 1050 && wavelength <= 1400) {
-    if (exposureTime < T2) {
-      mpe = 90 * C6 * C7 * Math.pow(exposureTime, 0.75); // J·m⁻²
-      steps.push(`Extended source (1050-1400 nm, t<T2): 90 × C6 × C7 × t^0.75 = ${mpe.toExponential(3)} J·m⁻²`);
-    } else {
-      mpe = 90 * C6 * C7 * Math.pow(T2, -0.25); // W·m⁻²
-      unit = 'W·m⁻²';
-      steps.push(`Extended source (1050-1400 nm, t≥T2): 90 × C6 × C7 × T2^(-0.25) = ${mpe.toExponential(3)} W·m⁻²`);
+    if (exposureTime >= 1e-12 && exposureTime < 1e-11) {
+      mpe = 1e-3 * C6 * C7;
+    }
+    else if (exposureTime >= 1e-11 && exposureTime < 1.3e-6) {
+      mpe = 2e-3 * C6 * C7;
+    }
+    else if (exposureTime >= 5.0e-6 && exposureTime < 1.3e-5) {
+      mpe = 90 * Math.pow(exposureTime, 0.75) * C6 * C7;
+    }
+    else if (exposureTime >= 10 && exposureTime <= 3e4) {
+      // Thermal retinal hazard region
+      if (exposureTime <= T2) {
+        mpe = 90 * C6 * C7 * Math.pow(exposureTime, 0.75);
+        unit = 'J·m⁻²';
+      } else {
+        mpe = 90 * C6 * C7 * Math.pow(T2, -0.25);
+        unit = 'W·m⁻²';
+      }
     }
   }
   else {
-    // Outside retinal hazard region, use point source values
-    steps.push(`Outside retinal hazard region - using point source values`);
-    return calculateTableA1MPE(wavelength, exposureTime, angularSubtense);
+    // Outside retinal hazard region (400-1400 nm), Table A.2 doesn't apply
+    steps.push(`Outside retinal hazard region (400-1400 nm) - Table A.2 not applicable`);
+    steps.push(`Falling back to point source calculation`);
+    // Return point source values or indicate that Table A.2 is not applicable
+    mpe = 0;
+    unit = 'N/A';
+    steps.push(`Table A.2 is only applicable for wavelengths 400-1400 nm (retinal hazard region)`);
+  }
+
+  if (mpe === 0 && wavelength >= 400 && wavelength <= 1400) {
+    steps.push(`Warning: Exposure time ${exposureTime.toExponential(3)} s outside defined ranges in Table A.2 for ${wavelength} nm`);
+    steps.push(`Consider using point source limits or interpolating between defined ranges`);
   }
 
   steps.push(`Final extended source MPE = ${mpe.toExponential(3)} ${unit}`);
@@ -287,7 +298,7 @@ export const calculateTableA2MPE = (
   return { mpe, unit, calculationSteps: steps };
 };
 
-// ======================== TABLE A.3 - POINT SOURCE MPE IN POWER/ENERGY (7mm aperture) ========================
+// ======================== TABLE A.3 - CORRECTED MPE CALCULATION ========================
 
 export const calculateTableA3MPE = (
   wavelength: number,
@@ -307,74 +318,177 @@ export const calculateTableA3MPE = (
   steps.push(`Aperture diameter: ${apertureDiameter} mm`);
   steps.push(`Aperture area: ${apertureArea.toExponential(3)} m²`);
   
+  // Get correction factors
   const { C1, C2, C3, C4, C5, C6, C7, T1, T2 } = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  steps.push(`Correction factors: C3=${C3.toFixed(3)}, C4=${C4.toFixed(3)}, C7=${C7.toFixed(3)}`);
   
   let mpe = 0;
   let unit = 'J';
+  
+  // Define time boundaries from Table A.3
+  const t1 = 1e-13;
+  const t2 = 1e-11;
+  const t3 = 5e-6;
+  const t4 = 13e-6;
+  const t5 = 10;
+  const t6 = 1e2;
+  const t7 = 3e4;
 
   // 400 to 450 nm
   if (wavelength >= 400 && wavelength < 450) {
-    mpe = 3.9e-3; // J
-    steps.push(`Range (400-450 nm): MPE = ${mpe.toExponential(3)} J`);
-  }
-  // 450 to 500 nm
-  else if (wavelength >= 450 && wavelength < 500) {
-    if (exposureTime < 10) {
-      mpe = 3.8e-8 + 7.7e-8; // Simplified from table
-    } else if (exposureTime >= 10 && exposureTime < 100) {
-      mpe = 3.9e-3 * C3; // J
-    } else {
-      mpe = 3.9e-4; // W
+    steps.push(`Wavelength range: 400-450 nm`);
+    
+    if (exposureTime >= t1 && exposureTime < t2) {
+      // No specific value given in table for this range
+      mpe = 3.8e-8; // Use longer exposure value as conservative estimate
+    }
+    else if (exposureTime >= t2 && exposureTime < t3) {
+      // No specific value given in table for this range
+      mpe = 7.7e-8; // Use longer exposure value as conservative estimate
+    }
+    else if (exposureTime >= t3 && exposureTime < t4) {
+      // No specific value given in table for this range
+      mpe = 7e-4 * Math.pow(exposureTime, 0.75); // J
+    }
+    else if (exposureTime >= t4 && exposureTime < t5) {
+      mpe = 7e-4 * Math.pow(exposureTime, 0.75); // J
+    }
+    else if (exposureTime >= t5 && exposureTime < t6) {
+      mpe = 3.9e-3; // J (table shows this continues)
+    }
+    else if (exposureTime >= t6 && exposureTime <= t7) {
+      mpe = 3.9e-4 * C3; // W
       unit = 'W';
     }
-    steps.push(`Range (450-500 nm): MPE = ${mpe.toExponential(3)} ${unit}`);
   }
+  
+  // 450 to 500 nm  
+  else if (wavelength >= 450 && wavelength < 500) {
+    steps.push(`Wavelength range: 450-500 nm`);
+    
+    if (exposureTime >= t1 && exposureTime < t2) {
+      mpe = 3.8e-8; // J
+    }
+    else if (exposureTime >= t2 && exposureTime < t3) {
+      mpe = 7.7e-8; // J
+    }
+    else if (exposureTime >= t3 && exposureTime < t5) {
+      mpe = 7e-4 * Math.pow(exposureTime, 0.75); // J
+    }
+    else if (exposureTime >= t5 && exposureTime < t6) {
+      // Dual limit: min of energy limit and power limit converted to energy
+      const energyLimit = 3.9e-3 * C3; // J
+      const powerLimitAsEnergy = 3.9e-4 * exposureTime; // W×s = J
+      mpe = Math.min(energyLimit, powerLimitAsEnergy);
+      if (mpe == powerLimitAsEnergy){
+        unit = 'W';
+      }
+    }
+    else if (exposureTime >= t6 && exposureTime <= t7) {
+      mpe = 3.9e-5 * C3; // W
+      unit = 'W';
+    }
+  }
+  
   // 500 to 700 nm
   else if (wavelength >= 500 && wavelength <= 700) {
-    if (exposureTime < 1.8e-5) {
+    steps.push(`Wavelength range: 500-700 nm`);
+    
+    if (exposureTime >= t1 && exposureTime < t2) {
+      // No specific value given, use next range value
+      mpe = 7.7e-8; // J
+      steps.push(`Time range: 10^-13 to 10^-11 s - Using 7.7×10^-8 J (from next range)`);
+    }
+    else if (exposureTime >= t2 && exposureTime < t3) {
       mpe = 7.7e-8; // J  
-    } else if (exposureTime >= 1.8e-5 && exposureTime < 0.25) {
+      steps.push(`Time range: 10^-11 to 5×10^-6 s - MPE = 7.7×10^-8 J`);
+    }
+    else if (exposureTime >= t3 && exposureTime < t4) {
       mpe = 7e-4 * Math.pow(exposureTime, 0.75); // J
-    } else {
+      steps.push(`Time range: 5×10^-6 to 13×10^-5 s - MPE = 7×10^-4 × t^0.75 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t4 && exposureTime < t6) {
+      // Table shows this continues through 10^2 s
       mpe = 3.9e-4; // W
       unit = 'W';
+      steps.push(`Time range: 13×10^-5 to 10^2 s - MPE = 3.9×10^-4 W`);
     }
-    steps.push(`Range (500-700 nm): MPE = ${mpe.toExponential(3)} ${unit}`);
+    else if (exposureTime >= t6 && exposureTime <= t7) {
+      mpe = 3.9e-4; // W
+      unit = 'W';
+      steps.push(`Time range: 10^2 to 3×10^4 s - MPE = 3.9×10^-4 W`);
+    }
   }
+  
   // 700 to 1050 nm
   else if (wavelength > 700 && wavelength <= 1050) {
-    if (exposureTime < 1.8e-5 * C4) {
-      mpe = 3.8e-8 * C4; // J
-    } else if (exposureTime >= 1.8e-5 * C4 && exposureTime < 0.25) {
+    steps.push(`Wavelength range: 700-1050 nm`);
+    
+    if (exposureTime >= t1 && exposureTime < t2) {
+      mpe = 3.8e-8; // J (no C4 correction for shortest pulses)
+      steps.push(`Time range: 10^-13 to 10^-11 s - MPE = 3.8×10^-8 J`);
+    }
+    else if (exposureTime >= t2 && exposureTime < t3) {
+      mpe = 7.7e-8 * C4; // J
+      steps.push(`Time range: 10^-11 to 5×10^-6 s - MPE = 7.7×10^-8 × C4 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t3 && exposureTime < t4) {
       mpe = 7e-4 * Math.pow(exposureTime, 0.75) * C4; // J
-    } else {
+      steps.push(`Time range: 5×10^-6 to 13×10^-5 s - MPE = 7×10^-4 × t^0.75 × C4 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t4 && exposureTime < t6) {
       mpe = 3.9e-4 * C4 * C7; // W
       unit = 'W';
+      steps.push(`Time range: 13×10^-5 to 10^2 s - MPE = 3.9×10^-4 × C4 × C7 = ${mpe.toExponential(3)} W`);
     }
-    steps.push(`Range (700-1050 nm): MPE = ${mpe.toExponential(3)} ${unit}`);
+    else if (exposureTime >= t6 && exposureTime <= t7) {
+      mpe = 3.9e-4 * C4 * C7; // W
+      unit = 'W';
+      steps.push(`Time range: 10^2 to 3×10^4 s - MPE = 3.9×10^-4 × C4 × C7 = ${mpe.toExponential(3)} W`);
+    }
   }
+  
   // 1050 to 1400 nm
   else if (wavelength > 1050 && wavelength <= 1400) {
-    if (exposureTime < 5e-5 * C7) {
+    steps.push(`Wavelength range: 1050-1400 nm`);
+    
+    if (exposureTime >= t1 && exposureTime < t2) {
       mpe = 3.8e-8 * C7; // J
-    } else if (exposureTime >= 5e-5 * C7 && exposureTime < 0.25) {
-      mpe = 7.7e-7 * C7; // J
-    } else if (exposureTime >= 0.25 && exposureTime < 10) {
-      mpe = 3.5e-3 * Math.pow(exposureTime, 0.75) * C7; // J
-    } else {
+      steps.push(`Time range: 10^-13 to 10^-11 s - MPE = 3.8×10^-8 × C7 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t2 && exposureTime < t3) {
+      mpe = 7.7e-7 * C7; // J (note: 7.7e-7, not 7.7e-8)
+      steps.push(`Time range: 10^-11 to 5×10^-6 s - MPE = 7.7×10^-7 × C7 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t3 && exposureTime < t4) {
+      mpe = 3.5e-3 * Math.pow(exposureTime, 0.75) * C7; // J (note: 3.5e-3, not 7e-4)
+      steps.push(`Time range: 5×10^-6 to 13×10^-5 s - MPE = 3.5×10^-3 × t^0.75 × C7 = ${mpe.toExponential(3)} J`);
+    }
+    else if (exposureTime >= t4 && exposureTime < t6) {
       mpe = 3.9e-4 * C4 * C7; // W
       unit = 'W';
+      steps.push(`Time range: 13×10^-5 to 10^2 s - MPE = 3.9×10^-4 × C4 × C7 = ${mpe.toExponential(3)} W`);
     }
-    steps.push(`Range (1050-1400 nm): MPE = ${mpe.toExponential(3)} ${unit}`);
+    else if (exposureTime >= t6 && exposureTime <= t7) {
+      mpe = 3.9e-4 * C4 * C7; // W
+      unit = 'W';
+      steps.push(`Time range: 10^2 to 3×10^4 s - MPE = 3.9×10^-4 × C4 × C7 = ${mpe.toExponential(3)} W`);
+    }
+  }
+  
+  // Outside specified wavelength range
+  else {
+    steps.push(`ERROR: Wavelength ${wavelength} nm is outside Table A.3 range (400-1400 nm)`);
+    return { mpe: 0, unit: 'J', calculationSteps: steps };
   }
 
-  // Convert to cm² for consistency with other calculations
+  // Convert to irradiance for reference
   if (unit === 'J') {
-    const mpePerCm2 = mpe / (apertureArea * 1e4); // Convert m² to cm²
-    steps.push(`MPE per cm²: ${mpePerCm2.toExponential(3)} J/cm²`);
+    const irradianceJPerCm2 = mpe / (apertureArea * 1e4); // Convert m² to cm²
+    steps.push(`MPE irradiance: ${irradianceJPerCm2.toExponential(3)} J/cm²`);
   } else {
-    const mpePerCm2 = mpe / (apertureArea * 1e4); // Convert m² to cm²
-    steps.push(`MPE per cm²: ${mpePerCm2.toExponential(3)} W/cm²`);
+    const irradianceWPerCm2 = mpe / (apertureArea * 1e4); // Convert m² to cm²
+    steps.push(`MPE irradiance: ${irradianceWPerCm2.toExponential(3)} W/cm²`);
   }
 
   return { mpe, unit, calculationSteps: steps };
