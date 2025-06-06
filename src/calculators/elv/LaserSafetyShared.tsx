@@ -772,13 +772,10 @@ export const IEC_AEL_TABLES = {
               thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
             }
             
-            // Compare limits - handle different units
             if (photochemicalLimit[1] === thermalLimit[1]) {
-              // Same units - direct comparison
               baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
               unit = photochemicalLimit[1];
             } else {
-              // Different units - convert for comparison
               const photochemicalPower = photochemicalLimit[0] / t;
               if (photochemicalPower <= thermalLimit[0]) {
                 baseAEL = photochemicalLimit[0];
@@ -798,39 +795,42 @@ export const IEC_AEL_TABLES = {
               unit = 'W';
             }
           }
-        } else if (t >= 100 && t < 1e4) {
+        } else if (t >= 100 && t < 3e4) {
           // Retinal photochemical hazard limit (400-600 nm)
           if (wavelength >= 400 && wavelength <= 600) {
-            photochemicalLimit = [3.9e-5 * corrections.C3, 'W']; // W using αlim = 110 mrad
+            // Photochemical limit
+            photochemicalLimit = [3.9e-5 * corrections.C3, 'J']; // J using αlim = 11 mrad
             // Thermal limit
             if (t <= corrections.T2) {
-              thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6 / t, 'W']; // W
+              thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
             } else {
               thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
             }
             
-            // Both are in W, direct comparison
-            baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
-            unit = 'W';
+            if (photochemicalLimit[1] === thermalLimit[1]) {
+              baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
+              unit = photochemicalLimit[1];
+            } else {
+              const photochemicalPower = photochemicalLimit[0] / t;
+              if (photochemicalPower <= thermalLimit[0]) {
+                baseAEL = photochemicalLimit[0];
+                unit = photochemicalLimit[1];
+              } else {
+                baseAEL = thermalLimit[0];
+                unit = thermalLimit[1];
+              }
+            }
           } else {
             // Retinal thermal hazard (600-700 nm)
             if (t <= corrections.T2) {
-              baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6 / t; // W
+              baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+              unit = 'J';
             } else {
               baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
+              unit = 'W';
             }
-            unit = 'W';
           }
-        } else if (t >= 1e4 && t < 3e4) {
-          // Same as previous range for these long exposure times
-          if (wavelength >= 400 && wavelength <= 600) {
-            baseAEL = 3.9e-5 * corrections.C3; // W
-            unit = 'W';
-          } else {
-            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W
-            unit = 'W';
-          }
-        }
+        } 
       } else if (wavelength >= 700 && wavelength < 1050) {
         // 700 nm to 1050 nm range
         if (t < 1e-11) {
