@@ -1,24 +1,8 @@
 // ======================== SHARED INTERFACES AND TYPES ========================
 
 export interface MPEResult {
-  mpeSinglePulse: number;
-  mpeAverage: number;
-  mpeThermal: number;
-  criticalMPE: number;
-  correctionFactorCA: number;
-  correctionFactorCB: number;
-  correctionFactorCC: number;
-  correctionFactorC5: number;
-  wavelengthRegion: string;
-  limitingMechanism: string;
-  calculationSteps: string[];
-  c5Details?: {
-    c5Factor: number;
-    numberOfPulses: number;
-    timeBase: number;
-    pulseGrouping: string;
-    c5Steps: string[];
-  };
+  value: number;
+  unit: string;
 }
 
 export interface NOHDResult {
@@ -1238,7 +1222,375 @@ export const IEC_AEL_TABLES = {
       return { value: baseAEL * c5Factor, unit };
     }
     return { value: baseAEL, unit };
-  }
+  },
+
+  // Table 3: Class 1 AEL values (IEC 60825-1:2014 compliant) - Corrected implementation
+  getMPEIrriance: (wavelength: number, exposureTime: number): MPEResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+
+    let baseAEL = 0;
+    let unit = 'W';
+    
+    // Determine if this is point source (C6 = 1) or extended source (C6 > 1)
+    const isExtendedSource = corrections.C6 > 1;
+    
+    if (!isExtendedSource) {
+      // =================== TABLE A.1: POINT SOURCE (CR = 1) ===================
+      
+      if (wavelength >= 180 && wavelength < 302.5) {
+        // UV-C region - skin hazard
+        if (t < 1e-9) {
+          baseAEL = 3e10; // W/m²
+          unit = 'W/m²';
+        } else {
+          baseAEL = 30; // J/m²
+          unit = 'J/m²';
+        }
+        return { value: baseAEL, unit }; 
+        
+      } else if (wavelength >= 302.5 && wavelength < 315) {
+        // UV-B region with thermal/photochemical transition
+        if (t < 1e-9) {
+          baseAEL = 3e10; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-9 && t < 10) {
+          // Thermal hazard (t < T₁) vs Photochemical hazard (t > T₁)
+          if (t <= corrections.T1) {
+            baseAEL = corrections.C1; // J/m² - thermal hazard
+            unit = 'J/m²';
+          } else {
+            baseAEL = corrections.C2; // J/m² - photochemical hazard
+            unit = 'J/m²';
+          }
+        } else if (t >= 10) {
+          baseAEL = corrections.C2; // J/m²
+          unit = 'J/m²';
+        }
+        
+      } else if (wavelength >= 315 && wavelength < 400) {
+        // UV-A region
+        if (t < 1e-9) {
+          baseAEL = 3e10; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-9 && t < 10) {
+          baseAEL = corrections.C1; // J/m²
+          unit = 'J/m²';
+        } else {
+          baseAEL = 1e4; // J/m²
+          unit = 'J/m²';
+        } 
+      } else if (wavelength >= 400 && wavelength < 450) {
+        // Blue light region
+        if (t < 1e-11) {
+          baseAEL = 1e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10 && t < 100) {
+          baseAEL = 100; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 100) {
+          baseAEL = corrections.C3; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 450 && wavelength < 500) {
+        // Blue-green region with dual limits
+        if (t < 1e-11) {
+          baseAEL = 1e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10 && t < 100) {
+          // Dual limits apply - minimum of photochemical and thermal
+          const photochemicalLimit = 100 * corrections.C3; // J/m²
+          const thermalLimit = 10; // W/m² converted to J/m²
+          baseAEL = Math.min(photochemicalLimit, thermalLimit * t);
+          unit = 'J/m²';
+        } else if (t >= 100) {
+          baseAEL = corrections.C3; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 500 && wavelength < 700) {
+        // Visible region
+        if (t < 1e-11) {
+          baseAEL = 1e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 10; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 700 && wavelength < 1050) {
+        // Near-infrared region
+        if (t < 1e-11) {
+          baseAEL = 1e-3 * corrections.C4; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3 * corrections.C4; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75) * corrections.C4; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 10 * corrections.C4 * corrections.C7; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 1050 && wavelength <= 1400) {
+        // Near-infrared region (1050-1400 nm)
+        if (t < 1e-11) {
+          baseAEL = 1e-3 * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 13e-6) {
+          baseAEL = 2e-2 * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 13e-6 && t < 10) {
+          baseAEL = 90 * Math.pow(t, 0.75) * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 10 * corrections.C4 * corrections.C7; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 1400 && wavelength < 1500) {
+        // Mid-infrared region
+        if (t < 1e-8) {
+          baseAEL = 1e12; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-8 && t < 1e-3) {
+          baseAEL = 1e3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-3 && t < 10) {
+          baseAEL = 5600 * Math.pow(t, 0.25); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 1000; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 1500 && wavelength < 1800) {
+        // Mid-infrared region
+        if (t < 1e-8) {
+          baseAEL = 1e13; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-9 && t < 10) {
+          baseAEL = 1e4; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 1000; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 1800 && wavelength < 2600) {
+        // Mid-infrared region
+        if (t < 1e-9) {
+          baseAEL = 1e12; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-9 && t < 1e-3) {
+          baseAEL = 1e3; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-3 && t < 10) {
+          baseAEL = 5600 * Math.pow(t, 0.25); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 1000; // W/m²
+          unit = 'W/m²';
+        }
+        
+      } else if (wavelength >= 2600 && wavelength <= 1e6) {
+        // Far-infrared region
+        if (t < 1e-9) {
+          baseAEL = 1e11; // W/m²
+          unit = 'W/m²';
+        } else if (t >= 1e-9 && t < 1e-7) {
+          baseAEL = 100; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-7 && t < 10) {
+          baseAEL = 5600 * Math.pow(t, 0.25); // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          baseAEL = 1000; // W/m²
+          unit = 'W/m²';
+        }
+        return { value: baseAEL, unit };
+      }
+      
+    } else {
+      // =================== TABLE A.2: EXTENDED SOURCE (RETINAL HAZARD REGION) ===================
+      // Only applies to wavelength range 400-1400 nm
+      
+      if (wavelength < 400 || wavelength > 1400) {
+        return { value: 0, unit: 'N/A' }; // Outside applicable range for extended sources
+      }
+
+      if (wavelength >= 400 && wavelength <= 700) {
+        // Visible region - retinal photochemical and thermal hazards
+        
+        if (t < 1e-11) {
+          baseAEL = 1e-3 * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3 * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10 && t < 100) {
+          if (wavelength >= 400 && wavelength <= 600) {
+            // Photochemical limit (using γph = 11 mrad)
+            let photochemicalLimit: number;
+            photochemicalLimit = 100 * corrections.C3; // J/m²
+            unit = 'J/m²';
+            // Thermal limit
+            let thermalLimit: number;
+            let thermalUnit: string;
+            if (t <= corrections.T2) {
+              thermalLimit = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
+              thermalUnit = 'J/m²';
+            } else {
+              thermalLimit = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
+              thermalUnit = 'W/m²';
+            }
+            
+            // Take the more restrictive limit
+            if (unit === thermalUnit) {
+              // Both limits in J/m²
+              baseAEL = Math.min(photochemicalLimit, thermalLimit);
+              unit = 'J/m²';
+            } else {
+              // Photochemical in W/m², thermal depends on T2 comparison
+              const photochemicalPower = photochemicalLimit;
+              const thermalPower = thermalLimit / t;
+              if (photochemicalPower <= thermalPower) {
+                baseAEL = photochemicalLimit;
+                unit = 'W/m²';
+              } else {
+                baseAEL = thermalPower;
+                unit = 'W/m²';
+              }
+            }
+            
+          } else {
+            // 600-700 nm: Only retinal thermal hazard
+            if (t <= corrections.T2) {
+              baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
+              unit = 'J/m²';
+            } else {
+              baseAEL = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
+              unit = 'W/m²';
+            }
+          }
+        } else if (t >= 100) {
+          if (wavelength >= 400 && wavelength <= 600) {
+            // Photochemical limit (using γph = 11 mrad)
+            let photochemicalLimit: number;
+            photochemicalLimit = corrections.C3; // J/m²
+            unit = 'W/m²';
+            // Thermal limit
+            let thermalLimit: number;
+            let thermalUnit: string;
+            if (t <= corrections.T2) {
+              thermalLimit = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
+              thermalUnit = 'J/m²';
+            } else {
+              thermalLimit = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
+              thermalUnit = 'W/m²';
+            }
+            
+            // Take the more restrictive limit
+            if (unit === thermalUnit) {
+              // Both limits in J/m²
+              baseAEL = Math.min(photochemicalLimit, thermalLimit);
+              unit = 'J/m²';
+            } else {
+              // Photochemical in W/m², thermal depends on T2 comparison
+              const photochemicalPower = photochemicalLimit;
+              const thermalPower = thermalLimit / t;
+              if (photochemicalPower <= thermalPower) {
+                baseAEL = photochemicalLimit;
+                unit = 'W/m²';
+              } else {
+                baseAEL = thermalPower;
+                unit = 'W/m²';
+              }
+            }
+            
+          } else {
+            // 600-700 nm: Only retinal thermal hazard
+            if (t <= corrections.T2) {
+              baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
+              unit = 'J/m²';
+            } else {
+              baseAEL = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
+              unit = 'W/m²';
+            }
+          }
+        } 
+
+      } else if (wavelength >= 700 && wavelength <= 1050) {
+        // Near-infrared region - retinal thermal hazard only
+        
+        if (t < 1e-11) {
+          baseAEL = 1e-3 * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 5e-6) {
+          baseAEL = 2e-3 * corrections.C4 * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 5e-6 && t < 10) {
+          baseAEL = 18 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          if (t <= corrections.T2) {
+            baseAEL = 18 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J/m²
+            unit = 'J/m²';
+          } else {
+            baseAEL = 18 * corrections.C4 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
+            unit = 'W/m²';
+          }
+        }
+        
+      } else if (wavelength >= 1050 && wavelength <= 1400) {
+        // Near-infrared region (1050-1400 nm) - retinal thermal hazard only
+        
+        if (t < 1e-11) {
+          baseAEL = 1e-3 * corrections.C6 * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1e-11 && t < 1.3e-5) {
+          baseAEL = 2e-2 * corrections.C6 * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 1.3e-5 && t < 10) {
+          baseAEL = 90 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J/m²
+          unit = 'J/m²';
+        } else if (t >= 10) {
+          if (t <= corrections.T2) {
+            baseAEL = 90 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J/m²
+            unit = 'J/m²';
+          } else {
+            baseAEL = 90 * corrections.C6 * corrections.C7 * Math.pow(corrections.T2, -0.25); // W/m²
+            unit = 'W/m²';
+          }
+        }
+      }
+    }
+    return { value: baseAEL, unit };
+  },
 };
 
 // ======================== IRRADIANCE CALCULATION UTILITIES ========================
