@@ -494,7 +494,7 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
             </>
           )}
 
-          <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
+          {/* <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
             <h4 className="font-medium text-green-800 mb-2 flex items-center">
               <Icons.CheckCircle />
               IEC 60825-1:2014 Compliance
@@ -505,7 +505,7 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               standard beam propagation formulas: NOHD = (1/Φ) × [√(4P/(π×MPE)) - D₀] where Φ is beam divergence, 
               P is laser power, and D₀ is initial beam diameter.
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

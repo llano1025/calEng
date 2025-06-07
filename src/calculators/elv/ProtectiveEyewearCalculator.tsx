@@ -578,7 +578,7 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
                 </div>
               </div>
 
-              <div className="mb-6 bg-yellow-50 p-3 rounded-md border border-yellow-300">
+              {/* <div className="mb-6 bg-yellow-50 p-3 rounded-md border border-yellow-300">
                 <h4 className="font-medium text-yellow-800 mb-2 flex items-center">
                   <Icons.InfoInline />
                   Critical Safety Notes
@@ -591,11 +591,11 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
                   <li><strong>IEC 60825-1:2014 compliant</strong> MPE calculations with C5 pulse corrections applied.</li>
                   <li>Consider multiple wavelengths - select eyewear covering all wavelengths with highest required OD.</li>
                 </ul>
-              </div>
+              </div> */}
             </>
           )}
 
-          <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
+          {/* <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
             <h4 className="font-medium text-green-800 mb-2 flex items-center">
               <Icons.CheckCircle />
               IEC 60825-1:2014 Compliance
@@ -606,7 +606,7 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
               applicable. EN 207 scale factors: D (CW), I (Incoherent/short pulse), R (Giant pulse), 
               M (Mode-locked). Required OD = log₁₀(Exposure Level / MPE).
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
