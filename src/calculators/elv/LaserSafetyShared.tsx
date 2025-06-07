@@ -1224,8 +1224,8 @@ export const IEC_AEL_TABLES = {
     return { value: baseAEL, unit };
   },
 
-  // Table 3: Class 1 AEL values (IEC 60825-1:2014 compliant) - Corrected implementation
-  getMPEIrriance: (wavelength: number, exposureTime: number): MPEResult => {
+  // Maximum permissible exposure (MPE)
+  getMPEIrriance: (wavelength: number, exposureTime: number, c5Factor: number = 1): MPEResult => {
     const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
     const t = exposureTime;
 
@@ -1589,7 +1589,305 @@ export const IEC_AEL_TABLES = {
         }
       }
     }
-    return { value: baseAEL, unit };
+    return { value: baseAEL * c5Factor, unit };
+  },
+  // Maximum permissible exposure (MPE) calculation for extended sources
+  getMPEPowerEnergy: (wavelength: number, exposureTime: number, c5Factor: number = 1): MPEResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+
+    let baseAEL = 0;
+    let unit = 'W';
+    let photochemicalLimit: [number, string] = [0, 'J'];
+    let thermalLimit: [number, string] = [0, 'J'];
+    
+    if (wavelength < 400 || wavelength > 1400) {
+        return { value: 0, unit: 'N/A' }; // Outside applicable range
+      }
+
+    if (wavelength >= 400 && wavelength < 700) {
+      // 400 nm to 700 nm range
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8 * corrections.C6; // J
+        unit = 'J';
+      } else if (t >= 1e-11 && t < 5e-6) { // Fixed: was 5e-8, should be 5e-6
+        baseAEL = 7.7e-8 * corrections.C6; // J
+        unit = 'J';
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+        unit = 'J';
+      } else if (t >= 10 && t < 100) {
+        // Retinal photochemical hazard limit (400-600 nm)
+        if (wavelength >= 400 && wavelength <= 600) {
+          // Photochemical limit
+          photochemicalLimit = [3.9e-3 * corrections.C3, 'J']; // J using αlim = 11 mrad
+          // Thermal limit
+          if (t <= corrections.T2) {
+            thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
+          } else {
+            thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
+          }
+          
+          if (photochemicalLimit[1] === thermalLimit[1]) {
+            baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
+            unit = photochemicalLimit[1];
+          } else {
+            const photochemicalPower = photochemicalLimit[0] / t;
+            if (photochemicalPower <= thermalLimit[0]) {
+              baseAEL = photochemicalLimit[0];
+              unit = photochemicalLimit[1];
+            } else {
+              baseAEL = thermalLimit[0];
+              unit = thermalLimit[1];
+            }
+          }
+        } else {
+          // Retinal thermal hazard (600-700 nm)
+          if (t <= corrections.T2) {
+            baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+            unit = 'J';
+          } else {
+            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
+            unit = 'W';
+          }
+        }
+      } else if (t >= 100 && t < 3e4) {
+        // Retinal photochemical hazard limit (400-600 nm)
+        if (wavelength >= 400 && wavelength <= 600) {
+          // Photochemical limit
+          photochemicalLimit = [3.9e-5 * corrections.C3, 'J']; // J using αlim = 11 mrad
+          // Thermal limit
+          if (t <= corrections.T2) {
+            thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
+          } else {
+            thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
+          }
+          
+          if (photochemicalLimit[1] === thermalLimit[1]) {
+            baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
+            unit = photochemicalLimit[1];
+          } else {
+            const photochemicalPower = photochemicalLimit[0] / t;
+            if (photochemicalPower <= thermalLimit[0]) {
+              baseAEL = photochemicalLimit[0];
+              unit = photochemicalLimit[1];
+            } else {
+              baseAEL = thermalLimit[0];
+              unit = thermalLimit[1];
+            }
+          }
+        } else {
+          // Retinal thermal hazard (600-700 nm)
+          if (t <= corrections.T2) {
+            baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
+            unit = 'J';
+          } else {
+            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
+            unit = 'W';
+          }
+        }
+      } 
+    } else if (wavelength >= 700 && wavelength < 1050) {
+      // 700 nm to 1050 nm range
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8 * corrections.C4; // J
+        unit = 'J';
+      } else if (t >= 1e-11 && t < 5e-6) { // Fixed: was 5e-8, should be 5e-6
+        baseAEL = 7.7e-8 * corrections.C4 * corrections.C6; // J
+        unit = 'J';
+      } else if (t >= 5e-6 && t < 10) {
+        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J
+        unit = 'J';
+      } else if (t >= 10 && t < 3e4) {
+        // Retinal thermal hazard
+        if (t <= corrections.T2) {
+          baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6 / t; // W (t ≤ T2)
+          unit = 'W';
+        } else {
+          baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C4 * corrections.C6 / t; // W (t > T2)
+          unit = 'W';
+        }
+      }
+    } else if (wavelength >= 1050 && wavelength <= 1400) {
+      // 1050 nm to 1400 nm range
+      if (t < 1e-11) {
+        baseAEL = 3.8e-8 * corrections.C6 * corrections.C7; // J
+        unit = 'J';
+      } else if (t >= 1e-11 && t < 1.3e-5) {
+        baseAEL = 7.7e-7 * corrections.C6 * corrections.C7; // J
+        unit = 'J';
+      } else if (t >= 1.3e-5 && t < 10) {
+        baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J
+        unit = 'J';
+      } else if (t >= 10 && t < 3e4) {
+        // Retinal thermal hazard
+        if (t <= corrections.T2) {
+          baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7 / t; // W (t ≤ T2)
+          unit = 'W';
+        } else {
+          baseAEL = 3.5e-3 * Math.pow(corrections.T2, 0.75) * corrections.C6 * corrections.C7 / t; // W (t > T2)
+          unit = 'W';
+        }
+      }
+    }
+    // Apply C5 correction for pulse trains
+    return { value: baseAEL * c5Factor, unit };
+  },
+  
+  // Table A.5: Maximum permissible exposure (MPE) of the skin to laser radiation
+  getMPESkin: (wavelength: number, exposureTime: number): AELResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+    const t = exposureTime;
+
+    let mpeValue = 0;
+    let unit = 'W/m²';
+
+    if (wavelength >= 180 && wavelength < 302.5) {
+      // =================== 180-302.5 nm (UV-C) ===================
+      // Constant value regardless of exposure time
+      if (t < 1e-9) {
+        mpeValue = 3e10; // W/m²
+        unit = 'W/m²';
+      } else {
+        mpeValue = 30; // J/m²
+        unit = 'J/m²';
+      }
+      
+    } else if (wavelength >= 302.5 && wavelength < 315) {
+      // =================== 302.5-315 nm (UV-B) ===================
+      if (t < 1e-9) {
+        mpeValue = 3e10; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 10) {
+        // Thermal hazard (t < T₁) vs Photochemical hazard (t > T₁)
+        if (t <= corrections.T1) {
+          mpeValue = corrections.C1; // J/m² - thermal hazard
+          unit = 'J/m²';
+        } else {
+          mpeValue = corrections.C2; // J/m² - photochemical hazard  
+          unit = 'J/m²';
+        }
+      } else if (t >= 10) {
+        mpeValue = corrections.C2; // J/m²
+        unit = 'J/m²';
+      }
+      
+    } else if (wavelength >= 315 && wavelength < 400) {
+      // =================== 315-400 nm (UV-A) ===================
+      if (t < 1e-9) {
+        mpeValue = 3e10; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-8 && t < 10) {
+        mpeValue = corrections.C1; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10 && t < 1e3) {
+        mpeValue = 1e4; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e3 && t < 3e4) {
+        mpeValue = 10; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 400 && wavelength < 700) {
+      // =================== 400-700 nm (Visible) ===================
+      if (t < 1e-9) {
+        mpeValue = 2e11; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 1e-7) {
+        mpeValue = 200; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e-7 && t < 10) {
+        mpeValue = 1.1e4 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 2000; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 700 && wavelength < 1400) {
+      // =================== 700-1400 nm (Near-IR) ===================
+      if (t < 1e-9) {
+        mpeValue = 2e11 * corrections.C4; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 1e-7) {
+        mpeValue = 200 * corrections.C4; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e-7 && t < 10) {
+        mpeValue = 1.1e4 * Math.pow(t, 0.25) * corrections.C4; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 2000 * corrections.C4; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 1400 && wavelength < 1500) {
+      // =================== 1400-1500 nm (IR-B) ===================
+      if (t < 1e-9) {
+        mpeValue = 1e12; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 1e-3) {
+        mpeValue = 1e3; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e-3 && t < 10) {
+        mpeValue = 5600 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 1000; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 1500 && wavelength < 1800) {
+      // =================== 1500-1800 nm (IR-B) ===================
+      if (t < 1e-9) {
+        mpeValue = 1e13; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t <10) {
+        mpeValue = 1e4; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 1000; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 1800 && wavelength < 2600) {
+      // =================== 1800-2600 nm (IR-B/IR-C) ===================
+      if (t < 1e-9) {
+        mpeValue = 1e12; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 1e-3) {
+        mpeValue = 1e3; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e-3 && t < 10) {
+        mpeValue = 5600 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 1000; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else if (wavelength >= 2600 && wavelength <= 1e6) {
+      // =================== 2600 nm - 1 mm (Far-IR) ===================
+      if (t < 1e-9) {
+        mpeValue = 1e11; // W/m²
+        unit = 'W/m²';
+      } else if (t >= 1e-9 && t < 1e-7) {
+        mpeValue = 100; // J/m²
+        unit = 'J/m²';
+      } else if (t >= 1e-7 && t < 10) {
+        mpeValue = 5600 * Math.pow(t, 0.25); // J/m²
+        unit = 'J/m²';
+      } else if (t >= 10) {
+        mpeValue = 1000; // W/m²
+        unit = 'W/m²';
+      }
+      
+    } else {
+      // Outside defined wavelength range
+      mpeValue = 0;
+      unit = 'N/A';
+    }
+
+    return { value: mpeValue, unit };
   },
 };
 
