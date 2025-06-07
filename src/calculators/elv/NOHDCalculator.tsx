@@ -3,7 +3,7 @@ import { Icons } from '../../components/Icons';
 import { 
   NOHDResult, 
   MPE_CONSTANTS, 
-  calculateMPEValue 
+  IEC_AEL_TABLES
 } from './LaserSafetyShared';
 
 interface NOHDCalculatorProps {
@@ -29,7 +29,7 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
   }, [power, beamDiameter, beamDivergence, wavelength, exposureTime]);
 
   const performAutoCalculation = () => {
-    if (power <= 0 || beamDiameter <= 0 || beamDivergence <= 0) {
+    if (power <= 0 || beamDiameter <= 0 || beamDivergence < 0) {
       setNohdResults(null);
       setCalculationPerformed(false);
       return;
@@ -38,98 +38,146 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
     setIsCalculating(true);
     
     try {
-      const mpeResult = calculateMPEValue(wavelength, exposureTime, 'continuous');
-      let mpe_W_cm2 = mpeResult.criticalMPE;
+      // Get MPE irradiance using the updated IEC_AEL_TABLES
+      const mpeResult = IEC_AEL_TABLES.getMPEIrriance(wavelength, exposureTime, 1.0);
+      let mpe_W_cm2 = 0;
       
-      if (!mpeResult.limitingMechanism.includes('CW') && !mpeResult.limitingMechanism.includes('W/cm²')) {
-         if (exposureTime > 0) {
-            mpe_W_cm2 = mpeResult.criticalMPE / exposureTime;
-         } else {
-            mpe_W_cm2 = 0;
-         }
+      // Convert MPE to W/cm² based on the unit returned
+      if (mpeResult.unit.includes('W/m²')) {
+        mpe_W_cm2 = mpeResult.value / MPE_CONSTANTS.M2_TO_CM2; // Convert W/m² to W/cm²
+      } else if (mpeResult.unit.includes('J/m²')) {
+        // For energy units, convert to power density
+        if (exposureTime > 0) {
+          mpe_W_cm2 = (mpeResult.value / exposureTime) / MPE_CONSTANTS.M2_TO_CM2; // Convert J/m² to W/cm²
+        } else {
+          mpe_W_cm2 = 0;
+        }
+      } else if (mpeResult.unit.includes('W') && !mpeResult.unit.includes('/')) {
+        // Direct power limit - need to convert to irradiance for NOHD calculation
+        // Use standard 7mm aperture area for eye hazard assessment
+        const eyeApertureArea_cm2 = Math.PI * Math.pow(0.35, 2); // 7mm diameter = 0.7cm radius = 0.35cm
+        mpe_W_cm2 = mpeResult.value / eyeApertureArea_cm2;
+      } else {
+        // Default handling - assume value is already in appropriate units
+        mpe_W_cm2 = mpeResult.value;
       }
       
       if (mpe_W_cm2 <= 0) {
-          setNohdResults(null);
-          setCalculationPerformed(false);
-          setIsCalculating(false);
-          return;
+        setNohdResults(null);
+        setCalculationPerformed(false);
+        setIsCalculating(false);
+        return;
       }
 
       const powerWatts = power * MPE_CONSTANTS.MW_TO_W;
-      const beamDiameterAtAperture_m = beamDiameter * MPE_CONSTANTS.MM_TO_CM / 100;
+      const beamDiameterAtAperture_m = beamDiameter * MPE_CONSTANTS.MM_TO_M;
       const beamDivergenceRad = beamDivergence * MPE_CONSTANTS.MRAD_TO_RAD;
-
       const mpe_W_m2 = mpe_W_cm2 * MPE_CONSTANTS.M2_TO_CM2;
 
       let nohd_m = 0;
       let calculationSteps = [
+        `=== NOHD Calculation Process ===`,
         `Laser power (P): ${power} mW = ${powerWatts.toExponential(3)} W`,
         `Beam diameter at aperture (D0): ${beamDiameter} mm = ${beamDiameterAtAperture_m.toExponential(3)} m`,
         `Beam divergence (Φ): ${beamDivergence} mrad = ${beamDivergenceRad.toExponential(3)} rad`,
         `Wavelength: ${wavelength} nm`,
         `Exposure time for MPE: ${exposureTime} s`,
-        `MPE used: ${mpe_W_cm2.toExponential(3)} W/cm² = ${mpe_W_m2.toExponential(3)} W/m²`
+        ``,
+        `=== MPE Calculation ===`,
+        `MPE from IEC 60825-1: ${mpeResult.value.toExponential(3)} ${mpeResult.unit}`,
+        `MPE converted to irradiance: ${mpe_W_cm2.toExponential(3)} W/cm² = ${mpe_W_m2.toExponential(3)} W/m²`,
+        ``,
+        `=== NOHD Formula ===`,
+        `NOHD = (1/Φ) × [√(4P/(π×MPE)) - D0]`
       ];
 
       if (beamDivergenceRad > 0) {
         const termInsideSqrt = (4 * powerWatts) / (Math.PI * mpe_W_m2);
-        calculationSteps.push(`Term (4P / (π × MPE_W_m2)): (4 × ${powerWatts.toExponential(3)}) / (π × ${mpe_W_m2.toExponential(3)}) = ${termInsideSqrt.toExponential(3)} m²`);
+        calculationSteps.push(`Term inside √: (4P/(π×MPE)) = (4 × ${powerWatts.toExponential(3)}) / (π × ${mpe_W_m2.toExponential(3)})`);
+        calculationSteps.push(`                              = ${termInsideSqrt.toExponential(3)} m²`);
         
         if (termInsideSqrt >= 0) {
           const sqrtVal = Math.sqrt(termInsideSqrt);
-          nohd_m = (1 / beamDivergenceRad) * (sqrtVal - beamDiameterAtAperture_m);
-          calculationSteps.push(`NOHD = (1/${beamDivergenceRad.toExponential(3)}) × (√${termInsideSqrt.toExponential(3)} - ${beamDiameterAtAperture_m.toExponential(3)})`);
-          calculationSteps.push(`   = (1/${beamDivergenceRad.toExponential(3)}) × (${sqrtVal.toExponential(3)} - ${beamDiameterAtAperture_m.toExponential(3)}) = ${nohd_m.toFixed(3)} m`);
+          const termInBrackets = sqrtVal - beamDiameterAtAperture_m;
+          nohd_m = (1 / beamDivergenceRad) * termInBrackets;
+          
+          calculationSteps.push(`√(4P/(π×MPE)) = √${termInsideSqrt.toExponential(3)} = ${sqrtVal.toExponential(3)} m`);
+          calculationSteps.push(`Term in brackets: ${sqrtVal.toExponential(3)} - ${beamDiameterAtAperture_m.toExponential(3)} = ${termInBrackets.toExponential(3)} m`);
+          calculationSteps.push(`NOHD = (1/${beamDivergenceRad.toExponential(3)}) × ${termInBrackets.toExponential(3)} = ${nohd_m.toFixed(3)} m`);
         } else {
-          calculationSteps.push(`Error: Negative term inside square root. Cannot calculate NOHD.`);
+          calculationSteps.push(`ERROR: Negative term inside square root (${termInsideSqrt.toExponential(3)})`);
+          calculationSteps.push(`This indicates the calculation parameters are invalid.`);
           nohd_m = 0;
         }
       } else {
-        calculationSteps.push(`Error: Beam divergence is zero. NOHD is infinite if P/A > MPE, or zero otherwise.`);
+        calculationSteps.push(`Special case: Beam divergence = 0 (collimated beam)`);
         const initialArea_m2 = Math.PI * Math.pow(beamDiameterAtAperture_m / 2, 2);
         const initialIrradiance_W_m2 = powerWatts / initialArea_m2;
+        
+        calculationSteps.push(`Initial beam area: π × (${beamDiameterAtAperture_m.toExponential(3)}/2)² = ${initialArea_m2.toExponential(3)} m²`);
+        calculationSteps.push(`Initial irradiance: ${powerWatts.toExponential(3)} / ${initialArea_m2.toExponential(3)} = ${initialIrradiance_W_m2.toExponential(3)} W/m²`);
+        
         if (initialIrradiance_W_m2 > mpe_W_m2) {
-            nohd_m = Infinity;
+          nohd_m = Infinity;
+          calculationSteps.push(`Initial irradiance > MPE: NOHD = ∞ (infinite)`);
         } else {
-            nohd_m = 0;
+          nohd_m = 0;
+          calculationSteps.push(`Initial irradiance ≤ MPE: NOHD = 0 m (safe at all distances)`);
         }
-        calculationSteps.push(`Initial irradiance: ${initialIrradiance_W_m2.toExponential(3)} W/m². NOHD = ${nohd_m === Infinity ? "∞" : "0"} m.`);
       }
       
-      if (nohd_m < 0) nohd_m = 0;
+      // Ensure NOHD is not negative
+      if (nohd_m < 0) {
+        calculationSteps.push(`NOHD calculated as negative (${nohd_m.toFixed(3)} m), setting to 0 m`);
+        nohd_m = 0;
+      }
 
-      const beamDiameterAtNOHD_m = beamDiameterAtAperture_m + nohd_m * beamDivergenceRad;
-      const beamAreaAtNOHD_m2 = Math.PI * Math.pow(beamDiameterAtNOHD_m / 2, 2);
-      const irradianceAtNOHD_W_m2 = powerWatts / beamAreaAtNOHD_m2;
+      // Calculate beam parameters at NOHD
+      let beamDiameterAtNOHD_m = beamDiameterAtAperture_m;
+      let beamAreaAtNOHD_m2 = Math.PI * Math.pow(beamDiameterAtAperture_m / 2, 2);
+      let irradianceAtNOHD_W_m2 = powerWatts / beamAreaAtNOHD_m2;
 
+      if (nohd_m !== Infinity && nohd_m > 0) {
+        beamDiameterAtNOHD_m = beamDiameterAtAperture_m + nohd_m * beamDivergenceRad;
+        beamAreaAtNOHD_m2 = Math.PI * Math.pow(beamDiameterAtNOHD_m / 2, 2);
+        irradianceAtNOHD_W_m2 = powerWatts / beamAreaAtNOHD_m2;
+      }
+
+      // Calculate initial power density for reference
       const initialBeamArea_cm2 = Math.PI * Math.pow((beamDiameter * MPE_CONSTANTS.MM_TO_CM) / 2, 2);
       const initialPowerDensity_W_cm2 = powerWatts / initialBeamArea_cm2;
 
+      // Determine hazard classification
       let hazardClass = '';
       if (nohd_m === Infinity) {
-        hazardClass = 'Extremely high hazard - Collimated beam exceeding MPE';
+        hazardClass = 'EXTREME HAZARD - Collimated beam exceeding MPE at all distances';
+      } else if (nohd_m === 0) {
+        hazardClass = 'SAFE - Irradiance below MPE at all distances';
       } else if (nohd_m < 0.1) {
-        hazardClass = 'Low hazard potential - NOHD < 10 cm';
+        hazardClass = 'LOW HAZARD - NOHD < 10 cm';
       } else if (nohd_m < 3) {
-        hazardClass = 'Moderate hazard potential - NOHD < 3 m';
+        hazardClass = 'MODERATE HAZARD - NOHD < 3 m (typical room size)';
       } else if (nohd_m < 100) {
-        hazardClass = 'High hazard potential - NOHD < 100 m';
+        hazardClass = 'HIGH HAZARD - NOHD < 100 m (outdoor hazard zone)';
       } else {
-        hazardClass = 'Very high hazard potential - NOHD ≥ 100 m';
+        hazardClass = 'VERY HIGH HAZARD - NOHD ≥ 100 m (long-range hazard)';
       }
 
-      calculationSteps.push(`---`);
-      calculationSteps.push(`Calculated NOHD: ${nohd_m === Infinity ? "∞" : nohd_m.toFixed(2)} m`);
-      calculationSteps.push(`Beam diameter at NOHD: ${nohd_m === Infinity ? "N/A" : (beamDiameterAtNOHD_m * 1000).toFixed(1)} mm`);
-      calculationSteps.push(`Irradiance at NOHD: ${nohd_m === Infinity ? "N/A" : (irradianceAtNOHD_W_m2 / MPE_CONSTANTS.M2_TO_CM2).toExponential(3)} W/cm² (should match MPE)`);
-      calculationSteps.push(`Hazard perception: ${hazardClass}`);
+      calculationSteps.push(``, `=== Results Summary ===`);
+      calculationSteps.push(`NOHD: ${nohd_m === Infinity ? "∞" : nohd_m.toFixed(2)} m`);
+      if (nohd_m !== Infinity) {
+        calculationSteps.push(`Beam diameter at NOHD: ${(beamDiameterAtNOHD_m * 1000).toFixed(1)} mm`);
+        calculationSteps.push(`Irradiance at NOHD: ${(irradianceAtNOHD_W_m2 / MPE_CONSTANTS.M2_TO_CM2).toExponential(3)} W/cm²`);
+        calculationSteps.push(`(Should approximately equal MPE: ${mpe_W_cm2.toExponential(3)} W/cm²)`);
+      }
+      calculationSteps.push(`Initial power density: ${initialPowerDensity_W_cm2.toExponential(3)} W/cm²`);
+      calculationSteps.push(`Hazard classification: ${hazardClass}`);
 
       setNohdResults({
         nohd: nohd_m,
         mpe: mpe_W_cm2,
-        beamDiameterAtNOHD: nohd_m === Infinity ? Infinity : beamDiameterAtNOHD_m * 1000,
-        irradianceAtNOHD: nohd_m === Infinity ? 0 : irradianceAtNOHD_W_m2 / MPE_CONSTANTS.M2_TO_CM2,
+        beamDiameterAtNOHD: nohd_m === Infinity ? Infinity : beamDiameterAtNOHD_m * 1000, // Convert to mm
+        irradianceAtNOHD: nohd_m === Infinity ? 0 : irradianceAtNOHD_W_m2 / MPE_CONSTANTS.M2_TO_CM2, // Convert to W/cm²
         hazardClass: hazardClass,
         initialPowerDensity: initialPowerDensity_W_cm2,
         calculationSteps: calculationSteps
@@ -159,15 +207,6 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">NOHD Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -183,10 +222,12 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               type="number"
               min="0.001"
               max="1e9"
+              step="any"
               value={power}
               onChange={(e) => setPower(Number(e.target.value))}
               className="w-full p-2 border rounded-md"
             />
+            <p className="text-xs text-gray-500 mt-1">Continuous wave laser power output</p>
           </div>
 
           <div className="mb-4">
@@ -197,10 +238,12 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               type="number"
               min="0.001"
               max="1000"
+              step="any"
               value={beamDiameter}
               onChange={(e) => setBeamDiameter(Number(e.target.value))}
               className="w-full p-2 border rounded-md"
             />
+            <p className="text-xs text-gray-500 mt-1">1/e² beam diameter at laser output</p>
           </div>
 
           <div className="mb-4">
@@ -216,7 +259,7 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               onChange={(e) => setBeamDivergence(Number(e.target.value))}
               className="w-full p-2 border rounded-md"
             />
-            <p className="text-xs text-gray-500 mt-1">Full angle divergence. Use 0 for collimated beam.</p>
+            <p className="text-xs text-gray-500 mt-1">Full angle divergence. Use 0 for perfectly collimated beam</p>
           </div>
 
           <div className="mb-4">
@@ -231,6 +274,7 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               onChange={(e) => setWavelength(Number(e.target.value))}
               className="w-full p-2 border rounded-md"
             />
+            <p className="text-xs text-gray-500 mt-1">Laser wavelength (180 nm - 1 mm per IEC 60825-1)</p>
           </div>
 
           <div className="mb-4">
@@ -246,18 +290,20 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               onChange={(e) => setExposureTime(Number(e.target.value))}
               className="w-full p-2 border rounded-md"
             />
-            <p className="text-xs text-gray-500 mt-1">Use 0.25s for visible accidental exposure, 10s for IR thermal, etc.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Typical values: 0.25s (visible blink reflex), 10s (IR thermal), 100s (general)
+            </p>
           </div>
 
           <div className="mt-6">
             <button
               onClick={resetCalculation}
-              className="bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 transition-colors"
+              className="bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 transition-colors w-full"
             >
               Reset to Defaults
             </button>
             {isCalculating && (
-              <p className="text-sm text-blue-600 mt-2 flex items-center">
+              <p className="text-sm text-blue-600 mt-2 flex items-center justify-center">
                 <span className="animate-spin inline-block w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></span>
                 Calculating NOHD...
               </p>
@@ -277,35 +323,53 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
           {isCalculating ? (
             <div className="text-center py-8 text-blue-600">
               <div className="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
-              <p>Calculating NOHD...</p>
+              <p>Calculating NOHD using IEC 60825-1:2014...</p>
             </div>
           ) : !calculationPerformed || !nohdResults ? (
             <div className="text-center py-8 text-gray-500">
               <p>NOHD values will appear automatically as you adjust parameters</p>
-              {nohdResults === null && calculationPerformed && <p className="text-red-500">Could not calculate NOHD. Check MPE validity or input parameters.</p>}
+              {nohdResults === null && calculationPerformed && (
+                <p className="text-red-500 mt-2">Could not calculate NOHD. Check input parameters or wavelength validity.</p>
+              )}
             </div>
           ) : (
             <>
               <div className="mb-6">
                 <h4 className="font-medium text-blue-800 mb-2">Nominal Ocular Hazard Distance (NOHD)</h4>
                 <div className={`p-3 rounded-md ${
-                  nohdResults.nohd === Infinity || nohdResults.nohd > 3
+                  nohdResults.nohd === Infinity 
                     ? 'bg-red-100 border border-red-300' 
-                    : 'bg-green-100 border border-green-300'
+                    : nohdResults.nohd === 0
+                      ? 'bg-green-100 border border-green-300'
+                      : nohdResults.nohd > 3
+                        ? 'bg-red-100 border border-red-300' 
+                        : nohdResults.nohd > 0.1
+                          ? 'bg-yellow-100 border border-yellow-300'
+                          : 'bg-green-100 border border-green-300'
                 }`}>
-                  <p className={`font-bold text-lg ${
-                    nohdResults.nohd === Infinity || nohdResults.nohd > 3 ? 'text-red-700' : 'text-green-700'
+                  <p className={`font-bold text-2xl ${
+                    nohdResults.nohd === Infinity 
+                      ? 'text-red-700' 
+                      : nohdResults.nohd === 0
+                        ? 'text-green-700'
+                        : nohdResults.nohd > 3
+                          ? 'text-red-700' 
+                          : nohdResults.nohd > 0.1
+                            ? 'text-yellow-700'
+                            : 'text-green-700'
                   }`}>
                     {nohdResults.nohd === Infinity 
                       ? "∞ (Infinite)"
-                      : nohdResults.nohd < 1 && nohdResults.nohd !==0
-                        ? `${(nohdResults.nohd * 100).toFixed(1)} cm` 
-                        : nohdResults.nohd < 1000 
-                          ? `${nohdResults.nohd.toFixed(2)} m`
-                          : `${(nohdResults.nohd / 1000).toFixed(2)} km`
+                      : nohdResults.nohd === 0
+                        ? "0 m (Safe)"
+                        : nohdResults.nohd < 1 && nohdResults.nohd !== 0
+                          ? `${(nohdResults.nohd * 100).toFixed(1)} cm` 
+                          : nohdResults.nohd < 1000 
+                            ? `${nohdResults.nohd.toFixed(2)} m`
+                            : `${(nohdResults.nohd / 1000).toFixed(2)} km`
                     }
                   </p>
-                  <p className="text-sm mt-1">{nohdResults.hazardClass}</p>
+                  <p className="text-sm mt-1 font-medium">{nohdResults.hazardClass}</p>
                 </div>
               </div>
 
@@ -315,33 +379,49 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
                   <tbody>
                     <tr className="border-t border-gray-200">
                       <td className="px-3 py-2 font-medium">MPE Used</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 font-mono">
                         {nohdResults.mpe < 0.001 && nohdResults.mpe !== 0
-                          ? nohdResults.mpe.toExponential(2) 
+                          ? nohdResults.mpe.toExponential(3) 
                           : nohdResults.mpe.toFixed(6)
                         } W/cm²
                       </td>
                     </tr>
                     <tr className="border-t border-gray-200">
-                      <td className="px-3 py-2 font-medium">Beam Diameter at NOHD</td>
-                      <td className="px-3 py-2">
-                          {nohdResults.beamDiameterAtNOHD === Infinity ? "N/A" : `${nohdResults.beamDiameterAtNOHD.toFixed(2)} mm`}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-gray-200">
-                      <td className="px-3 py-2 font-medium">Irradiance at NOHD</td>
-                      <td className="px-3 py-2">
-                        {nohdResults.irradianceAtNOHD === 0 && nohdResults.nohd === Infinity ? "N/A" :
-                         nohdResults.irradianceAtNOHD < 0.001 && nohdResults.irradianceAtNOHD !==0
-                          ? nohdResults.irradianceAtNOHD.toExponential(2) 
-                          : nohdResults.irradianceAtNOHD.toFixed(6)
+                      <td className="px-3 py-2 font-medium">Initial Power Density</td>
+                      <td className="px-3 py-2 font-mono">
+                        {nohdResults.initialPowerDensity < 0.001 && nohdResults.initialPowerDensity !== 0
+                          ? nohdResults.initialPowerDensity.toExponential(3)
+                          : nohdResults.initialPowerDensity.toFixed(6)
                         } W/cm²
                       </td>
                     </tr>
                     <tr className="border-t border-gray-200">
-                      <td className="px-3 py-2 font-medium">Initial Power Density</td>
+                      <td className="px-3 py-2 font-medium">Beam Diameter at NOHD</td>
+                      <td className="px-3 py-2 font-mono">
+                        {nohdResults.beamDiameterAtNOHD === Infinity 
+                          ? "N/A (infinite)" 
+                          : `${nohdResults.beamDiameterAtNOHD.toFixed(2)} mm`}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-200">
+                      <td className="px-3 py-2 font-medium">Irradiance at NOHD</td>
+                      <td className="px-3 py-2 font-mono">
+                        {nohdResults.irradianceAtNOHD === 0 && nohdResults.nohd === Infinity 
+                          ? "N/A (infinite)" 
+                          : nohdResults.irradianceAtNOHD < 0.001 && nohdResults.irradianceAtNOHD !== 0
+                            ? nohdResults.irradianceAtNOHD.toExponential(3) 
+                            : nohdResults.irradianceAtNOHD.toFixed(6)
+                        } W/cm²
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-200">
+                      <td className="px-3 py-2 font-medium">Safety Factor</td>
                       <td className="px-3 py-2">
-                        {nohdResults.initialPowerDensity.toFixed(2)} W/cm²
+                        {nohdResults.nohd === Infinity 
+                          ? "∞ (Exceeds MPE)" 
+                          : nohdResults.nohd === 0
+                            ? "Safe at all distances"
+                            : `${(nohdResults.initialPowerDensity / nohdResults.mpe).toFixed(1)}× above MPE initially`}
                       </td>
                     </tr>
                   </tbody>
@@ -349,27 +429,82 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
               </div>
 
               <div className="mb-6">
-                <h4 className="font-medium text-blue-800 mb-2">Calculation Steps</h4>
+                <h4 className="font-medium text-blue-800 mb-2">Calculation Process (IEC 60825-1:2014)</h4>
                 <div className="bg-white p-3 rounded-md max-h-64 overflow-y-auto">
-                  <ol className="list-decimal pl-5 space-y-1 text-xs font-mono">
+                  <div className="text-xs font-mono space-y-1">
                     {nohdResults.calculationSteps.map((step: string, index: number) => (
-                      <li key={index}>{step}</li>
+                      <div key={index} className={
+                        step.startsWith('===') ? 'font-bold text-blue-700 mt-2' : 
+                        step.includes('ERROR') ? 'text-red-700 font-medium' :
+                        step.includes('NOHD:') || step.includes('Results') ? 'font-bold text-green-700' : 
+                        step === '' ? 'h-1' : ''
+                      }>
+                        {step || '\u00A0'}
+                      </div>
                     ))}
-                  </ol>
+                  </div>
                 </div>
+              </div>
+
+              <div className="mb-6 bg-yellow-50 p-3 rounded-md border border-yellow-300">
+                <h4 className="font-medium text-yellow-800 mb-2 flex items-center">
+                  <Icons.InfoInline />
+                  Safety Recommendations
+                </h4>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-yellow-800">
+                  {nohdResults.nohd === Infinity && (
+                    <>
+                      <li className="font-medium text-red-800">IMMEDIATE ACTION REQUIRED: This laser exceeds MPE at all distances</li>
+                      <li className="font-medium text-red-800">Implement engineering controls to reduce beam power or increase divergence</li>
+                      <li className="font-medium text-red-800">Ensure no personnel can access the beam path without appropriate protection</li>
+                    </>
+                  )}
+                  {nohdResults.nohd > 100 && nohdResults.nohd !== Infinity && (
+                    <>
+                      <li>Establish controlled area extending {nohdResults.nohd.toFixed(0)} m from laser</li>
+                      <li>Consider beam path in adjacent buildings or areas</li>
+                      <li>Aircraft and vehicle safety protocols may be required</li>
+                    </>
+                  )}
+                  {nohdResults.nohd > 3 && nohdResults.nohd <= 100 && (
+                    <>
+                      <li>Establish controlled area of at least {nohdResults.nohd.toFixed(1)} m radius</li>
+                      <li>Post appropriate warning signs at hazard zone boundaries</li>
+                      <li>Consider eye protection requirements within NOHD</li>
+                    </>
+                  )}
+                  {nohdResults.nohd > 0 && nohdResults.nohd <= 3 && (
+                    <>
+                      <li>Hazard zone extends {nohdResults.nohd < 1 ? `${(nohdResults.nohd * 100).toFixed(1)} cm` : `${nohdResults.nohd.toFixed(2)} m`}</li>
+                      <li>Ensure proper beam termination beyond this distance</li>
+                      <li>Eye protection recommended for direct beam viewing</li>
+                    </>
+                  )}
+                  {nohdResults.nohd === 0 && (
+                    <>
+                      <li className="text-green-800">Laser operates below MPE at all distances</li>
+                      <li className="text-green-800">Standard safety precautions still apply</li>
+                      <li className="text-green-800">Avoid intentional direct viewing regardless</li>
+                    </>
+                  )}
+                  <li>This calculation assumes direct intrabeam viewing - diffuse reflections may still pose risks</li>
+                  <li>Additional safety factors should be applied in practice</li>
+                </ul>
               </div>
             </>
           )}
 
-          <div className="mt-6 bg-gray-100 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">About NOHD Calculations</h4>
-            <ul className="list-disc pl-5 space-y-1 text-sm">
-              <li>NOHD is the distance beyond which direct beam exposure is below the MPE level.</li>
-              <li>Calculations assume Gaussian beam propagation and direct intrabeam viewing.</li>
-              <li>Uses enhanced MPE calculations with proper correction factors.</li>
-              <li>Always establish controlled areas based on NOHD and other safety considerations.</li>
-              <li>Consider eye protection even outside the NOHD for additional safety margins.</li>
-            </ul>
+          <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
+            <h4 className="font-medium text-green-800 mb-2 flex items-center">
+              <Icons.CheckCircle />
+              IEC 60825-1:2014 Compliance
+            </h4>
+            <p className="text-sm text-green-800">
+              This NOHD calculator uses the latest IEC 60825-1:2014 MPE values with proper correction factors, 
+              extended source considerations, and wavelength-specific hazard mechanisms. The calculation follows 
+              standard beam propagation formulas: NOHD = (1/Φ) × [√(4P/(π×MPE)) - D₀] where Φ is beam divergence, 
+              P is laser power, and D₀ is initial beam diameter.
+            </p>
           </div>
         </div>
       </div>

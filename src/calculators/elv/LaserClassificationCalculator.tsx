@@ -1736,6 +1736,121 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                     </table>
                   </div>
 
+                  {/* MPE Information */}
+                  <div className="mb-6">
+                    <h4 className="font-medium text-blue-800 mb-2">Maximum Permissible Exposure (MPE)</h4>
+                    <div className="bg-white rounded-md border border-gray-200">
+                      {wavelengths.filter(w => w.isActive).map((wl, index) => {
+                        // Calculate C5 factor for pulsed lasers
+                        let c5Factor = 1.0;
+                        if (wl.laserType === 'pulsed' && wl.repetitionRate > 0) {
+                          const corrections = IEC_AEL_TABLES.getCorrectionFactors(wl.wavelength, exposureTime, wl.beamDivergence);
+                          const t2 = corrections.T2;
+                          const numberOfPulses = Math.floor(t2 * wl.repetitionRate);
+                          if (numberOfPulses > 1) {
+                            const c5Details = calculateC5Factor(wl.wavelength, wl.pulseWidth, wl.repetitionRate, t2);
+                            c5Factor = c5Details.c5Factor;
+                          }
+                        }
+
+                        // Calculate MPE values
+                        const mpeIrradiance = IEC_AEL_TABLES.getMPEIrriance(wl.wavelength, exposureTime, c5Factor);
+                        const mpePowerEnergy = (wl.wavelength >= 400 && wl.wavelength <= 1400) 
+                          ? IEC_AEL_TABLES.getMPEPowerEnergy(wl.wavelength, exposureTime, c5Factor)
+                          : null;
+                        const mpeSkin = IEC_AEL_TABLES.getMPESkin(wl.wavelength, exposureTime);
+
+                        return (
+                          <div key={wl.id} className={`p-3 ${index > 0 ? 'border-t border-gray-200' : ''}`}>
+                            <div className="flex justify-between items-center mb-2">
+                              <h5 className="font-medium text-gray-700">
+                                {wavelengths.filter(w => w.isActive).length === 1 
+                                  ? `Wavelength: ${wl.wavelength} nm` 
+                                  : `Wavelength ${index + 1}: ${wl.wavelength} nm`}
+                              </h5>
+                              <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
+                                {wl.laserType.toUpperCase()}
+                                {c5Factor !== 1.0 && ` • C5=${c5Factor.toFixed(3)}`}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                              {/* MPE Irradiance */}
+                              <div className="bg-blue-50 p-2 rounded">
+                                <div className="font-medium text-blue-800 mb-1">
+                                  MPE Irradiance
+                                </div>
+                                <div className="text-xs text-blue-700 mt-1">
+                                  Eye / Retina
+                                </div>
+                                <div className="font-mono text-blue-900">
+                                  {mpeIrradiance.value.toExponential(3)} {mpeIrradiance.unit}
+                                </div>
+                                <div className="text-xs text-blue-700 mt-1">
+                                  Exposure time: {exposureTime} s
+                                </div>
+                              </div>
+
+                              {/* MPE Power/Energy (400-1400nm only) */}
+                              {mpePowerEnergy && (
+                                <div className="bg-green-50 p-2 rounded">
+                                  <div className="font-medium text-green-800 mb-1">
+                                    MPE Power/Energy
+                                  </div>
+                                <div className="text-xs text-green-700 mt-1">
+                                  Retinal Hazard
+                                </div>
+                                  <div className="font-mono text-green-900">
+                                    {mpePowerEnergy.value.toExponential(3)} {mpePowerEnergy.unit}
+                                  </div>
+                                  <div className="text-xs text-green-700 mt-1">
+                                    400-1400 nm range
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* MPE Skin */}
+                              <div className="bg-orange-50 p-2 rounded">
+                                <div className="font-medium text-orange-800 mb-1">
+                                  MPE Skin
+                                </div>
+                                <div className="text-xs text-orange-700 mt-1">
+                                  Thermal
+                                </div>
+                                <div className="font-mono text-orange-900">
+                                  {mpeSkin.value.toExponential(3)} {mpeSkin.unit}
+                                </div>
+                                <div className="text-xs text-orange-700 mt-1">
+                                  Skin exposure limit
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* MPE Notes */}
+                            <div className="mt-2 text-xs text-gray-600">
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex items-center">
+                                  <Icons.InfoInline />
+                                  MPE values per IEC 60825-1:2014 Annex A
+                                </span>
+                                {wl.wavelength < 400 || wl.wavelength > 1400 ? (
+                                  <span className="text-gray-500">
+                                    • Retinal MPE not applicable (wavelength outside 400-1400 nm)
+                                  </span>
+                                ) : null}
+                                {c5Factor !== 1.0 && (
+                                  <span className="text-purple-600">
+                                    • C5 pulse correction applied
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {classificationResults.additiveCalculation && (
                     <div className="mb-6">
                       <h4 className="font-medium text-blue-800 mb-2">Additive Calculation Details</h4>
@@ -1795,7 +1910,7 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                 </div>
               )}
 
-              <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
+              {/* <div className="mt-6 bg-green-50 p-3 rounded-md border border-green-300">
                 <h4 className="font-medium text-green-800 mb-2 flex items-center">
                   <Icons.CheckCircle /> IEC 60825-1:2014 Compliance
                 </h4>
@@ -1804,9 +1919,10 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
                   including additive rules for wavelengths affecting the same biological endpoint and independent 
                   classification for non-additive wavelengths. Each wavelength can be configured as CW or pulsed 
                   with full parameter control. Pulse energy is calculated as Power (mW) × Pulse Width (ns) × 10⁻⁶. 
-                  C5 correction uses T2 from correction factors for proper pulse train assessment.
+                  C5 correction uses T2 from correction factors for proper pulse train assessment. MPE values are 
+                  calculated per Annex A for irradiance, retinal hazard (400-1400nm), and skin thermal limits.
                 </p>
-              </div>
+              </div> */}
             </>
           )}
         </div>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Icons } from '../../components/Icons';
-import MPECalculator from './MPECalculator';
 import NOHDCalculator from './NOHDCalculator';
 import LaserClassificationCalculator from './LaserClassificationCalculator';
 import ProtectiveEyewearCalculator from './ProtectiveEyewearCalculator';
@@ -13,7 +12,7 @@ interface LaserSafetyCalculatorProps {
 // The main Laser Safety Calculator component that coordinates the sub-calculators
 const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTutorial }) => {
   // State for the selected calculator type
-  const [activeTab, setActiveTab] = useState<'mpe' | 'nohd' | 'classification' | 'eyewear'>('classification');
+  const [activeTab, setActiveTab] = useState<'nohd' | 'classification' | 'eyewear'>('classification');
 
   return (
     <div className="animate-fade-in">
@@ -33,16 +32,6 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
 
         {/* Tab Selector */}
         <div className="flex border-b mb-6">
-          <button
-            className={`py-2 px-4 mr-2 ${
-              activeTab === 'mpe'
-                ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
-                : 'text-gray-600 hover:text-blue-600'
-            }`}
-            onClick={() => setActiveTab('mpe')}
-          >
-            MPE Calculator
-          </button>
           <button
             className={`py-2 px-4 mr-2 ${
               activeTab === 'nohd'
@@ -76,7 +65,6 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
         </div>
         
         {/* Content Based on Active Tab */}
-        {activeTab === 'mpe' && <MPECalculator onShowTutorial={onShowTutorial} />}
         {activeTab === 'nohd' && <NOHDCalculator onShowTutorial={onShowTutorial} />}
         {activeTab === 'classification' && <LaserClassificationCalculator onShowTutorial={onShowTutorial} />}
         {activeTab === 'eyewear' && <ProtectiveEyewearCalculator onShowTutorial={onShowTutorial} />}
