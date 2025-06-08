@@ -569,7 +569,7 @@ const RadiationShieldingCalculator: React.FC<RadiationCalculatorProps> = ({ onSh
 
         {/* Results Section */}
         <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="font-medium text-lg mb-4">Live Calculation Results</h3>
+          <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
           <RoomIllustration />
           <div className="mb-6">
             <h4 className="font-medium text-blue-800 mb-2">Overall Assessment</h4>
