@@ -53,7 +53,7 @@ interface PsychrometricPoint {
 // Interface for process calculation
 interface Process {
   id: string;
-  type: 'heating' | 'cooling' | 'humidification' | 'dehumidification' | 'mixing' | 'custom';
+  type: 'heating' | 'cooling' | 'humidification' | 'dehumidification' | 'mixing' | 'custom' | 'auto';
   startPointId: string;
   endPointId: string;
   mixingRatio?: number; // For mixing process (0-1)
@@ -61,13 +61,14 @@ interface Process {
   energyChange?: number; // kW or cooling/heating tons
   massFlowRate?: number; // kg/s
   processColor: string;
+  autoDetectedType?: string; // Store the auto-detected process type
 }
 
 // Define standard atmospheric pressure (101.325 kPa)
 const STANDARD_PRESSURE = 101.325;
 
-// CORRECTED: Air properties constants based on ASHRAE Fundamentals 2017
-const SPECIFIC_GAS_CONSTANT_DRY_AIR = 287.042; // J/(kg·K) - CORRECTED from 287.058
+// CORRECTED: Air properties constants based on HTML reference (more accurate)
+const SPECIFIC_GAS_CONSTANT_DRY_AIR = 287.055; // J/(kg·K) - CORRECTED to match HTML
 const SPECIFIC_HEAT_CAPACITY_AIR = 1.006; // kJ/(kg·K)
 const HEAT_VAPORIZATION_WATER = 2501.0; // kJ/kg at 0°C
 const SPECIFIC_HEAT_CAPACITY_VAPOR = 1.86; // kJ/(kg·K) for water vapor
@@ -78,7 +79,7 @@ const CHART_CONFIG = {
   tempMax: 50, // °C
   rhCurves: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], // %
   wbCurves: [-5, 0, 5, 10, 15, 20, 25, 30, 35], // °C
-  humidityCurves: [0, 5, 10, 15, 20, 25, 30], // g/kg - CORRECTED: Start from 0
+  humidityCurves: [0, 5, 10, 15, 20, 25, 30], // g/kg
   enthalpyCurves: [0, 20, 40, 60, 80, 100, 120], // kJ/kg
   specificVolumeCurves: [0.75, 0.8, 0.85, 0.9, 0.95], // m³/kg
   dbTempCurves: [-10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50], // °C
@@ -135,7 +136,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   
   // State for new process creation
-  const [newProcessType, setNewProcessType] = useState<Process['type']>('heating');
+  const [newProcessType, setNewProcessType] = useState<Process['type']>('auto');
   const [newProcessStartId, setNewProcessStartId] = useState<string>('');
   const [newProcessEndId, setNewProcessEndId] = useState<string>('');
   const [newProcessMixingRatio, setNewProcessMixingRatio] = useState<number>(0.5);
@@ -176,7 +177,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     showHumidityCurves: true,
     showEnthalpyCurves: true,
     showVolumeLines: false,
-    showDbTempLines: true, // ADDED
+    showDbTempLines: true,
     showPoints: true,
     showProcesses: true,
     highlightSelectedPoint: true,
@@ -184,7 +185,7 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   
   // Effect hook to calculate barometric pressure based on altitude
   useEffect(() => {
-    // CORRECTED: Using ASHRAE formula for pressure vs altitude
+    // Using standard atmosphere formula for pressure vs altitude
     const calculatedPressure = 101325 * Math.pow(1 - 2.25577e-5 * altitude, 5.2559);
     setBarometricPressure(Math.max(calculatedPressure / 1000, 10)); // Convert to kPa and ensure positive
   }, [altitude]);
@@ -232,6 +233,12 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
       }
       
       let energyChange: number | undefined = undefined;
+      let autoDetectedType: string | undefined = undefined;
+      
+      // Auto-detect process type if set to 'auto'
+      if (process.type === 'auto') {
+        autoDetectedType = detectProcessType(startPoint, endPoint);
+      }
       
       // Mass flow rate is in kg/s, enthalpy in kJ/kg
       if (process.massFlowRate && startPoint.enthalpy !== undefined && endPoint.enthalpy !== undefined) {
@@ -239,13 +246,51 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
         energyChange = process.massFlowRate * (endPoint.enthalpy - startPoint.enthalpy);
       }
       
-      return { ...process, energyChange };
+      return { ...process, energyChange, autoDetectedType };
     });
     
     setProcesses(updatedProcesses);
   };
 
-// Function to calculate psychrometric properties from any two parameters
+  // ADDED: Function to auto-detect process type based on point directions
+  const detectProcessType = (startPoint: PsychrometricPoint, endPoint: PsychrometricPoint): string => {
+    if (!startPoint.dbTemp || !endPoint.dbTemp || !startPoint.humidity || !endPoint.humidity) {
+      return 'custom';
+    }
+    
+    const deltaTemp = endPoint.dbTemp - startPoint.dbTemp;
+    const deltaHumidity = endPoint.humidity - startPoint.humidity;
+    
+    // Define thresholds for considering changes significant
+    const tempThreshold = 0.5; // °C
+    const humidityThreshold = 0.5; // g/kg
+    
+    const tempChange = Math.abs(deltaTemp) > tempThreshold;
+    const humidityChange = Math.abs(deltaHumidity) > humidityThreshold;
+    
+    if (tempChange && !humidityChange) {
+      // Only temperature changes
+      return deltaTemp > 0 ? 'heating' : 'cooling';
+    } else if (!tempChange && humidityChange) {
+      // Only humidity changes
+      return deltaHumidity > 0 ? 'humidification' : 'dehumidification';
+    } else if (tempChange && humidityChange) {
+      // Both temperature and humidity change
+      if (deltaTemp > 0 && deltaHumidity > 0) {
+        return 'heating and humidifying';
+      } else if (deltaTemp > 0 && deltaHumidity < 0) {
+        return 'heating and dehumidifying';
+      } else if (deltaTemp < 0 && deltaHumidity > 0) {
+        return 'cooling and humidifying';
+      } else {
+        return 'cooling and dehumidifying';
+      }
+    }
+    
+    return 'custom'; // Fallback for minimal changes
+  };
+
+// CORRECTED: Function to calculate psychrometric properties using HTML reference formulas
 const calculatePsychrometricProperties = (point: Partial<PsychrometricPoint>, pressure: number): Partial<PsychrometricPoint> => {
   const paramOne = point.parameterOne;
   const paramTwo = point.parameterTwo;
@@ -290,12 +335,13 @@ const calculateFromDBandRH = (dbTemp: number, rh: number, pressure: number): Par
   const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
   const vaporPressure = satVaporPressure * (rh / 100);
   
-  // CORRECTED: Using precise humidity ratio formula from ASHRAE
+  // CORRECTED: Using precise humidity ratio formula from HTML reference
   const humidityRatio = 0.621945 * (vaporPressure / (pressure - vaporPressure));
   const humidity = humidityRatio * 1000; // Convert to g/kg
   
-  // CORRECTED: Specific volume calculation with precise constants
-  const specificVolume = (SPECIFIC_GAS_CONSTANT_DRY_AIR * dbTempK * (1 + 1.607858 * humidityRatio)) / (pressure * 1000);
+  // CORRECTED: Specific volume calculation matching HTML reference
+  const Rda = SPECIFIC_GAS_CONSTANT_DRY_AIR / 1000; // Convert to kJ/(kg·K)
+  const specificVolume = Rda * dbTempK * (1 + 1.6078 * humidityRatio) / pressure;
   
   // Enthalpy calculation
   const enthalpy = SPECIFIC_HEAT_CAPACITY_AIR * dbTemp + humidityRatio * (HEAT_VAPORIZATION_WATER + SPECIFIC_HEAT_CAPACITY_VAPOR * dbTemp);
@@ -321,26 +367,32 @@ const calculateFromDBandWB = (dbTemp: number, wbTemp: number, pressure: number):
     return { dbTemp, wbTemp }; // Invalid input
   }
   
-  // CORRECTED: Direct calculation of humidity ratio from wet bulb using ASHRAE method
-  let w = 0.01; // Initial guess for humidity ratio
-  let count = 0;
-  let error = 1.0;
+  // CORRECTED: More robust calculation matching HTML reference
+  let W_low = 0;
+  const pvs = calculateSaturationVaporPressure(dbTemp);
+  let W_high = 0.621945 * pvs / (pressure - pvs);
+  let W = W_high / 2;
   
-  while (count < 1000 && Math.abs(error) > 0.001) {
-    const p_ws_wb = calculateSaturationVaporPressure(wbTemp);
-    const ws_wb = 0.621945 * p_ws_wb / (pressure - p_ws_wb);
-    const w_calc = ((2501 - 2.326 * wbTemp) * ws_wb - 1.006 * (dbTemp - wbTemp)) / (2501 + 1.86 * dbTemp - 4.186 * wbTemp);
-    error = w - w_calc;
-    w = w_calc;
-    count++;
+  const maxIter = 50;
+  let iter = 0;
+  
+  while (iter < maxIter) {
+    const twb_calc = calculateWetBulbFromDBandRH(dbTemp, calculateRHFromHumidityRatio(W, dbTemp, pressure), pressure);
+    const error = Math.abs(twb_calc - wbTemp);
     
-    if (w < 0) w = 0.001; // Prevent negative humidity ratio
+    if (error < 0.01) break;
+    
+    if (twb_calc < wbTemp) {
+      W_low = W;
+    } else {
+      W_high = W;
+    }
+    W = (W_low + W_high) / 2;
+    iter++;
   }
   
-  // Calculate RH from calculated humidity ratio
-  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
-  const vaporPressure = (w * pressure) / (0.621945 + w);
-  const rh = Math.min(100, Math.max(0, (vaporPressure / satVaporPressure) * 100));
+  W = Math.max(0, W);
+  const rh = calculateRHFromHumidityRatio(W, dbTemp, pressure);
   
   // Get all properties from DB and RH
   const allProps = calculateFromDBandRH(dbTemp, rh, pressure);
@@ -350,6 +402,13 @@ const calculateFromDBandWB = (dbTemp: number, wbTemp: number, pressure: number):
     dbTemp: dbTemp,
     wbTemp: wbTemp,
   };
+};
+
+// Helper function to calculate RH from humidity ratio
+const calculateRHFromHumidityRatio = (W: number, dbTemp: number, pressure: number): number => {
+  const vaporPressure = (W * pressure) / (0.621945 + W);
+  const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
+  return Math.min(100, Math.max(0, (vaporPressure / satVaporPressure) * 100));
 };
 
 // Calculate properties from dry bulb temperature and dew point
@@ -459,21 +518,22 @@ const calculateFromRHandWB = (rh: number, wbTemp: number, pressure: number): Par
   };
 };
 
-// CORRECTED: Using iterative wet bulb calculation from ASHRAE (independent calculation)
+// CORRECTED: Wet bulb calculation using HTML reference method
 const calculateWetBulbFromDBandRH = (dbTemp: number, rh: number, pressure: number): number => {
-  // Calculate humidity ratio directly without calling calculateFromDBandRH
+  // Calculate humidity ratio directly
   const satVaporPressure = calculateSaturationVaporPressure(dbTemp);
   const vaporPressure = satVaporPressure * (rh / 100);
-  const w = 0.621945 * (vaporPressure / (pressure - vaporPressure));
+  const W = 0.621945 * (vaporPressure / (pressure - vaporPressure));
   
   let t_wb = dbTemp;
   let count = 0;
+  const maxIter = 10000;
   let error = 1.0;
   
-  while (count < 10000 && Math.abs(error) > 0.001) {
+  while (count < maxIter && Math.abs(error) > 0.001) {
     const p_ws_wb = calculateSaturationVaporPressure(t_wb);
     const ws_wb = 0.621945 * p_ws_wb / (pressure - p_ws_wb);
-    const test = (2501 * (ws_wb - w) - dbTemp * (1.006 + 1.86 * w)) / (2.326 * ws_wb - 1.006 - 4.186 * w);
+    const test = (2501 * (ws_wb - W) - dbTemp * (1.006 + 1.86 * W)) / (2.326 * ws_wb - 1.006 - 4.186 * W);
     error = t_wb - test;
     t_wb = t_wb - error / 100;
     count++;
@@ -491,52 +551,56 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
   return 0.621945 * (satVaporPressure / (pressure - satVaporPressure));
 };
   
-  // CORRECTED: Saturation vapor pressure using ASHRAE 2017 formulas
+  // CORRECTED: Saturation vapor pressure using HTML reference formulas
   const calculateSaturationVaporPressure = (tempC: number) => {
     const T = tempC + 273.15; // Temperature in Kelvin
     
-    if (tempC > 0) {
-      // For temperatures above 0°C (over water)
-      const c8 = -5.8002206e3;
-      const c9 = 1.3914993;
-      const c10 = -4.8640239e-2;
-      const c11 = 4.1764768e-5;
-      const c12 = -1.4452093e-8;
-      const c13 = 6.5459673;
-      
-      return Math.exp(c8/T + c9 + c10*T + c11*T*T + c12*T*T*T + c13*Math.log(T)) / 1000; // Convert Pa to kPa
+    if (tempC >= 0) {
+      // For temperatures above 0°C (over water) - HTML reference formula
+      const Pws_Pa = Math.exp(-5.8002206e3/T + 1.3914993 + -4.8640239e-2*T + 4.1764768e-5*T*T + -1.4452093e-8*T*T*T + 6.5459673*Math.log(T));
+      return Pws_Pa / 1000; // Convert Pa to kPa
     } else {
-      // For temperatures below 0°C (over ice)
-      const c1 = -5.6745359e3;
-      const c2 = 6.3925247e0;
-      const c3 = -9.677843e-3;
-      const c4 = 6.2215701e-7;
-      const c5 = 2.0747825e-9;
-      const c6 = -9.484024e-13;
-      const c7 = 4.1635019e0;
-      
-      return Math.exp(c1/T + c2 + c3*T + c4*T*T + c5*T*T*T + c6*T*T*T*T + c7*Math.log(T)) / 1000; // Convert Pa to kPa
+      // For temperatures below 0°C (over ice) - HTML reference formula
+      const Pws_Pa = Math.exp(-5.6745359e3/T + 6.3925247 + -9.677843e-3*T + 6.2215701e-7*T*T + 2.0747825e-9*T*T*T + -9.484024e-13*T*T*T*T + 4.1635019*Math.log(T));
+      return Pws_Pa / 1000; // Convert Pa to kPa
     }
   };
   
-  // CORRECTED: Dew point calculation using ASHRAE method
+  // CORRECTED: Dew point calculation using HTML reference method
   const calculateDewPoint = (vaporPressure: number) => {
     if (vaporPressure <= 0) return -999; 
     
-    const p_w = vaporPressure; // kPa
-    const a = Math.log(p_w);
-    const c14 = 6.54;
-    const c15 = 14.526;
-    const c16 = 0.7389;
-    const c17 = 0.09486;
-    const c18 = 0.4569;
+    const pv = Math.min(vaporPressure, barometricPressure * 0.9999);
+    const alpha = Math.log(pv);
     
-    let dew = c14 + c15*a + c16*a*a + c17*a*a*a + c18*Math.pow(p_w, 0.1984);
-    if (dew < 0) {
-      dew = 6.09 + 12.608*a + 0.4959*a*a;
+    let Tdp: number;
+    if (pv < 0.61094) {
+      // Low pressure formula
+      Tdp = 6.09 + 12.608 * alpha + 0.4959 * alpha * alpha;
+      Tdp = Math.max(Tdp, -90);
+    } else {
+      // High pressure formula
+      Tdp = 6.54 + 14.526 * alpha + 0.7389 * alpha * alpha + 0.09486 * Math.pow(alpha, 3) + 0.4569 * Math.pow(pv, 0.1984);
+      Tdp = Math.min(Tdp, 200);
     }
     
-    return dew;
+    // Newton-Raphson refinement (from HTML reference)
+    let Tdp_new = Tdp;
+    for (let i = 0; i < 5; i++) {
+      const pvs_tdp = calculateSaturationVaporPressure(Tdp_new);
+      const a = 17.62;
+      const b = 243.12;
+      const derivative = pvs_tdp * (a * b) / Math.pow(b + Tdp_new, 2);
+      
+      if (Math.abs(derivative) < 1e-9) break;
+      
+      Tdp_new = Tdp_new - (pvs_tdp - vaporPressure) / derivative;
+      
+      if (Math.abs(Tdp_new - Tdp) < 0.01) break;
+      Tdp = Tdp_new;
+    }
+    
+    return Tdp;
   };
   
   // Function to add a new psychrometric point
@@ -746,7 +810,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     const maxHumidity = CHART_CONFIG.humidityCurves[CHART_CONFIG.humidityCurves.length - 1];
     if (maxHumidity === 0) return chartMargin.top + chartContentHeight;
     
-    // CORRECTED: Ensure humidity is clamped to valid range
+    // Ensure humidity is clamped to valid range
     const clampedHumidity = Math.max(0, Math.min(humidity, maxHumidity));
     return chartMargin.top + chartContentHeight - ((clampedHumidity / maxHumidity) * chartContentHeight);
   };
@@ -766,7 +830,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     
     return (
       <g className="chart-axes">
-        {/* Chart boundary rectangle - ADDED for clean boundaries */}
+        {/* Chart boundary rectangle */}
         <rect
           x={chartMargin.left}
           y={chartMargin.top}
@@ -841,7 +905,6 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
         {CHART_CONFIG.rhCurves.map((rh) => {
           let pathData = "";
           const tempStep = 0.5;
-          let previousValidPoint: {x: number, y: number} | null = null;
 
           for (let t = CHART_CONFIG.tempMin; t <= CHART_CONFIG.tempMax; t += tempStep) {
             const props = calculateFromDBandRH(t, rh, barometricPressure);
@@ -849,7 +912,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
               const x = tempToX(t);
               const y = humidityToY(props.humidity);
               
-              // CORRECTED: Ensure curves don't go below the chart bottom
+              // Ensure curves don't go below the chart bottom
               const clampedY = Math.min(y, bottomY);
               
               if (clampedY >= chartMargin.top && clampedY <= bottomY) {
@@ -858,16 +921,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                 } else {
                   pathData += ` L ${x} ${clampedY}`;
                 }
-                previousValidPoint = {x, y: clampedY};
               }
-            }
-          }
-          
-          // CORRECTED: Close the path at the bottom boundary for low RH curves
-          if (pathData && previousValidPoint && rh < 100) {
-            const lastX = tempToX(CHART_CONFIG.tempMax);
-            if (previousValidPoint.y < bottomY - 5) {
-              pathData += ` L ${lastX} ${bottomY}`;
             }
           }
           
@@ -901,9 +955,13 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     );
   };
   
-  // Function to render wet bulb temperature curves
+  // CORRECTED: Function to render wet bulb temperature curves (fixed bouncing issue)
   const renderWBCurves = (): JSX.Element | null => {
     if (!displayOptions.showWBCurves) return null;
+    
+    const currentChartHeight = isChartExpanded ? expandedChartHeight : chartHeight;
+    const chartContentHeight = currentChartHeight - chartMargin.top - chartMargin.bottom;
+    const bottomY = chartMargin.top + chartContentHeight;
     
     return (
       <g className="wb-curves" clipPath="url(#chart-clip)">
@@ -912,17 +970,23 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
           
           const startTemp = Math.max(wb, CHART_CONFIG.tempMin);
           
-          // FIXED: Simplified loop to prevent line artifacts at the bottom of the chart
+          // CORRECTED: Fixed loop to prevent line artifacts and ensure proper clipping
           for (let db = startTemp; db <= CHART_CONFIG.tempMax; db += 0.5) {
             const props = calculateFromDBandWB(db, wb, barometricPressure);
-            if (props.humidity !== undefined) {
+            if (props.humidity !== undefined && props.humidity >= 0) {
               const x = tempToX(db);
-              const y = humidityToY(props.humidity); // humidityToY clamps to 0 if humidity is negative
+              const y = humidityToY(props.humidity);
 
-              if (pathData === "") {
-                pathData = `M ${x} ${y}`;
-              } else {
-                pathData += ` L ${x} ${y}`;
+              // CORRECTED: Ensure y doesn't go below bottom boundary
+              const clampedY = Math.min(y, bottomY);
+              
+              // Only add points within chart boundaries
+              if (clampedY >= chartMargin.top && clampedY <= bottomY) {
+                if (pathData === "") {
+                  pathData = `M ${x} ${clampedY}`;
+                } else {
+                  pathData += ` L ${x} ${clampedY}`;
+                }
               }
             }
           }
@@ -942,10 +1006,10 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
               {wb >= CHART_CONFIG.tempMin && wb % 5 === 0 && (
                 <text
                   x={tempToX(wb) + 15}
-                  y={humidityToY(calculateSaturationHumidityRatio(wb, barometricPressure) * 1000) - 5}
+                  y={Math.max(chartMargin.top + 15, humidityToY(calculateSaturationHumidityRatio(wb, barometricPressure) * 1000) - 5)}
                   fontSize="10"
                   fill="#0066CC"
-                  transform={`rotate(-45 ${tempToX(wb) + 15} ${humidityToY(calculateSaturationHumidityRatio(wb, barometricPressure) * 1000) - 5})`}
+                  transform={`rotate(-45 ${tempToX(wb) + 15} ${Math.max(chartMargin.top + 15, humidityToY(calculateSaturationHumidityRatio(wb, barometricPressure) * 1000) - 5)})`}
                 >
                   {wb}°WB
                 </text>
@@ -957,7 +1021,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     );
   };
   
-  // CORRECTED: Function to render enthalpy lines with proper positioning and labeling
+  // Function to render enthalpy lines with proper positioning and labeling
   const renderEnthalpyLines = (): JSX.Element | null => {
     if (!displayOptions.showEnthalpyCurves) return null;
     
@@ -996,7 +1060,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
               />
               
               {enthalpyVal % 20 === 0 && (() => {
-                  // CORRECTED: Better label positioning for enthalpy lines
+                  // Better label positioning for enthalpy lines
                   const labelTemp = CHART_CONFIG.tempMax - 5;
                   const propsForLabel = calculateFromDBandEnthalpy(labelTemp, enthalpyVal, barometricPressure);
                   if (propsForLabel.humidity !== undefined && propsForLabel.humidity > 0) {
@@ -1069,7 +1133,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     );
   };
 
-  // ADDED: Function to render dry bulb temperature lines
+  // Function to render dry bulb temperature lines
   const renderDbTempLines = (): JSX.Element | null => {
     if (!displayOptions.showDbTempLines) return null;
     
@@ -1179,6 +1243,9 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
 
           const isSelected = selectedProcessId === process.id;
           
+          // Determine display type and label
+          const displayType = process.type === 'auto' ? process.autoDetectedType || 'auto' : process.type;
+          
           return (
             <g 
               key={`process-${process.id}`} 
@@ -1221,7 +1288,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                 paintOrder="stroke"
                 textAnchor="middle"
               >
-                {process.type.charAt(0).toUpperCase() + process.type.slice(1)}
+                {displayType.charAt(0).toUpperCase() + displayType.slice(1)}
                 {process.energyChange !== undefined && ` (${process.energyChange.toFixed(1)} kW)`}
               </text>
             </g>
@@ -1675,6 +1742,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                   onChange={(e) => setNewProcessType(e.target.value as Process['type'])} 
                   className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
+                  <option value="auto">Auto Detect</option>
                   <option value="heating">Heating</option>
                   <option value="cooling">Cooling</option>
                   <option value="humidification">Humidification</option>
@@ -1738,6 +1806,8 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                     const endPoint = points.find(p => p.id === process.endPointId);
                     if (!startPoint || !endPoint) return null;
                     
+                    const displayType = process.type === 'auto' ? process.autoDetectedType || 'auto' : process.type;
+                    
                     return (
                       <li 
                         key={process.id} 
@@ -1755,7 +1825,10 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                               style={{ backgroundColor: process.processColor }}
                             ></div>
                             <span className="text-sm font-semibold text-gray-700 truncate">
-                              {process.type.charAt(0).toUpperCase() + process.type.slice(1)}
+                              {displayType.charAt(0).toUpperCase() + displayType.slice(1)}
+                              {process.type === 'auto' && process.autoDetectedType && (
+                                <span className="text-xs text-gray-500 ml-1">(auto)</span>
+                              )}
                             </span>
                           </div>
                           <button 

@@ -191,7 +191,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
           </button>
 
           {/* Refrigerant */}
-          <button
+          {/* <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
               calculatorType === 'refrigerant'
                 ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
@@ -208,7 +208,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
                 <Icons.InfoInline /> Refrigerant Pipe Sizing
               </p>
             </div>
-          </button>
+          </button> */}
 
           {/* Vibration */}
           <button
