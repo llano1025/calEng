@@ -109,6 +109,26 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             </div>
           </button>
 
+          {/* AHU */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'ahu'
+                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
+                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+            }`}
+            onClick={() => setCalculatorType('ahu')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'ahu' ? 'text-white' : 'text-indigo-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Air Handling Unit</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'ahu' ? 'text-indigo-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> AHU sizing
+              </p>
+            </div>
+          </button>
+
           {/* Duct Static Pressure */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
@@ -166,26 +186,6 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
               <h3 className="font-semibold text-sm sm:text-base">Steam Pipe</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'steamPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Pipework sizing
-              </p>
-            </div>
-          </button>
-
-          {/* AHU */}
-          <button
-            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'ahu'
-                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 ring-offset-1'
-                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-            }`}
-            onClick={() => setCalculatorType('ahu')}
-          >
-            <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'ahu' ? 'text-white' : 'text-indigo-500'}`} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm sm:text-base">Air Handling Unit</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'ahu' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> AHU sizing
               </p>
             </div>
           </button>

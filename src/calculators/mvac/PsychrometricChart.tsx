@@ -59,7 +59,8 @@ interface Process {
   mixingRatio?: number; // For mixing process (0-1)
   sensibleHeatRatio?: number; // For custom processes
   energyChange?: number; // kW or cooling/heating tons
-  massFlowRate?: number; // kg/s
+  volumetricFlowRate?: number; // L/s - CHANGED from massFlowRate
+  massFlowRate?: number; // kg/s - calculated internally from volumetricFlowRate
   processColor: string;
   autoDetectedType?: string; // Store the auto-detected process type
 }
@@ -135,13 +136,13 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
   const [selectedPointId, setSelectedPointId] = useState<string | null>('1');
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   
-  // State for new process creation
+  // State for new process creation - CHANGED: volumetricFlowRate instead of massFlowRate
   const [newProcessType, setNewProcessType] = useState<Process['type']>('auto');
   const [newProcessStartId, setNewProcessStartId] = useState<string>('');
   const [newProcessEndId, setNewProcessEndId] = useState<string>('');
   const [newProcessMixingRatio, setNewProcessMixingRatio] = useState<number>(0.5);
   const [newProcessSHR, setNewProcessSHR] = useState<number>(0.7);
-  const [newProcessMassFlow, setNewProcessMassFlow] = useState<number>(1); // kg/s
+  const [newProcessVolumetricFlow, setNewProcessVolumetricFlow] = useState<number>(1000); // L/s - CHANGED
   
   // State for chart visibility
   const [isChartExpanded, setIsChartExpanded] = useState<boolean>(false);
@@ -221,6 +222,15 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     };
   }, [isChartExpanded]);
   
+  // ADDED: Function to convert volumetric flow rate (L/s) to mass flow rate (kg/s)
+  const convertVolumetricToMassFlow = (volumetricFlowLS: number, specificVolume: number): number => {
+    // Convert L/s to m³/s
+    const volumetricFlowM3S = volumetricFlowLS / 1000;
+    // Convert m³/s to kg/s using specific volume
+    const massFlowKgS = volumetricFlowM3S / specificVolume;
+    return massFlowKgS;
+  };
+  
   // Calculate process properties
   const calculateProcessProperties = (currentPoints: PsychrometricPoint[]) => {
     const updatedProcesses = processes.map(process => {
@@ -228,11 +238,13 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
       const endPoint = currentPoints.find(p => p.id === process.endPointId);
       
       if (!startPoint || !endPoint || startPoint.enthalpy === undefined || endPoint.enthalpy === undefined || 
-          startPoint.humidity === undefined || endPoint.humidity === undefined) {
-        return { ...process, energyChange: undefined };
+          startPoint.humidity === undefined || endPoint.humidity === undefined ||
+          startPoint.specificVolume === undefined) {
+        return { ...process, energyChange: undefined, massFlowRate: undefined };
       }
       
       let energyChange: number | undefined = undefined;
+      let massFlowRate: number | undefined = undefined;
       let autoDetectedType: string | undefined = undefined;
       
       // Auto-detect process type if set to 'auto'
@@ -240,13 +252,18 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
         autoDetectedType = detectProcessType(startPoint, endPoint);
       }
       
-      // Mass flow rate is in kg/s, enthalpy in kJ/kg
-      if (process.massFlowRate && startPoint.enthalpy !== undefined && endPoint.enthalpy !== undefined) {
-        // Energy change in kW
-        energyChange = process.massFlowRate * (endPoint.enthalpy - startPoint.enthalpy);
+      // Convert volumetric flow rate to mass flow rate using start point specific volume
+      if (process.volumetricFlowRate && startPoint.specificVolume !== undefined) {
+        massFlowRate = convertVolumetricToMassFlow(process.volumetricFlowRate, startPoint.specificVolume);
       }
       
-      return { ...process, energyChange, autoDetectedType };
+      // Energy change calculation using mass flow rate in kg/s, enthalpy in kJ/kg
+      if (massFlowRate && startPoint.enthalpy !== undefined && endPoint.enthalpy !== undefined) {
+        // Energy change in kW
+        energyChange = massFlowRate * (endPoint.enthalpy - startPoint.enthalpy);
+      }
+      
+      return { ...process, energyChange, massFlowRate, autoDetectedType };
     });
     
     setProcesses(updatedProcesses);
@@ -668,7 +685,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
     }
   };
   
-  // Function to add a new process
+  // Function to add a new process - UPDATED for volumetric flow
   const addProcess = () => {
     if (!newProcessStartId || !newProcessEndId || newProcessStartId === newProcessEndId) {
       alert("Please select valid and different start and end points for the process.");
@@ -682,7 +699,7 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
       startPointId: newProcessStartId,
       endPointId: newProcessEndId,
       processColor: PROCESS_COLORS[processes.length % PROCESS_COLORS.length],
-      massFlowRate: newProcessMassFlow,
+      volumetricFlowRate: newProcessVolumetricFlow, // CHANGED: Use volumetric flow rate
     };
     
     if (newProcessType === 'mixing') {
@@ -1752,14 +1769,15 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mass Flow (kg/s)</label>
+                {/* CHANGED: Label and unit from kg/s to L/s */}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Airflow Rate (L/s)</label>
                 <input 
                   type="number" 
-                  value={newProcessMassFlow} 
-                  onChange={(e) => setNewProcessMassFlow(Math.max(0.01, Number(e.target.value)))} 
+                  value={newProcessVolumetricFlow} 
+                  onChange={(e) => setNewProcessVolumetricFlow(Math.max(1, Number(e.target.value)))} 
                   className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" 
-                  step="0.1"
-                  min="0.01"
+                  step="10"
+                  min="1"
                 />
               </div>
               
@@ -1844,6 +1862,17 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                           {process.energyChange !== undefined && (
                             <span className="font-medium whitespace-nowrap ml-2">
                               {process.energyChange.toFixed(1)} kW
+                            </span>
+                          )}
+                        </div>
+                        {/* ADDED: Display both volumetric and mass flow rates */}
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>
+                            {process.volumetricFlowRate?.toFixed(0)} L/s
+                          </span>
+                          {process.massFlowRate && (
+                            <span>
+                              {process.massFlowRate.toFixed(3)} kg/s
                             </span>
                           )}
                         </div>
@@ -1966,11 +1995,12 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                         </div>
                         
                         <div className="bg-green-50 p-2 rounded border border-green-200">
-                          <div className="text-xs font-medium text-green-600 truncate">MASS FLOW</div>
+                          {/* CHANGED: Display airflow in L/s instead of mass flow */}
+                          <div className="text-xs font-medium text-green-600 truncate">AIRFLOW</div>
                           <div className="text-sm font-bold text-green-700">
-                            {process.massFlowRate?.toFixed(2) || '-'}
+                            {process.volumetricFlowRate?.toFixed(0) || '-'}
                           </div>
-                          <div className="text-xs text-green-600">kg/s</div>
+                          <div className="text-xs text-green-600">L/s</div>
                         </div>
                       </div>
                       
@@ -2000,6 +2030,13 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
                               <span>Water removed: {(process.massFlowRate * Math.abs(deltaHumidity) / 1000).toFixed(4)} kg/s</span>
                             )}
                           </div>
+                          
+                          {/* ADDED: Display mass flow rate for reference */}
+                          {process.massFlowRate && (
+                            <div className="mt-1 text-xs text-gray-500 border-t border-gray-200 pt-1">
+                              Mass flow rate: {process.massFlowRate.toFixed(3)} kg/s (calc. from {process.volumetricFlowRate?.toFixed(0)} L/s)
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2084,18 +2121,20 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
       <div className="mt-8 bg-gray-100 p-4 rounded-lg border border-gray-200">
         <h3 className="font-medium text-lg mb-2 text-gray-700">Important Notes & Corrections Applied</h3>
         <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
-          <li><strong>CORRECTED:</strong> Psychrometric calculations now use ASHRAE 2017 standards with precise constants (0.621945 for humidity ratio, 287.042 J/(kg·K) for gas constant).</li>
-          <li><strong>CORRECTED:</strong> Saturation vapor pressure uses different formulas for temperatures above/below 0°C as per ASHRAE standard.</li>
-          <li><strong>CORRECTED:</strong> Wet bulb temperature calculation uses iterative method based on psychrometric equation (equation 33 from ASHRAE).</li>
-          <li><strong>ADDED:</strong> Dry bulb temperature lines (vertical constant temperature lines) for better chart readability.</li>
-          <li><strong>CORRECTED:</strong> Enthalpy line labeling repositioned and improved with better visibility and professional styling.</li>
-          <li><strong>IMPROVED:</strong> Chart styling updated to match professional psychrometric charts with proper colors and line weights.</li>
+          <li>Psychrometric calculations now use ASHRAE 2017 standards with precise constants (0.621945 for humidity ratio, 287.042 J/(kg·K) for gas constant).</li>
+          <li>Saturation vapor pressure uses different formulas for temperatures above/below 0°C as per ASHRAE standard.</li>
+          <li>Wet bulb temperature calculation uses iterative method based on psychrometric equation (equation 33 from ASHRAE).</li>
+          <li>Dry bulb temperature lines (vertical constant temperature lines) for better chart readability.</li>
+          <li>Enthalpy line labeling repositioned and improved with better visibility and professional styling.</li>
+          <li>Chart styling updated to match professional psychrometric charts with proper colors and line weights.</li>
+          <li>Flow rate input changed from mass flow (kg/s) to volumetric flow (L/s) with automatic conversion to mass flow using specific volume.</li>
           <li>Barometric pressure adjusts automatically with altitude using International Standard Atmosphere model.</li>
           <li>Define points with any two independent parameters. All other properties are calculated automatically.</li>
-          <li>Process energy calculations: Q = ṁ × Δh, where Q is in kW, ṁ in kg/s, and h in kJ/kg.</li>
+          <li>Process energy calculations: Q = ṁ × Δh, where Q is in kW, ṁ in kg/s (converted from L/s), and h in kJ/kg.</li>
           <li>Specific volume includes correction factor (1 + 1.607858W) for moist air with precise constants.</li>
           <li>Valid input ranges: Temperature: -10 to 50°C, RH: 0-100%, Pressure: 10-110 kPa.</li>
           <li>Chart shows constant property lines: RH curves in green (100% saturation line is bold), WB lines in blue (dashed), enthalpy lines in red (dashed), and dry bulb temperature lines in gray (dotted).</li>
+          <li>Volumetric flow rate (L/s) is converted to mass flow rate (kg/s) using: ṁ = V̇ ÷ v, where V̇ is in m³/s and v is specific volume in m³/kg.</li>
         </ul>
       </div>
     </div>

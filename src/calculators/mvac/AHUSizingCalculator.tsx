@@ -306,7 +306,7 @@ const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutoria
 
   // State for condition A with pre-filled values
   const [conditionA, setConditionA] = useState({
-    oa: { dryBulb: '33', wetBulb: '29', rh: '', humidityRatio: '' },
+    oa: { dryBulb: '35', wetBulb: '29', rh: '', humidityRatio: '' },
     ra: { dryBulb: '25', wetBulb: '', rh: '55', humidityRatio: '' },
     oca: { dryBulb: '13', wetBulb: '', rh: '95', humidityRatio: '' },
     totalAirflow: '1000',
@@ -329,12 +329,12 @@ const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutoria
 
   // State for condition B
   const [conditionB, setConditionB] = useState({
-    oa: { dryBulb: '', wetBulb: '', rh: '', humidityRatio: '' },
-    ra: { dryBulb: '', wetBulb: '', rh: '', humidityRatio: '' },
-    oca: { dryBulb: '', wetBulb: '', rh: '', humidityRatio: '' },
-    totalAirflow: '',
+    oa: { dryBulb: '33', wetBulb: '28', rh: '', humidityRatio: '' },
+    ra: { dryBulb: '25', wetBulb: '', rh: '55', humidityRatio: '' },
+    oca: { dryBulb: '13', wetBulb: '', rh: '95', humidityRatio: '' },
+    totalAirflow: '1000',
     totalAirflowUnit: 'L/s',
-    oaAirflow: '',
+    oaAirflow: '200',
     oaAirflowUnit: 'L/s',
     chwEnabled: false,
     chwSupply: '7',
