@@ -32,12 +32,36 @@ A comprehensive web-based engineering calculator suite built with React and Type
   - Steam Pipe Sizing
   - Vibration Isolator Selection
 
+- **Fire Services**
+  - Sprinkler System Design
+  - Fire Pump Sizing
+  - Smoke Extraction Systems
+  - Fire Alarm System Design
+
+- **Medical Gas Systems**
+  - Oxygen System Design
+  - Compressed Air Systems
+  - Vacuum System Design
+  - Nitrous Oxide Distribution
+
+- **Pumping and Drainage**
+  - Sump Pump Sizing
+  - Drainage Pipe Sizing
+  - Greywater Systems
+  - Stormwater Management
+
+- **Vertical Transportation**
+  - Elevator Traffic Analysis
+  - Escalator Capacity Calculations
+  - Lift Power Requirements
+  - Shaft Sizing
+
 ### Key Features
 
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
 - **Interactive Calculations**: Real-time results with proper unit handling
 - **Professional UI**: Clean, modern interface with smooth animations
-- **Comprehensive Coverage**: Specialized calculators for 3 core engineering disciplines
+- **Comprehensive Coverage**: Specialized calculators for 7 core engineering disciplines
 - **TypeScript**: Full type safety and better developer experience
 
 ## 🛠️ Technology Stack
@@ -151,6 +175,30 @@ The application uses several configuration files:
 - **Piping Systems**: Chilled water, refrigerant, and steam pipe sizing
 - **Duct Design**: Static pressure calculations
 - **Vibration Control**: Isolator selection
+
+### Fire Services Calculators
+- **Sprinkler Systems**: Design and flow rate calculations
+- **Fire Pumps**: Sizing and pressure requirements
+- **Smoke Extraction**: Ventilation system design
+- **Fire Alarms**: Detection and alarm system design
+
+### Medical Gas Calculators
+- **Oxygen Systems**: Medical oxygen distribution design
+- **Compressed Air**: Medical air system calculations
+- **Vacuum Systems**: Medical suction system design
+- **Gas Distribution**: Nitrous oxide and other medical gases
+
+### Pumping and Drainage Calculators
+- **Sump Pumps**: Capacity and head calculations
+- **Drainage Design**: Pipe sizing and flow capacity
+- **Water Management**: Greywater and stormwater systems
+- **System Optimization**: Flow and pressure optimization
+
+### Vertical Transportation Calculators
+- **Traffic Analysis**: Elevator passenger flow and capacity
+- **Escalator Design**: Capacity and flow calculations
+- **Power Systems**: Electrical requirements for lifts
+- **Space Planning**: Shaft sizing and dimensional requirements
 
 ## 🤝 Contributing
 

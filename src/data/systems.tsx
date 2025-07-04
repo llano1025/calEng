@@ -59,13 +59,31 @@ export const engineeringSystemsData: EngineeringSystemsData = {
     'mvac': {
       name: 'Mechanical Ventilation & Air Conditioning',
       icon: <Icons.TemperatureHigh /> as React.ReactElement,
-      // No formulas needed here; the MVACalculator component handles its own logic
       formulas: {}
     },
     'broadcast': {
       name: 'Extra Low Voltage',
       icon: <Icons.BroadcastTower /> as React.ReactElement,
-      // No formulas needed here; the BroadcastCalculator component handles its own logic.
+      formulas: {}
+    },
+    'fire_services': {
+      name: 'Fire Services',
+      icon: <Icons.Flame /> as React.ReactElement,
+      formulas: {}
+    },
+    'medical_gas': {
+      name: 'Medical Gas',
+      icon: <Icons.Activity /> as React.ReactElement,
+      formulas: {}
+    },
+    'pumping_drainage': {
+      name: 'Pumping and Drainage',
+      icon: <Icons.Droplets /> as React.ReactElement,
+      formulas: {}
+    },
+    'vertical_transportation': {
+      name: 'Vertical Transportation',
+      icon: <Icons.ArrowUpDown /> as React.ReactElement,
       formulas: {}
     }
 };

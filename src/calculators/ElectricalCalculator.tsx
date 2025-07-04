@@ -111,7 +111,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Electrical Load Estimation</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'load' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Electrical load
+                <Icons.InfoInline /> Calculate project load, diversity factors, and demand analysis
               </p>
             </div>
           </button>
@@ -131,7 +131,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Transformer</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'transformer' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Transformer sizing
+                <Icons.InfoInline /> Calculate transformer sizing and impedance
               </p>
             </div>
           </button>
@@ -151,7 +151,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Generator Set</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'genset' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Generator sizing
+                <Icons.InfoInline /> Calculate generator sizing, fuel consumption, and louver sizing
               </p>
             </div>
           </button>
@@ -171,7 +171,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Cable Sizing</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'cableSizing' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate cable size
+                <Icons.InfoInline /> Calculate cable sizing, voltage drop, and protective conductor
               </p>
             </div>
           </button>
@@ -191,7 +191,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Circuit Protection</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'circuitProtection' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Circuit Protection check
+                <Icons.InfoInline /> Calculate protection coordination and discrimination
               </p>
             </div>
           </button>
@@ -211,7 +211,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Cable Containment</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'cableContainment' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Conduit & trunking capacity
+                <Icons.InfoInline /> Calculate conduit fill, trunking capacity, and cable tray sizing
               </p>
             </div>
           </button>
@@ -231,7 +231,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Copper Loss</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'copperLoss' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Circuit copper loss calculation
+                <Icons.InfoInline /> Calculate copper loss and maximum conductor resistance
               </p>
             </div>
           </button>
@@ -251,7 +251,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Power Quality</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'loadBalancing' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Power quality calculator
+                <Icons.InfoInline /> Calculate load balancing, power factor correction, and harmonics
               </p>
             </div>
           </button>
@@ -271,7 +271,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Lighting</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'lightingControl' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Lighting calculations
+                <Icons.InfoInline /> Calculate lighting power density and control circuits
               </p>
             </div>
           </button>
@@ -291,7 +291,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Uninterruptible Power</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'ups' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> UPS & battery calculations
+                <Icons.InfoInline /> Calculate UPS sizing, battery backup time, and autonomy
               </p>
             </div>
           </button>

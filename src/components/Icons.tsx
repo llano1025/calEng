@@ -110,7 +110,32 @@ export const Icons = {
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 mr-1">
     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
   </svg>
-)
+),
+  Flame: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 mx-auto mb-2">
+      <path d="M13.5 0.5C12.5 0.5 12 1.5 12 1.5S11.5 0.5 10.5 0.5c-1 0-1.5 1-1.5 1s-0.5-1-1.5-1c-1.5 0-2.5 2.5-2.5 4.5 0 4 5 8 5 8s5-4 5-8c0-2-1-4.5-2.5-4.5z"/>
+      <path d="M12 6c-1 0-2 1-2 3 0 2 2 4 2 4s2-2 2-4c0-2-1-3-2-3z"/>
+    </svg>
+  ),
+  Activity: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 mx-auto mb-2">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      <polyline points="1 12 5 12 8 3 16 21 19 12 23 12" stroke="currentColor" strokeWidth="2" fill="none"/>
+    </svg>
+  ),
+  Droplets: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 mx-auto mb-2">
+      <path d="M7 16.5c0 2.485 2.015 4.5 4.5 4.5S16 18.985 16 16.5c0-1.16-.615-2.195-1.55-3.07L11.5 10.5 8.55 13.43C7.615 14.305 7 15.34 7 16.5z"/>
+      <path d="M3 12.5c0 1.657 1.343 3 3 3s3-1.343 3-3c0-.772-.41-1.463-1.035-2.05L6 8.5 4.035 10.45C3.41 11.037 3 11.728 3 12.5z"/>
+      <path d="M15 6.5c0 1.657 1.343 3 3 3s3-1.343 3-3c0-.772-.41-1.463-1.035-2.05L18 2.5 16.035 4.45C15.41 5.037 15 5.728 15 6.5z"/>
+    </svg>
+  ),
+  ArrowUpDown: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 mx-auto mb-2">
+      <path d="M8 3L4 7h3v10h2V7h3L8 3z"/>
+      <path d="M16 21l4-4h-3V7h-2v10h-3l4 4z"/>
+    </svg>
+  )
 };
 
 // Optional: Define a type for the Icons object keys if needed elsewhere
