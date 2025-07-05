@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
 import LiftTrafficCalculator from './lift/LiftTrafficCalculator';
 import EscalatorCalculator from './lift/EscalatorCalculator';
+import LiftRopeCalculator from './lift/LiftRopeCalculator';
 import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
@@ -27,6 +28,8 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
         return <LiftTrafficCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'escalator_capacity':
         return <EscalatorCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'lift_rope':
+        return <LiftRopeCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'lift_power':
         return <div className="p-6 text-center text-gray-500">Lift Power Calculation - Coming Soon</div>;
       case 'shaft_sizing':
@@ -65,7 +68,7 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Elevator Traffic Analysis</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'elevator_traffic' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Advanced lift traffic analysis including RTT calculations, performance metrics, and CIBSE-compliant sizing methods
+                <Icons.InfoInline /> Lift traffic analysis including RTT calculations and performance metrics
               </p>
             </div>
           </button>
@@ -85,7 +88,27 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Escalator Capacity</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'escalator_capacity' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Professional escalator capacity calculations with European K-factors and theoretical/practical capacity analysis
+                <Icons.InfoInline /> Escalator capacity calculations with K-factors analysis
+              </p>
+            </div>
+          </button>
+
+          {/* Lift Power Calculation */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'lift_rope'
+                ? 'bg-purple-600 text-white ring-2 ring-purple-400 ring-offset-1'
+                : 'bg-purple-50 hover:bg-purple-100 border-purple-100'
+            }`}
+            onClick={() => setCalculatorType('lift_rope')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'lift_rope' ? 'text-white' : 'text-purple-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Lift Rope Calculation</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'lift_rope' ? 'text-purple-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculator for minimium number of lift ropes
               </p>
             </div>
           </button>
