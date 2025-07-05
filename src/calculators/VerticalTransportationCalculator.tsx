@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
+import LiftTrafficCalculator from './lift/LiftTrafficCalculator';
+import EscalatorCalculator from './lift/EscalatorCalculator';
+import TutorialContent from './electrical/TutorialContent';
 
 // Define props type for the component
 interface VerticalTransportationCalculatorProps {
@@ -10,12 +13,20 @@ interface VerticalTransportationCalculatorProps {
 const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculatorProps> = ({ onBack }) => {
   // State for the selected calculator type
   const [calculatorType, setCalculatorType] = useState<string>('');
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
 
-  // Placeholder for future sub-calculators
+  // Show tutorial if enabled
+  if (showTutorial && calculatorType) {
+    return <TutorialContent calculatorType={calculatorType} onClose={() => setShowTutorial(false)} />;
+  }
+
+  // Render the selected calculator
   const renderCalculator = () => {
     switch (calculatorType) {
       case 'elevator_traffic':
-        return <div className="p-6 text-center text-gray-500">Elevator Traffic Analysis - Coming Soon</div>;
+        return <LiftTrafficCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'escalator_capacity':
+        return <EscalatorCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'lift_power':
         return <div className="p-6 text-center text-gray-500">Lift Power Calculation - Coming Soon</div>;
       case 'shaft_sizing':
@@ -54,7 +65,7 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Elevator Traffic Analysis</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'elevator_traffic' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Analyze elevator traffic patterns and capacity
+                <Icons.InfoInline /> Advanced lift traffic analysis including RTT calculations, performance metrics, and CIBSE-compliant sizing methods
               </p>
             </div>
           </button>
@@ -74,7 +85,7 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Escalator Capacity</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'escalator_capacity' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate escalator passenger capacity and flow
+                <Icons.InfoInline /> Professional escalator capacity calculations with European K-factors and theoretical/practical capacity analysis
               </p>
             </div>
           </button>
@@ -94,7 +105,7 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Lift Power Calculation</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'lift_power' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate electrical power requirements for lifts
+                <Icons.InfoInline /> Comprehensive electrical power calculations for lift motors, drives, and auxiliary systems per IEC standards
               </p>
             </div>
           </button>
@@ -114,7 +125,7 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Shaft Sizing</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'shaft_sizing' ? 'text-purple-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate elevator shaft dimensions and requirements
+                <Icons.InfoInline /> Precise elevator shaft sizing calculations including clearances, machine room requirements, and safety considerations
               </p>
             </div>
           </button>

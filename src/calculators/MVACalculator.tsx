@@ -97,7 +97,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Psychrometric Chart</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'psyChart' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Psychrometric chart
+                <Icons.InfoInline /> Advanced psychrometric analysis for air conditioning processes
               </p>
             </div>
           </button>
@@ -117,7 +117,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Air Handling Unit</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'ahu' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> AHU sizing
+                <Icons.InfoInline /> AHU sizing calculations including airflow, cooling/heating loads analysis
               </p>
             </div>
           </button>
@@ -137,7 +137,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Duct Static Pressure</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'ductPressure' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Calculate system pressure drop
+                <Icons.InfoInline /> Ductwork pressure loss calculations including friction and fittings resistance
               </p>
             </div>
           </button>
@@ -157,7 +157,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Chilled Water Pipe</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'chillerPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Pipework sizing
+                <Icons.InfoInline /> Chilled water piping design with flow rates, pressure drops, and pump sizing calculations
               </p>
             </div>
           </button>
@@ -178,7 +178,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Steam Pipe</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'steamPipe' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Pipework sizing
+                <Icons.InfoInline /> Steam distribution system design including pipe sizing, pressure drops
               </p>
             </div>
           </button>
@@ -218,7 +218,7 @@ const MVACalculator: React.FC<MVACalculatorProps> = ({ onBack }) => {
             <div>
               <h3 className="font-semibold text-sm sm:text-base">Vibration Isolator</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'vibrationIsolator' ? 'text-indigo-100' : 'text-gray-600'}`}>
-                <Icons.InfoInline /> Vibration Isolator Sizing
+                <Icons.InfoInline /> Vibration isolation design for isolator selection
               </p>
             </div>
           </button>
