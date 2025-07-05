@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface FuseOperationTimeCalculatorProps {
   onShowTutorial?: () => void;
 }
 
 const FuseOperationTimeCalculator: React.FC<FuseOperationTimeCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Fuse Operation Time Calculator',
+    discipline: 'electrical',
+    calculatorType: 'fuseOperationTime'
+  });
+
   // State for input values
   const [ratedCurrent, setRatedCurrent] = useState<number | string>('');
   const [actualCurrent, setActualCurrent] = useState<number | string>('');
@@ -77,6 +86,23 @@ const FuseOperationTimeCalculator: React.FC<FuseOperationTimeCalculatorProps> = 
     }
     
     setOperationTime(time);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Fuse Rated Current': `${ratedCurrentNum} A`,
+      'Actual Current': `${actualCurrentNum} A`,
+      'Fuse Type': fuseType === 'gG' ? 'General Purpose (gG)' : 'Motor Circuit (aM)',
+      'Current Ratio': (actualCurrentNum / ratedCurrentNum).toFixed(2)
+    };
+    
+    const results = {
+      'Operation Time': formatTime(time),
+      'Current Ratio': (actualCurrentNum / ratedCurrentNum).toFixed(2),
+      'Will Operate': time !== Infinity ? 'Yes' : 'No'
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
   
   // Calculate on input change
@@ -105,6 +131,13 @@ const FuseOperationTimeCalculator: React.FC<FuseOperationTimeCalculatorProps> = 
   };
   
   return (
+    <CalculatorWrapper
+      title="Fuse Operation Time Calculator"
+      discipline="electrical"
+      calculatorType="fuseOperationTime"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">BS88 Part 2 Fuse Operation Time Calculator</h2>
@@ -217,6 +250,7 @@ const FuseOperationTimeCalculator: React.FC<FuseOperationTimeCalculatorProps> = 
         </div>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

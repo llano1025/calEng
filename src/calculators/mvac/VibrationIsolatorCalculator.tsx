@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface VibrationIsolatorCalculatorProps {
   onShowTutorial?: () => void;
@@ -64,22 +66,25 @@ const ISOLATOR_TYPES = [
 
 // Main combined component with tabs
 const VibrationIsolatorCalculator: React.FC<VibrationIsolatorCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Vibration Isolator Calculator',
+    discipline: 'mvac',
+    calculatorType: 'vibrationIsolator'
+  });
+
   const [activeTab, setActiveTab] = useState<'sizing' | 'transmission'>('sizing');
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Vibration Isolator Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Vibration Isolator Calculator"
+      discipline="mvac"
+      calculatorType="vibrationIsolator"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
 
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
@@ -111,7 +116,9 @@ const VibrationIsolatorCalculator: React.FC<VibrationIsolatorCalculatorProps> = 
       ) : (
         <TransmissionAnalysisCalculator onShowTutorial={onShowTutorial} />
       )}
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface GensetLouverSizingCalculatorProps {
   onShowTutorial?: () => void;
 }
 
 const GensetLouverSizingCalculator: React.FC<GensetLouverSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Genset Louver Sizing Calculator',
+    discipline: 'electrical',
+    calculatorType: 'gensetLouver'
+  });
+
   // State for input values
   const [gensetCapacity, setGensetCapacity] = useState<number>(2000); // Default 2000 kVA
   const [radiatorAirFlow, setRadiatorAirFlow] = useState<number>(1584); // Default 1584 m³/min

@@ -13,6 +13,7 @@ import {
 } from './LaserSafetyShared';
 
 interface LaserClassificationProps {
+  onBack?: () => void;
   onShowTutorial?: () => void;
 }
 
@@ -1005,7 +1006,7 @@ const getSafetyRequirements = (laserClass: string): string[] => {
 
 // ======================== MAIN COMPONENT ========================
 
-const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onShowTutorial }) => {
+const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onBack, onShowTutorial }) => {
   // State for wavelength data - starts with single wavelength (simplified)
   const [wavelengths, setWavelengths] = useState<WavelengthData[]>([
     {
@@ -1174,6 +1175,28 @@ const LaserClassificationCalculator: React.FC<LaserClassificationProps> = ({ onS
 
       setClassificationResults(results);
       setCalculationPerformed(true);
+      
+      // Save calculation and prepare export data
+      if (results) {
+        const inputs = {
+          wavelengths: activeWavelengths.map(w => ({
+            wavelength: w.wavelength,
+            laserType: w.laserType,
+            power: w.power,
+            powerUnit: w.powerUnit,
+            pulseWidth: w.pulseWidth,
+            repetitionRate: w.repetitionRate,
+            beamDivergence: w.beamDivergence
+          })),
+          exposureTime,
+          beamDiameter,
+          useManualPowers,
+          condition1Power,
+          condition3Power
+        };
+        
+        // Results calculated successfully
+      }
     } catch (error) {
       console.error('Classification error:', error);
       setClassificationResults(null);

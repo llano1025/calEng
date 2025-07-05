@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface RFParameterConverterProps {
   onShowTutorial?: () => void;
@@ -131,6 +133,13 @@ class Matrix {
 }
 
 const RFParameterConverter: React.FC<RFParameterConverterProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'RF Parameter Converter',
+    discipline: 'elv',
+    calculatorType: 'rf-parameter-converter'
+  });
+
   // State for selected parameter type
   const [parameterType, setParameterType] = useState<ParameterType>('S');
   
@@ -441,12 +450,25 @@ const RFParameterConverter: React.FC<RFParameterConverterProps> = ({ onShowTutor
       abcdParams = ZtoABCD(zParams);
       
       // Set the results
-      setResults({
+      const calculatedResults = {
         S: sParams,
         Z: zParams,
         Y: yParams,
         ABCD: abcdParams
-      });
+      };
+      
+      setResults(calculatedResults);
+      
+      // Save calculation and prepare export data
+      const calculationInputs = {
+        parameterType,
+        inputFormat,
+        inputs,
+        polarInputs
+      };
+      
+      saveCalculation(calculationInputs, calculatedResults);
+      prepareExportData(calculationInputs, calculatedResults);
     } catch (error) {
       console.error("Calculation error:", error);
       setCalculationError("Error in parameter conversion. Check your input values and try again.");
@@ -538,21 +560,15 @@ const RFParameterConverter: React.FC<RFParameterConverterProps> = ({ onShowTutor
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">RF Parameter Converter Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <CalculatorWrapper
+      title="RF Parameter Converter Calculator"
+      discipline="elv"
+      calculatorType="rf-parameter-converter"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <h3 className="font-medium text-lg mb-4 text-gray-700">Parameter Input</h3>
@@ -955,7 +971,8 @@ const RFParameterConverter: React.FC<RFParameterConverterProps> = ({ onShowTutor
           <li>For lossless networks, S-parameter magnitudes for reflections (S₁₁, S₂₂) plus transmissions (S₁₂, S₂₁) should sum to 1.</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

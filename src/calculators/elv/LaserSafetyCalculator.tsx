@@ -3,6 +3,8 @@ import { Icons } from '../../components/Icons';
 import NOHDCalculator from './NOHDCalculator';
 import LaserClassificationCalculator from './LaserClassificationCalculator';
 import ProtectiveEyewearCalculator from './ProtectiveEyewearCalculator';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface LaserSafetyCalculatorProps {
@@ -11,24 +13,25 @@ interface LaserSafetyCalculatorProps {
 
 // The main Laser Safety Calculator component that coordinates the sub-calculators
 const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Laser Safety Calculator',
+    discipline: 'elv',
+    calculatorType: 'laser-safety'
+  });
+
   // State for the selected calculator type
   const [activeTab, setActiveTab] = useState<'nohd' | 'classification' | 'eyewear'>('classification');
 
   return (
-    <div className="animate-fade-in">
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Laser Safety Calculations</h2>
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
-            </button>
-          )}
-        </div>
+    <CalculatorWrapper
+      title="Laser Safety Calculator"
+      discipline="elv"
+      calculatorType="laser-safety"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
 
         {/* Tab Selector */}
         <div className="flex border-b mb-6">
@@ -143,7 +146,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
           </div>
         </div> */}
       </div>
-    </div>
+    </CalculatorWrapper>
   );
 };
 

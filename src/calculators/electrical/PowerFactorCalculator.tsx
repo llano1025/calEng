@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface PowerFactorCalculatorProps {
@@ -18,6 +20,13 @@ const PowerFactorCalculator: React.FC<PowerFactorCalculatorProps> = ({ onShowTut
 
   // State for calculation results
   const [powerFactorResults, setPowerFactorResults] = useState<any>(null);
+
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Power Factor Correction Calculator',
+    discipline: 'electrical',
+    calculatorType: 'powerFactor'
+  });
 
   // Handler for input changes
   const handlePowerFactorInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -63,7 +72,7 @@ const PowerFactorCalculator: React.FC<PowerFactorCalculatorProps> = ({ onShowTut
     const standardCapacitorSize = Math.ceil(kVArRequired / 25) * 25;
 
     // Set results
-    setPowerFactorResults({
+    const results = {
       initialTotalPF: initialTotalPF.toFixed(3),
       targetTotalPF: targetTotalPF.toFixed(3),
       initialAngleDegrees: (initialAngle * 180 / Math.PI).toFixed(2),
@@ -75,24 +84,41 @@ const PowerFactorCalculator: React.FC<PowerFactorCalculatorProps> = ({ onShowTut
       initialKVA: initialKVA.toFixed(1),
       targetKVA: targetKVA.toFixed(1),
       standardCapacitorSize: standardCapacitorSize
-    });
+    };
+
+    setPowerFactorResults(results);
+
+    // Save to history and prepare export data
+    const inputs = {
+      'Load Power': `${powerFactorInputs.loadPower} kW`,
+      'Initial Power Factor': powerFactorInputs.initialPowerFactor,
+      'Target Power Factor': powerFactorInputs.targetPowerFactor,
+      'Harmonic Distortion': `${powerFactorInputs.harmonicDistortion}%`
+    };
+
+    const exportResults = {
+      'Initial Total Power Factor': results.initialTotalPF,
+      'Target Total Power Factor': results.targetTotalPF,
+      'Required Capacitor kVAr': `${results.kVArRequired} kVAr`,
+      'Standard Capacitor Size': `${results.standardCapacitorSize} kVAr`,
+      'kVA Reduction': `${results.kVAReduction} kVA`,
+      'Initial kVA': `${results.initialKVA} kVA`,
+      'Target kVA': `${results.targetKVA} kVA`
+    };
+
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Power Factor Correction Calculator</h2>
-        
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Power Factor Correction Calculator"
+      discipline="electrical"
+      calculatorType="powerFactor"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="p-6">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -268,7 +294,8 @@ const PowerFactorCalculator: React.FC<PowerFactorCalculatorProps> = ({ onShowTut
           <li>For systems with significant harmonics, consider using detuned capacitor banks to avoid resonance issues.</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

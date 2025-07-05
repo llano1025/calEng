@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface CircuitProtectionCalculatorProps {
   onShowTutorial?: () => void;
@@ -7,23 +9,25 @@ interface CircuitProtectionCalculatorProps {
 
 // Main combined calculator component
 const CircuitProtectionCalculator: React.FC<CircuitProtectionCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Circuit Protection Calculator',
+    discipline: 'electrical',
+    calculatorType: 'circuitProtection'
+  });
+
   // State for current tab
   const [activeTab, setActiveTab] = useState<'standard' | 'coordination'>('coordination');
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Circuit Protection Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Circuit Protection Calculator"
+      discipline="electrical"
+      calculatorType="circuitProtection"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6 p-6">
 
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
@@ -51,16 +55,31 @@ const CircuitProtectionCalculator: React.FC<CircuitProtectionCalculatorProps> = 
 
       {/* Show the appropriate calculator based on active tab */}
       {activeTab === 'coordination' ? (
-        <StandardCircuitProtectionCalculator onShowTutorial={onShowTutorial} />
+        <StandardCircuitProtectionCalculator 
+          onShowTutorial={onShowTutorial}
+          saveCalculation={saveCalculation}
+          prepareExportData={prepareExportData}
+        />
       ) : (
         <ProtectionCoordinationCalculator onShowTutorial={onShowTutorial} />
       )}
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 
 // Standard Circuit Protection Calculator Component
-const StandardCircuitProtectionCalculator: React.FC<{ onShowTutorial?: () => void }> = ({ onShowTutorial }) => {
+interface StandardCalculatorProps {
+  onShowTutorial?: () => void;
+  saveCalculation: (inputs: Record<string, any>, results: Record<string, any>, notes?: string) => void;
+  prepareExportData: (inputs: Record<string, any>, results: Record<string, any>, projectName?: string) => void;
+}
+
+const StandardCircuitProtectionCalculator: React.FC<StandardCalculatorProps> = ({ 
+  onShowTutorial, 
+  saveCalculation, 
+  prepareExportData 
+}) => {
   // State for circuit protection calculator inputs
   const [circuitProtectionInputs, setCircuitProtectionInputs] = useState({
     faultLevel: '5000', // in amperes
@@ -146,14 +165,38 @@ const StandardCircuitProtectionCalculator: React.FC<{ onShowTutorial?: () => voi
       : "Cable Potentially Not Protected (Source Fault) - Check Breaker Energy Let-Through";
 
     // Set results
-    setCircuitProtectionResults({
+    const results = {
       cableImpedance: cableImpedance.toFixed(4),
       faultCurrentAtEnd: faultCurrentAtEnd.toFixed(0),
       operatingTime: operatingTime.toFixed(2),
       protectionStatus,
       thermalWithstandCurrent: thermalWithstandCurrent.toFixed(0),
       thermalStatus
-    });
+    };
+    setCircuitProtectionResults(results);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Fault Level': `${faultLevel} A`,
+      'Breaker Rating': `${breakerRating} A`,
+      'Breaker Type': breakerType.toUpperCase(),
+      'Cable CSA': `${cableCsa} mm²`,
+      'Cable Length': `${cableLength} m`,
+      'Disconnection Time': `${disconnectionTime} s`,
+      'Cable Type': cableType.toUpperCase()
+    };
+    
+    const exportResults = {
+      'Cable Impedance': `${results.cableImpedance} Ω`,
+      'Fault Current at End': `${results.faultCurrentAtEnd} A`,
+      'Operating Time': `${results.operatingTime} s`,
+      'Protection Status': results.protectionStatus,
+      'Thermal Withstand Current': `${results.thermalWithstandCurrent} A`,
+      'Thermal Status': results.thermalStatus
+    };
+    
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   };
 
   return (

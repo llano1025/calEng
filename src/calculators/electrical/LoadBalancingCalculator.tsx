@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface LoadBalancingCalculatorProps {
   onShowTutorial?: () => void;
 }
 
 const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Load Balancing Calculator',
+    discipline: 'electrical',
+    calculatorType: 'loadBalancing'
+  });
+
   // Tab state to toggle between calculators
   const [activeTab, setActiveTab] = useState<'loadBalancing' | 'powerFactor'>('loadBalancing');
 
@@ -76,8 +85,27 @@ const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onSho
       setUnbalancePercentage(unbalance);
       
       // Check if compliant (unbalance should be <= 10%)
-      setIsCompliant(unbalance <= 10);
+      const compliant = unbalance <= 10;
+      setIsCompliant(compliant);
       setIsCalculated(true);
+      
+      // Save calculation and prepare export data
+      const inputs = {
+        'Phase A Current': `${phaseA} A`,
+        'Phase B Current': `${phaseB} A`,
+        'Phase C Current': `${phaseC} A`
+      };
+      
+      const results = {
+        'Average Current': `${avg.toFixed(2)} A`,
+        'Maximum Deviation': `${maxDev.toFixed(2)} A`,
+        'Unbalance Percentage': `${unbalance.toFixed(2)}%`,
+        'Compliance Status': compliant ? 'PASS' : 'FAIL',
+        'Standard Limit': '10%'
+      };
+      
+      saveCalculation(inputs, results);
+      prepareExportData(inputs, results);
     } else {
       // Alert user if inputs are invalid
       alert("Please enter valid current values for all three phases.");
@@ -136,7 +164,7 @@ const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onSho
     const standardCapacitorSize = Math.ceil(kVArRequired / 25) * 25;
 
     // Set results
-    setPowerFactorResults({
+    const results = {
       initialTotalPF: initialTotalPF.toFixed(3),
       targetTotalPF: targetTotalPF.toFixed(3),
       initialAngleDegrees: (initialAngle * 180 / Math.PI).toFixed(2),
@@ -148,7 +176,27 @@ const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onSho
       initialKVA: initialKVA.toFixed(1),
       targetKVA: targetKVA.toFixed(1),
       standardCapacitorSize: standardCapacitorSize
-    });
+    };
+    setPowerFactorResults(results);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Load Power': `${powerFactorInputs.loadPower} kW`,
+      'Initial Power Factor': powerFactorInputs.initialPowerFactor,
+      'Target Power Factor': powerFactorInputs.targetPowerFactor,
+      'Harmonic Distortion': `${powerFactorInputs.harmonicDistortion}%`
+    };
+    
+    const exportResults = {
+      'Initial Total Power Factor': results.initialTotalPF,
+      'Target Total Power Factor': results.targetTotalPF,
+      'kVAr Required': `${results.kVArRequired} kVAr`,
+      'kVA Reduction': `${results.kVAReduction} kVA`,
+      'Standard Capacitor Size': `${results.standardCapacitorSize} kVAr`
+    };
+    
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   };
 
   // Render the Load Balancing Calculator
@@ -486,21 +534,14 @@ const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onSho
   );
 
   return (
+    <CalculatorWrapper
+      title="Power Quality Calculators"
+      discipline="electrical"
+      calculatorType="loadBalancing"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Power Quality Calculators</h2>
-        
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-      
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -528,6 +569,7 @@ const LoadBalancingCalculator: React.FC<LoadBalancingCalculatorProps> = ({ onSho
       {/* Render the active calculator */}
       {activeTab === 'loadBalancing' ? renderLoadBalancingCalculator() : renderPowerFactorCalculator()}
     </div>
+    </CalculatorWrapper>
   );
 };
 

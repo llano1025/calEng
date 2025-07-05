@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface ProtectionCoordinationCalculatorProps {
   onShowTutorial?: () => void;
@@ -8,6 +10,13 @@ interface ProtectionCoordinationCalculatorProps {
 const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculatorProps> = ({ 
   onShowTutorial 
 }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Protection Coordination Calculator',
+    discipline: 'electrical',
+    calculatorType: 'protectionCoordination'
+  });
+
   // System parameters
   const [faultLevel, setFaultLevel] = useState<number>(350);
   const [voltage, setVoltage] = useState<number>(11);
@@ -236,9 +245,46 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
     ];
     
     setDetailedCalculations(detailCalcs);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'System Parameters': {
+        'Fault Level': `${faultLevel} MVA`,
+        'Voltage': `${voltage} kV`,
+        'Transformer Rating': `${incomingTransformerRating} kVA`,
+        'Transformer Impedance': `${transformerImpedance}%`
+      },
+      'Breaker Settings': {
+        'Main Breaker Rating': `${mainBreakerRating} A`,
+        'Feeder Breaker Rating': `${feederBreakerRating} A`,
+        'Main TM': mainTM,
+        'Feeder TM': feederTM
+      }
+    };
+    
+    const results = {
+      'Fault Current': `${faultCurrentVal.toFixed(2)} kA`,
+      'Main Breaker Operating Time': `${mainEIOpTime.toFixed(1)} ms`,
+      'Feeder Breaker Operating Time': `${feederEIOpTime.toFixed(1)} ms`,
+      'Total Main Break Time': `${mainBreakTime.toFixed(1)} ms`,
+      'Total Feeder Break Time': `${feederBreakTime.toFixed(1)} ms`,
+      'Coordination Status': isCoord ? 'COORDINATED' : 'NOT COORDINATED',
+      'Fuse Coordination': isFuseCoord ? 'PASSED' : 'FAILED',
+      'Recommended Main TM': actualMainTM.toFixed(3)
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
   
   return (
+    <CalculatorWrapper
+      title="Protection Coordination Calculator"
+      discipline="electrical"
+      calculatorType="protectionCoordination"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Protection Coordination Calculator</h2>
@@ -650,6 +696,7 @@ const ProtectionCoordinationCalculator: React.FC<ProtectionCoordinationCalculato
         </ul>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

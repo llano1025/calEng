@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface CCTVSystemCalculatorProps {
   onBack?: () => void; // MODIFIED: Made onBack optional
@@ -8,36 +10,28 @@ interface CCTVSystemCalculatorProps {
 
 // Main CCTV System Calculator component that coordinates the sub-calculators
 const CCTVSystemCalculator: React.FC<CCTVSystemCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'CCTV System Calculator',
+    discipline: 'elv',
+    calculatorType: 'cctv-system'
+  });
+  
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'storage' | 'bandwidth' | 'coverage' | 'power'>('storage');
 
   return (
-    <div className="animate-fade-in">
-      {/* Back Button - MODIFIED: Conditionally render if onBack is provided */}
-      {onBack && (
-        <button
-          onClick={onBack}
-          className="mb-6 inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-        >
-          <Icons.ArrowLeft /> Back to Disciplines
-        </button>
-      )}
+    <CalculatorWrapper
+      title="CCTV System Calculator"
+      discipline="elv"
+      calculatorType="cctv-system"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="animate-fade-in">
 
       {/* Tab Selector */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">CCTV System Sizing</h2>
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
-            </button>
-          )}
-        </div>
-
         <div className="flex border-b mb-6 overflow-x-auto">
           <button
             className={`py-2 px-4 mr-2 whitespace-nowrap ${
@@ -93,6 +87,7 @@ const CCTVSystemCalculator: React.FC<CCTVSystemCalculatorProps> = ({ onBack, onS
         )}
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 
@@ -272,6 +267,8 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
       };
     });
     setStorageBreakdown(breakdown);
+    
+    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
     
   }, [cameras, retentionDays, raidType, selectedDriveSize, spareFactor]);
 

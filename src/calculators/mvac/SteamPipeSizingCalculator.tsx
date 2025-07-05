@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface SteamPipeSizingCalculatorProps {
@@ -82,6 +84,13 @@ const RETURN_VELOCITY_LIMIT_MIN = 5;  // m/s for condensate return lines (minimu
 const STANDARD_PIPE_SIZES = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500, 600, 750]; // mm
 
 const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Steam Pipe Sizing Calculator',
+    discipline: 'mvac',
+    calculatorType: 'steamPipe'
+  });
+
   // State for steam parameters
   const [steamPressure, setSteamPressure] = useState<number>(5);  // bar(g)
   const [steamTemperature, setSteamTemperature] = useState<number>(160); // °C
@@ -594,6 +603,30 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
     setMaxOverallVelocity(highestOverallVelocity);
     setIsSystemCompliant(systemIsCompliant);
     
+    // Save calculation and prepare export data
+    if (results.length > 0 && adjustedTotalDrop > 0) {
+      const inputs = {
+        steamPressure,
+        steamTemperature,
+        steamQuality,
+        isSuperheated,
+        allowablePressureDrop,
+        safetyFactor,
+        pipeSegments
+      };
+      
+      const calculationResults = {
+        sectionResults: results,
+        totalPressureDrop: adjustedTotalDrop,
+        maxOverallVelocity: highestOverallVelocity,
+        isSystemCompliant: systemIsCompliant,
+        steamProperties
+      };
+      
+      saveCalculation(inputs, calculationResults);
+      prepareExportData(inputs, calculationResults);
+    }
+    
   }, [pipeSegments, steamProperties, allowablePressureDrop, safetyFactor, steamPressure, isSuperheated, steamQuality, steamTemperature]); 
   
   // Functions to manage pipe segments
@@ -819,19 +852,15 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Steam Pipe Sizing Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Steam Pipe Sizing Calculator"
+      discipline="mvac"
+      calculatorType="steamPipe"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -1392,7 +1421,9 @@ const SteamPipeSizingCalculator: React.FC<SteamPipeSizingCalculatorProps> = ({ o
           <li>Steam systems should include proper condensate drainage points at natural low points.</li>
         </ul>
       </div>
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

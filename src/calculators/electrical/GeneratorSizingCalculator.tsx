@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface GensetLouverSizingProps {
   onShowTutorial?: () => void;
@@ -95,24 +97,25 @@ interface StepTotal {
 
 // Main combined component
 const CombinedGeneratorCalculator: React.FC<CombinedGeneratorCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Generator Sizing Calculator',
+    discipline: 'electrical',
+    calculatorType: 'genset'
+  });
+
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'generator' | 'louver'>('generator');
 
   return (
+    <CalculatorWrapper
+      title="Generator Calculators"
+      discipline="electrical"
+      calculatorType="genset"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Generator Calculators</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -144,6 +147,7 @@ const CombinedGeneratorCalculator: React.FC<CombinedGeneratorCalculatorProps> = 
         <GensetLouverSizingCalculator onShowTutorial={onShowTutorial} />
       )}
     </div>
+    </CalculatorWrapper>
   );
 };
 
@@ -447,6 +451,39 @@ const GeneratorSizingCalculator: React.FC<GeneratorSizingProps> = ({ onShowTutor
     });
     
     setGeneratorResults(results);
+    
+    // Save calculation and prepare export data for generator sizing
+    const inputs = {
+      'Number of Generators': generators.length,
+      'Number of Loads': loads.length,
+      'Generator Configurations': generators.map(gen => ({
+        'Name': gen.name,
+        'Type': gen.type,
+        'Rating': `${gen.rating} kVA`,
+        'Power Factor': gen.powerFactor,
+        'Step Load Acceptance': `${gen.stepLoadAcceptance}%`,
+        'Max Voltage Drop': `${gen.maxVoltageDropAllowed}%`
+      }))
+    };
+    
+    const exportResults = Object.fromEntries(
+      generators.map(generator => {
+        const result = results[generator.id];
+        if (result) {
+          return [`${generator.name} Results`, {
+            'Total Steady Load': `${result.totalSteadyKVA.toFixed(1)} kVA`,
+            'Utilization': `${result.utilizationPercentage.toFixed(1)}%`,
+            'Overall Power Factor': result.overallPowerFactor.toFixed(2),
+            'Max Step Starting Load': `${result.maxStepStartingKW.toFixed(1)} kW`,
+            'Compliance Status': result.criteriaResults.overallPassed ? 'PASS' : 'FAIL',
+            'Assigned Loads': result.loadDetails.length
+          }];
+        }
+        return [`${generator.name} Results`, 'No data'];
+      })
+    );
+    
+    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
   }, [generators, loads]);
 
   // Function to add a new generator

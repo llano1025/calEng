@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface PublicAddressCalculatorProps {
@@ -9,35 +11,25 @@ interface PublicAddressCalculatorProps {
 
 // The main Public Address Calculator component that coordinates the sub-calculators
 const PublicAddressCalculator: React.FC<PublicAddressCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Public Address System Calculator',
+    discipline: 'elv',
+    calculatorType: 'public-address'
+  });
+
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'coverage' | 'spl' | 'amplifier' | 'cable' | 'reverb'>('coverage');
   
   return (
-    <div className="animate-fade-in">
-      {/* Back Button - MODIFIED: Conditionally render if onBack is provided */}
-      {onBack && (
-        <button
-          onClick={onBack}
-          className="mb-6 inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-        >
-          <Icons.ArrowLeft /> Back to Disciplines
-        </button>
-      )}
-
-      {/* Tab Selector */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Public Address System Sizing</h2>
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
-            </button>
-          )}
-        </div>
+    <CalculatorWrapper
+      title="Public Address System Calculator"
+      discipline="elv"
+      calculatorType="public-address"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
       
         <div className="flex border-b mb-6">
           <button
@@ -111,8 +103,8 @@ const PublicAddressCalculator: React.FC<PublicAddressCalculatorProps> = ({ onBac
           {activeTab === 'reverb' && <ReverbTimeCalculator onShowTutorial={onShowTutorial} />}
         </div>
         {/* Tutorial Modal would be rendered here based on showTutorial state, if implemented */}
-        </div>
       </div>
+    </CalculatorWrapper>
   );
 };
 

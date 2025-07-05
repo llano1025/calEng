@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface ChilledWaterPipeSizingCalculatorProps {
   onShowTutorial?: () => void;
@@ -83,6 +85,13 @@ const getInnerDiameterInternal = (
 
 
 const ChilledWaterPipeSizingCalculator: React.FC<ChilledWaterPipeSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Chilled Water Pipe Sizing Calculator',
+    discipline: 'mvac',
+    calculatorType: 'chilledWaterPipe'
+  });
+
   const [systemCoolingLoad, setSystemCoolingLoad] = useState<number>(50);
   const [temperatureDrop, setTemperatureDrop] = useState<number>(5.5);
   const [systemFlowRate, setSystemFlowRate] = useState<number>(2.2);
@@ -397,6 +406,35 @@ const ChilledWaterPipeSizingCalculator: React.FC<ChilledWaterPipeSizingCalculato
     setIsSystemCompliant(systemCompliantOverall);
     setMaxVelocity(highestVelocityOverall);
     
+    // Save calculation and prepare export data
+    if (results.length > 0 && adjustedTotalDrop > 0) {
+      const inputs = {
+        systemCoolingLoad,
+        temperatureDrop,
+        systemFlowRate,
+        flowRateManual,
+        waterTemperature,
+        glycolPercentage,
+        safetyFactor,
+        pumpEfficiency,
+        pipeSections
+      };
+      
+      const calculationResults = {
+        sectionResults: results,
+        totalPressureDrop: adjustedTotalDrop,
+        pumpHead: pumpHeadM,
+        isSystemCompliant: systemCompliantOverall,
+        maxVelocity: highestVelocityOverall,
+        waterDensity,
+        waterViscosity,
+        specificHeat
+      };
+      
+      saveCalculation(inputs, calculationResults);
+      prepareExportData(inputs, calculationResults);
+    }
+    
   }, [pipeSections, waterDensity, waterViscosity, safetyFactor]); 
   
   const addPipeSection = () => {
@@ -630,19 +668,15 @@ const ChilledWaterPipeSizingCalculator: React.FC<ChilledWaterPipeSizingCalculato
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Chilled Water Pipe Sizing Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Chilled Water Pipe Sizing Calculator"
+      discipline="mvac"
+      calculatorType="chilledWaterPipe"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -1440,7 +1474,9 @@ const ChilledWaterPipeSizingCalculator: React.FC<ChilledWaterPipeSizingCalculato
           <li>For comprehensive pump selection, consult manufacturer performance curves and include system component pressure drops.</li>
         </ul>
       </div>
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

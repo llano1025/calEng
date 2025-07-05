@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'; // Ensure useEffect is imported
 import { Icons } from '../../components/Icons';
-
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface AccessControlCalculatorProps {
@@ -114,7 +115,12 @@ interface CalculationSettings {
 
 // The main Access Control Calculator component
 const AccessControlCalculator: React.FC<AccessControlCalculatorProps> = ({ onBack, onShowTutorial }) => {
-  const [showTutorial, setShowTutorial] = useState<boolean>(false);
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Access Control Calculator',
+    discipline: 'elv',
+    calculatorType: 'access-control'
+  });
   const [showStandard, setShowStandard] = useState<boolean>(false);
   
   const initialDevice1Type = DEVICE_TYPES.find(t => t.value === 'mainPanel') || DEVICE_TYPES[0];
@@ -417,8 +423,40 @@ const AccessControlCalculator: React.FC<AccessControlCalculatorProps> = ({ onBac
       );
     }
     setRecommendedBatteries(recommendations);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      securityGrade: settings.securityGrade,
+      systemVoltage: settings.systemVoltage,
+      batteryAgingFactor: settings.batteryAgingFactor,
+      temperatureFactor: settings.temperatureFactor,
+      devices: devices.map(device => ({
+        name: device.name,
+        deviceType: device.deviceType,
+        quantity: device.quantity,
+        category: device.category,
+        baseCurrent: device.baseCurrent,
+        activatedCurrent: device.activatedCurrent,
+        actuationsPerHour: device.actuationsPerHour,
+        actuationDurationSecs: device.actuationDurationSecs
+      }))
+    };
+    
+    const results = {
+      totalEquipmentCurrent: totalIEquip,
+      totalFailSafeCurrent: totalIFailSafe,
+      totalFailSecureAvgCurrent: totalIFailSecureAvg,
+      totalAverageCurrent: totalIAvg,
+      standbyTime: effectiveStandbyTime,
+      batteryCapacity: batteryCapacity,
+      adjustedCapacity: adjustedCapacity,
+      recommendedBatteries: recommendedBatteries
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, settings]);
+  }, [devices, settings, saveCalculation, prepareExportData]);
 
   useEffect(() => {
     calculateBatteryCapacity();
@@ -438,7 +476,14 @@ const AccessControlCalculator: React.FC<AccessControlCalculatorProps> = ({ onBac
 
 
   return (
-    <div className="animate-fade-in">
+    <CalculatorWrapper
+      title="Access Control Calculator"
+      discipline="elv"
+      calculatorType="access-control"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="animate-fade-in">
       {/* Main Calculator */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
         <div className="flex justify-between items-center mb-6">
@@ -451,15 +496,6 @@ const AccessControlCalculator: React.FC<AccessControlCalculatorProps> = ({ onBac
               <span className="mr-1">{showStandard ? 'Hide Standard Info' : 'Show Standard Info'}</span>
               <Icons.InfoInline />
             </button>
-            {onShowTutorial && (
-              <button 
-                onClick={() => setShowTutorial(true)} 
-                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-              >
-                <span className="mr-1">Tutorial</span>
-                <Icons.InfoInline />
-              </button>
-            )}
           </div>
         </div>
         
@@ -967,98 +1003,8 @@ const AccessControlCalculator: React.FC<AccessControlCalculatorProps> = ({ onBac
         </div>
       </div>
       
-      {showTutorial && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Standby Battery Calculation Tutorial (IEC 60839-11-1 Annex B style)</h3>
-              <button onClick={() => setShowTutorial(false)} className="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="space-y-4 text-sm">
-              <div>
-                <h4 className="font-medium text-lg">Understanding Battery Capacity Calculation</h4>
-                <p className="mt-1">This calculator helps determine standby battery capacity for access control systems, using a methodology similar to IEC 60839-11-1 Annex B. It calculates an average system current (I<sub>avg</sub>) and multiplies it by the required standby time (t) to find the raw capacity (C = t × I<sub>avg</sub>). De-rating factors are then applied.</p>
-              </div>
-              <div>
-                <h4 className="font-medium">Step 1: System Parameters</h4>
-                <ul className="list-disc pl-5 mt-1">
-                  <li><strong>Security Grade:</strong> Select based on risk. This sets a default standby time (e.g., Grade 3: 2h, Grade 4: 4h, per IEC 60839-11-2 Table 2).</li>
-                  <li><strong>System Voltage:</strong> Choose 12VDC or 24VDC.</li>
-                  <li><strong>Custom Standby Time:</strong> Optionally override the grade-defined standby time.</li>
-                  <li><strong>De-rating Factors:</strong>
-                    <ul>
-                      <li><em>Battery Aging:</em> Compensates for capacity loss over time (e.g., 1.25 for 25% extra).</li>
-                      <li><em>Temperature:</em> Accounts for reduced performance in cold (e.g., 1.1 for 10% extra).</li>
-                    </ul>
-                  </li>
-                  <li><strong>Power Supply Efficiency:</strong> If included, increases required battery capacity to account for PSU losses (e.g., 0.85 for 85% efficient PSU).</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-medium">Step 2: Add Devices</h4>
-                <p className="mt-1">List all devices powered by the battery. For each device:</p>
-                <ul className="list-disc pl-5 mt-1">
-                  <li><strong>Name & Quantity:</strong> For identification and count.</li>
-                  <li><strong>Device Type:</strong> Choose a preset or 'Custom Device'. This determines its category and default electrical properties.</li>
-                  <li><strong>Currents & Actuation Data:</strong> These values (Base Current, Activated Current, etc.) are pre-filled based on the Device Type but can be directly edited.</li>
-                  <li>For 'Custom Device' type:
-                    <ul>
-                      <li><em>Device Category:</em> Select the behavior (Equipment, Fail-Safe, Fail-Secure).</li>
-                      <li><em>Custom Current/Actuation Overrides:</em> Optionally provide specific values that take precedence over the (editable) base values for the 'Custom Device'.</li>
-                    </ul>
-                  </li>
-                   <li>Device Categories for calculation:
-                        <ul className="list-circle pl-4">
-                            <li><strong>Equipment:</strong> Constant load (e.g., controllers, sensors). Uses 'Base Current'.</li>
-                            <li><strong>Fail-Safe Actuator:</strong> Continuously powered when active (e.g., maglock powered to lock). Uses 'Activated Current'.</li>
-                            <li><strong>Fail-Secure Actuator:</strong> Intermittently powered (e.g., electric strike pulsed to open). Uses 'Base/Quiescent Current', 'Activated Current' (during pulse), 'Actuations/Hour', and 'Actuation Duration (sec)'.</li>
-                        </ul>
-                      </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-medium">Step 3: Understanding Results</h4>
-                <ul className="list-disc pl-5 mt-1">
-                  <li><strong>I<sub>avg</sub> Breakdown:</strong> Shows total currents for Equipment & Quiescent (I<sub>equip</sub>), Fail-Safe Actuators (I<sub>fail-safe</sub>), and average for Fail-Secure Actuators' active part (I<sub>fail-secure_active_avg</sub>). These sum to I<sub>avg</sub>.</li>
-                  <li><strong>Raw Capacity (C):</strong> Calculated as I<sub>avg</sub> × Standby Time (t).</li>
-                  <li><strong>Adjusted Capacity:</strong> Raw capacity increased by de-rating factors and PSU efficiency. This is the target Ah for battery selection.</li>
-                  <li><strong>Recommendations:</strong> Suggested battery sizes.</li>
-                </ul>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-md">
-                <h4 className="font-medium text-blue-800">Formula Summary</h4>
-                <p className="text-xs mt-1 font-mono">
-                  D<sub>i</sub> (Duty Cycle for one fail-secure device type) = (Actuations/Hour × Actuation Duration sec) / 3600
-                </p>
-                <p className="text-xs mt-1 font-mono">
-                  I<sub>equip_total</sub> = Σ (Base Current<sub>equip/quiescent</sub> × Quantity)
-                </p>
-                <p className="text-xs mt-1 font-mono">
-                  I<sub>fail-safe_total</sub> = Σ (Activated Current<sub>fs</sub> × Quantity)
-                </p>
-                <p className="text-xs mt-1 font-mono">
-                  I<sub>fail-secure_active_avg_total</sub> = Σ (Activated Current<sub>fsc_pulse</sub> × D<sub>i</sub> × Quantity)
-                </p>
-                 <p className="text-xs mt-1 font-mono">
-                  I<sub>avg</sub> = I<sub>equip_total</sub> + I<sub>fail-safe_total</sub> + I<sub>fail-secure_active_avg_total</sub>
-                </p>
-                <p className="text-xs mt-1 font-mono">
-                  C<sub>raw</sub> = Standby Time (t) × I<sub>avg</sub>
-                </p>
-                <p className="text-xs mt-1 font-mono">
-                  C<sub>adj</sub> = C<sub>raw</sub> × AgingFactor × TempFactor / (PSUEfficiency if included)
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button onClick={() => setShowTutorial(false)} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">Close Tutorial</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+    </CalculatorWrapper>
   );
 };
 

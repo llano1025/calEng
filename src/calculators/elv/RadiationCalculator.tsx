@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface RadiationCalculatorProps {
   onShowTutorial?: () => void;
@@ -90,6 +92,13 @@ const getHVLForMaterial = (materialId: string, kVp: number): number => {
 
 
 const RadiationShieldingCalculator: React.FC<RadiationCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'X-ray Shielding Calculator',
+    discipline: 'elv',
+    calculatorType: 'radiation-shielding'
+  });
+
   // State for room dimensions
   const [roomDimensions, setRoomDimensions] = useState<RoomDimensions>({
     length: 7.0,
@@ -223,6 +232,24 @@ const RadiationShieldingCalculator: React.FC<RadiationCalculatorProps> = ({ onSh
 
     setMaxDoseRate(maxDose);
     setSystemCompliant(allCompliant);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      roomDimensions,
+      sources,
+      wallMaterials,
+      surveyPoints: surveyPoints.map(p => ({ id: p.id, name: p.name, positionX: p.positionX, positionY: p.positionY, positionZ: p.positionZ })),
+      doseLimit
+    };
+    
+    const results = {
+      maxDoseRate: maxDose,
+      systemCompliant: allCompliant,
+      calculatedSurveyPoints: updatedSurveyPoints
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   }, [
     roomDimensions, 
     sources, 
@@ -396,19 +423,14 @@ const RadiationShieldingCalculator: React.FC<RadiationCalculatorProps> = ({ onSh
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">X-ray Shielding Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="X-ray Shielding Calculator"
+      discipline="elv"
+      calculatorType="radiation-shielding"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -652,7 +674,8 @@ const RadiationShieldingCalculator: React.FC<RadiationCalculatorProps> = ({ onSh
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Icons } from '../../components/Icons';
+import React, { useState } from 'react';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface UPSCalculatorProps {
   onShowTutorial?: () => void;
@@ -38,6 +39,13 @@ const batteryParams = {
 };
 
 const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'UPS Calculator',
+    discipline: 'electrical',
+    calculatorType: 'ups'
+  });
+
   // State for the various calculator inputs
   const [activeTab, setActiveTab] = useState<string>('batteryPower');
   const [formData, setFormData] = useState({
@@ -98,38 +106,84 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
 
   // Calculate specific sections based on active tab
   const handleCalculate = () => {
+    let newResults = { ...results };
+    let currentTabResults: any = {};
+    let currentTabInputs: any = {};
+    
     switch (activeTab) {
       case 'batteryPower':
         const batteryPower = calculateBatteryPower();
-        setResults({
+        newResults = {
           ...results,
           batteryPower
-        });
+        };
+        currentTabResults = { batteryPower };
+        currentTabInputs = {
+          loadPower: formData.loadPower,
+          powerFactor: formData.powerFactor,
+          efficiency: formData.efficiency,
+          batteryVoltage: formData.batteryVoltage,
+          batteryString: formData.batteryString,
+          batteryPerString: formData.batteryPerString,
+          agingFactor: formData.agingFactor
+        };
         break;
       case 'batteryBreaker':
         const batteryBreaker = calculateBatteryBreaker();
-        setResults({
+        newResults = {
           ...results,
           batteryBreaker
-        });
+        };
+        currentTabResults = { batteryBreaker };
+        currentTabInputs = {
+          loadPower: formData.loadPower,
+          powerFactor: formData.powerFactor,
+          efficiency: formData.efficiency,
+          batteryVoltage: formData.batteryVoltage,
+          batteryPerString: formData.batteryPerString
+        };
         break;
       case 'ventilation':
         const ventilation = calculateVentilation();
-        setResults({
+        newResults = {
           ...results,
           ventilation
-        });
+        };
+        currentTabResults = { ventilation };
+        currentTabInputs = {
+          batteryType: formData.batteryType,
+          chargingMode: formData.chargingMode,
+          numCells: formData.numCells,
+          batteryCapacity: formData.batteryCapacity,
+          batteryString: formData.batteryString,
+          roomFloorArea: formData.roomFloorArea,
+          lowerExplosionLimit: formData.lowerExplosionLimit
+        };
         break;
       case 'chargingCurrent':
         const chargingCurrent = calculateChargingCurrent();
-        setResults({
+        newResults = {
           ...results,
           chargingCurrent
-        });
+        };
+        currentTabResults = { chargingCurrent };
+        currentTabInputs = {
+          batteryCapacity: formData.batteryCapacity,
+          chargingEfficiency: formData.chargingEfficiency,
+          chargingTime: formData.chargingTime
+        };
         break;
       default:
         break;
     }
+    
+    setResults(newResults);
+    
+    // Save calculation with both inputs and results
+    saveCalculation(formData, newResults);
+    
+    // Prepare export data with only current tab's results and relevant inputs
+    prepareExportData(currentTabInputs, currentTabResults);
   };
 
   // Calculate Battery Power Required
@@ -255,20 +309,14 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Uninterruptible Power Supply Calculator</h2>
-        
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Uninterruptible Power Supply Calculator"
+      discipline="electrical"
+      calculatorType="ups"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
 
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
@@ -989,7 +1037,8 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
           <li>Aging factor accounts for battery capacity loss over time and is typically 1.15-1.25 for VRLA batteries.</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

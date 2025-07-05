@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface IPSubnetCalculatorProps {
+  onBack?: () => void;
   onShowTutorial?: () => void;
 }
 
@@ -33,7 +36,13 @@ interface VLSMSubnet {
   actualHosts: number;
 }
 
-const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onShowTutorial }) => {
+const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'IP Subnet Calculator',
+    discipline: 'elv',
+    calculatorType: 'ip-subnet'
+  });
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'basic' | 'vlsm'>('basic');
   
@@ -184,6 +193,17 @@ const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onShowTutorial 
         setCalculationResult(result);
         setIsValidInput(true);
         setErrorMessage('');
+        
+        // Save calculation and prepare export data
+        const inputs = {
+          ipAddress,
+          cidrNotation: useCustomMask ? cidr : cidrNotation,
+          customSubnetMask: useCustomMask ? customSubnetMask : '',
+          useCustomMask
+        };
+        
+        saveCalculation(inputs, result);
+        prepareExportData(inputs, result);
       } else {
         setIsValidInput(false);
         setErrorMessage('Invalid IP address or CIDR notation');
@@ -194,7 +214,7 @@ const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onShowTutorial 
       setErrorMessage('Calculation error occurred');
       setCalculationResult(null);
     }
-  }, [ipAddress, cidrNotation, customSubnetMask, useCustomMask]);
+  }, [ipAddress, cidrNotation, customSubnetMask, useCustomMask, saveCalculation, prepareExportData]);
 
   // VLSM Functions
   const addVLSMSubnet = () => {
@@ -289,20 +309,14 @@ const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onShowTutorial 
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">IP Address and Subnet Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
+    <CalculatorWrapper
+      title="IP Subnet Calculator"
+      discipline="elv"
+      calculatorType="ip-subnet"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -764,6 +778,7 @@ const IPSubnetCalculator: React.FC<IPSubnetCalculatorProps> = ({ onShowTutorial 
         </ul>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

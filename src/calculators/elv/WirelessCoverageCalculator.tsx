@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface WirelessCoverageCalculatorProps {
   onShowTutorial?: () => void;
@@ -80,6 +82,13 @@ interface AccessPoint {
 }
 
 const WirelessCoverageCalculator: React.FC<WirelessCoverageCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Wireless Coverage Calculator',
+    discipline: 'elv',
+    calculatorType: 'wireless-coverage'
+  });
+
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'wifi' | 'bluetooth' | 'lora' | 'zigbee'>('wifi');
   
@@ -177,6 +186,34 @@ const WirelessCoverageCalculator: React.FC<WirelessCoverageCalculatorProps> = ({
     generateAPPlacements(requiredAPs, maxDistance);
     
     setCalculationPerformed(true);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      activeTab,
+      buildingLength,
+      buildingWidth,
+      buildingHeight,
+      numberOfFloors,
+      selectedFrequency,
+      txPower,
+      targetRSSI,
+      userDensity,
+      safetyMargin,
+      obstacles,
+      apHeight,
+      interFloorAttenuation
+    };
+    
+    const results = {
+      linkBudget: budget,
+      pathLoss: availablePathLoss,
+      maxCoverageRadius: maxDistance,
+      totalCoverageArea: buildingArea,
+      recommendedAPs: Math.max(1, requiredAPs)
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
   
   const generateAPPlacements = (numAPs: number, radius: number) => {
@@ -678,21 +715,15 @@ const WirelessCoverageCalculator: React.FC<WirelessCoverageCalculatorProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Wireless Network Coverage Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
-      {/* Tab Selector */}
+    <CalculatorWrapper
+      title="Wireless Network Coverage Calculator"
+      discipline="elv"
+      calculatorType="wireless-coverage"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        {/* Tab Selector */}
       <div className="flex border-b mb-6 overflow-x-auto">
         <button
           className={`py-2 px-4 mr-2 whitespace-nowrap ${
@@ -1442,7 +1473,8 @@ const WirelessCoverageCalculator: React.FC<WirelessCoverageCalculatorProps> = ({
           <li><strong>3D Propagation:</strong> Vertical heatmap helps identify coverage gaps between floors and optimal AP mounting heights</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

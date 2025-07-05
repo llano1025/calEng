@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface ElectricalLoadCalculatorProps {
   onShowTutorial?: () => void;
@@ -243,6 +245,13 @@ interface FlattenedEquipmentItem extends BaseEquipmentFields {
 
 
 const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Electrical Load Estimation Calculator',
+    discipline: 'electrical',
+    calculatorType: 'load'
+  });
+
   // Project Info State
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({
     projectName: '',
@@ -1049,6 +1058,29 @@ const ElectricalLoadCalculator: React.FC<ElectricalLoadCalculatorProps> = ({ onS
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    // Also save to history and prepare export data
+    const inputs = {
+      'Project Information': projectInfo,
+      'Total Categories': Object.keys(categorySummaries).length,
+      'Total Area': `${projectInfo.totalArea} m²`,
+      'Number of Floors': projectInfo.numberOfFloors,
+      'Number of Risers': projectInfo.numberOfRisers
+    };
+    
+    const results = {
+      'Total Connected Load': `${categorySummaries.reduce((sum, summary) => sum + summary.estimatedConnectedLoad, 0).toFixed(2)} kVA`,
+      'Total Diversified Load': `${totalDiversifiedLoad.toFixed(2)} kVA`,
+      'Total Additional Demand': `${totalAdditionalDemand.toFixed(2)} kVA`,
+      'Total Estimated Demand': `${totalEstimatedDemand.toFixed(2)} kVA`,
+      'Overall Diversity Factor': overallDiversityFactor.toFixed(3),
+      'Normal Power Load': `${(totalEstimatedDemand - totalEmergencyPowerLoad).toFixed(2)} kVA`,
+      'Emergency Power Load': `${totalEmergencyPowerLoad.toFixed(2)} kVA`,
+      'FSI Load': `${totalFSILoad.toFixed(2)} kVA`,
+      'Demand Density': `${demandDensity.toFixed(2)} VA/m²`
+    };
+    
+    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
   };
 
   const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -3449,12 +3481,16 @@ const renderTabContent = () => {
   };
 
   return (
+    <CalculatorWrapper
+      title="Electrical Load Estimation Calculator"
+      discipline="electrical"
+      calculatorType="load"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="animate-fade-in">
       {/* Header */}
       <div className="mb-6 flex flex-wrap justify-between items-center gap-y-4">
-        <div className="flex items-center">
-          <h1 className="text-xl font-semibold">Electrical Load Estimation</h1>
-        </div>
         <div className="flex items-center space-x-2">
             <button
                 onClick={handleExportData}
@@ -3475,15 +3511,6 @@ const renderTabContent = () => {
                 onChange={handleImportData}
                 className="hidden"
             />
-            {onShowTutorial && (
-            <button 
-                onClick={onShowTutorial} 
-                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-                <span className="mr-1">Tutorial</span>
-                <Icons.InfoInline />
-            </button>
-            )}
         </div>
       </div>
 
@@ -3678,6 +3705,7 @@ const renderTabContent = () => {
         </div>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

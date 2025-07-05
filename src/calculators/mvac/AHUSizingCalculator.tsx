@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface AHUSizingCalculatorProps {
   onShowTutorial?: () => void;
@@ -298,6 +300,13 @@ class Psychrometrics {
 // ======================== AHU/PAU SIZING CALCULATOR ========================
 
 const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'AHU Sizing Calculator',
+    discipline: 'mvac',
+    calculatorType: 'ahuSizing'
+  });
+
   // State for unit mode
   const [unitMode, setUnitMode] = useState<'ahu' | 'pau'>('ahu');
   
@@ -533,6 +542,25 @@ const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutoria
       setResultsA(newResultsA);
       setResultsB(newResultsB);
       setCalculationPerformed(newResultsA !== null || newResultsB !== null);
+      
+      // Save calculation and prepare export data
+      if (newResultsA || newResultsB) {
+        const inputs = {
+          unitMode,
+          pressure,
+          conditionA,
+          conditionB
+        };
+        
+        const calculationResults = {
+          resultsA: newResultsA,
+          resultsB: newResultsB,
+          activeCondition
+        };
+        
+        saveCalculation(inputs, calculationResults);
+        prepareExportData(inputs, calculationResults);
+      }
 
     } catch (error: any) {
       // Only show errors if there's actually some meaningful input
@@ -716,19 +744,15 @@ const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutoria
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">AHU/PAU Sizing Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="AHU/PAU Sizing Calculator"
+      discipline="mvac"
+      calculatorType="ahuSizing"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -1305,7 +1329,9 @@ const AHUSizingCalculator: React.FC<AHUSizingCalculatorProps> = ({ onShowTutoria
           <li>Sensible Heat Ratio (SHR) indicates the proportion of sensible vs. latent cooling required.</li>
         </ul>
       </div>
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

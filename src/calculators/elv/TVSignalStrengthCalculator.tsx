@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface TVSignalStrengthCalculatorProps {
   onShowTutorial?: () => void;
@@ -20,6 +22,13 @@ interface DiagramComponent {
 }
 
 const TVSignalStrengthCalculator: React.FC<TVSignalStrengthCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'TV Signal Strength Calculator',
+    discipline: 'elv',
+    calculatorType: 'tv-signal-strength'
+  });
+
   // State for signal strength calculator inputs
   const [signalStrengthInputs, setSignalStrengthInputs] = useState({
     antennaSignal: '500', 
@@ -382,27 +391,34 @@ const TVSignalStrengthCalculator: React.FC<TVSignalStrengthCalculatorProps> = ({
     else if (finalSignalDBuV < 57) { acceptabilityStatus = 'Too Low - Signal Amplification Required'; }
     else { acceptabilityStatus = 'Too High - Signal Attenuation Required'; }
 
-    setSignalStrengthResults({
+    const results = {
       antennaSignalDBuV: antennaSignalDBuV.toFixed(1),
       finalSignalDBuV: finalSignalDBuV.toFixed(1),
       acceptabilityStatus
-    });
+    };
+    
+    setSignalStrengthResults(results);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      signalStrengthInputs,
+      components
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">TV Signal Strength Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="flex items-center text-blue-600 hover:text-blue-800"
-          >
-            <Icons.InfoInline /> Tutorial
-          </button>
-        )}
-      </div>
-      <p className="mb-4 text-gray-600">
+    <CalculatorWrapper
+      title="TV Signal Strength Calculator"
+      discipline="elv"
+      calculatorType="tv-signal-strength"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <p className="mb-4 text-gray-600">
         Configure the signal path using the component table and diagram. Enter source/final path details below.
       </p>
       
@@ -712,7 +728,8 @@ const TVSignalStrengthCalculator: React.FC<TVSignalStrengthCalculatorProps> = ({
           <div className="mt-2 text-xs text-gray-600">Acceptable range: 57-77 dBμV. Results based on diagram components + final path inputs.</div>
         </div>
       )}
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

@@ -78,7 +78,7 @@ const GenericCalculator: React.FC<GenericCalculatorProps> = ({ systems, initialD
 
   // --- Render Logic ---
    if (!currentSystemData) {
-     return ( /* Error/Loading State */ <div className="text-center p-10"><p className="text-red-600">Error: Discipline data not found.</p><button onClick={onBack} className="mt-4 inline-flex items-center bg-gray-500 text-white px-4 py-2 rounded-md shadow hover:bg-gray-600 transition-colors"><Icons.ArrowLeft /> Back to Disciplines</button></div>);
+     return ( /* Error/Loading State */ <div className="text-center p-10"><p className="text-red-600">Error: Discipline data not found.</p></div>);
    }
 
   // (JSX remains the same as the EngineeringCalculator in the previous combined version)
@@ -86,10 +86,6 @@ const GenericCalculator: React.FC<GenericCalculatorProps> = ({ systems, initialD
   // It includes the Back button using the onBack prop.
   return (
     <div className="animate-fade-in">
-       {/* Back Button */}
-       <button onClick={onBack} className="mb-6 inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
-           <Icons.ArrowLeft /> Back to Disciplines
-       </button>
 
         {/* Formula Selection Section */}
         <section className="mb-10 transition-opacity duration-500 ease-in-out opacity-100">

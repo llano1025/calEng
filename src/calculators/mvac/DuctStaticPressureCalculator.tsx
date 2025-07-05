@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface DuctStaticPressureCalculatorProps {
   onShowTutorial?: () => void;
@@ -74,6 +76,13 @@ const MIN_ROUGHNESS = 0.001; // mm
 const MAX_ROUGHNESS = 50; // mm
 
 const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Duct Static Pressure Calculator',
+    discipline: 'mvac',
+    calculatorType: 'ductStaticPressure'
+  });
+
   // State for input system parameters
   const [systemFlowRate, setSystemFlowRate] = useState<number>(1000); // m³/h
   const [airTemperature, setAirTemperature] = useState<number>(13); // °C
@@ -412,6 +421,31 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
     setMaxOverallVelocity(safeNumber(highestOverallVelocity));
     setIsSystemCompliant(systemIsCompliant);
     
+    // Save calculation and prepare export data
+    if (results.length > 0 && adjustedTotalDrop > 0) {
+      const inputs = {
+        systemFlowRate,
+        airTemperature,
+        elevation,
+        safetyFactor,
+        ductLocation,
+        spaceCriticality,
+        ductSections
+      };
+      
+      const calculationResults = {
+        airDensity,
+        kinematicViscosity,
+        totalPressureDrop: adjustedTotalDrop,
+        maxOverallVelocity: safeNumber(highestOverallVelocity),
+        isSystemCompliant: systemIsCompliant,
+        sectionResults: results
+      };
+      
+      saveCalculation(inputs, calculationResults);
+      prepareExportData(inputs, calculationResults);
+    }
+    
   }, [ductSections, airDensity, kinematicViscosity, safetyFactor, ductLocation, spaceCriticality]);
   
   const addDuctSection = () => {
@@ -703,19 +737,15 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Air Duct Static Pressure Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Air Duct Static Pressure Calculator"
+      discipline="mvac"
+      calculatorType="ductStaticPressure"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -1450,7 +1480,9 @@ const DuctStaticPressureCalculator: React.FC<DuctStaticPressureCalculatorProps> 
           <li>All input values are validated and clamped to reasonable engineering ranges to prevent calculation errors.</li>
         </ul>
       </div>
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-
+import CalculatorWrapper from '../../components/CalculatorWrapper';
 // Projector lens types with throw ratios
 import { Icons } from '../../components/Icons';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Graphical Preview Components
 interface ProjectorVisualizationProps {
@@ -26,6 +27,7 @@ interface AudioVisualizationProps {
 }
 
 interface AudioVisualCalculatorProps {
+  onBack?: () => void;
   onShowTutorial?: () => void;
 }
 
@@ -499,24 +501,25 @@ const SPEAKER_PATTERNS = [
 ];
 
 // Main combined component
-const AudioVisualCalculator: React.FC<AudioVisualCalculatorProps> = ({ onShowTutorial }) => {
+const AudioVisualCalculator: React.FC<AudioVisualCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Audio Visual Calculator',
+    discipline: 'elv',
+    calculatorType: 'audio-visual'
+    
+  });
   const [activeTab, setActiveTab] = useState<'projector' | 'audio'>('projector');
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Audio Visual System Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
+    <CalculatorWrapper
+      title="Audio Visual Calculator"
+      discipline="elv"
+      calculatorType="audio-visual"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -548,6 +551,7 @@ const AudioVisualCalculator: React.FC<AudioVisualCalculatorProps> = ({ onShowTut
         <AudioCalculator onShowTutorial={onShowTutorial} />
       )}
     </div>
+    </CalculatorWrapper>
   );
 };
 
@@ -653,6 +657,8 @@ const ProjectorCalculator: React.FC<ProjectorCalculatorProps> = ({ onShowTutoria
     setIsViewingDistanceOptimal(viewingDistance >= minViewingDist && viewingDistance <= maxViewingDist);
 
     setCalculationPerformed(true);
+    
+    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
   }, [projectorLumens, lensType, customThrowRatio, screenWidth, screenHeight, lightingCondition, screenGain, 
       viewingDistance, ceilingHeight, projectorOffset, screenCenterHeight, roomLength, roomWidth]);
 
@@ -1220,6 +1226,8 @@ const AudioCalculator: React.FC<AudioCalculatorProps> = ({ onShowTutorial }) => 
     setIsCableLengthOK(cableLength <= maxCableLengthValue);
 
     setCalculationPerformed(true);
+    
+    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
   }, [roomLength, roomWidth, roomHeight, audienceCapacity, speakerPower, speakerSensitivity, 
       speakerPattern, numberOfSpeakers, targetSPL, headroom, backgroundNoise, 
       cableLength, cableType, signalLevel]);

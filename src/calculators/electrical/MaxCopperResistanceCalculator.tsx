@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Interface for component props
 interface MaxCopperResistanceCalculatorProps {
@@ -7,6 +9,13 @@ interface MaxCopperResistanceCalculatorProps {
 }
 
 const MaxCopperResistanceCalculator: React.FC<MaxCopperResistanceCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Max Copper Resistance Calculator',
+    discipline: 'electrical',
+    calculatorType: 'maxResistance'
+  });
+
   // Common inputs
   const [lineVoltage, setLineVoltage] = useState<number>(380);
   const [powerFactor, setPowerFactor] = useState<number>(0.9);
@@ -65,9 +74,39 @@ const MaxCopperResistanceCalculator: React.FC<MaxCopperResistanceCalculatorProps
     const activePower = Math.sqrt(3) * lineVoltage * i1 * powerFactor;
     const lossPercentage = (estimatedLoss / activePower) * 100;
     setCopperLossPercentage(lossPercentage);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Line Voltage': `${lineVoltage} V`,
+      'Power Factor': powerFactor,
+      'Design Current': `${designCurrent} A`,
+      'Cable Length': `${cableLength} m`,
+      'Max Loss Percentage': `${maxLossPercentage}%`,
+      'THD': `${thd}%`,
+      'Include Neutral': includeNeutral ? 'Yes' : 'No',
+      'Neutral Current Ratio': includeNeutral ? neutralCurrentRatio : 'N/A'
+    };
+    
+    const results = {
+      'Maximum Resistance': `${maxR.toFixed(4)} mΩ/m`,
+      'Fundamental Current': `${i1.toFixed(2)} A`,
+      'Neutral Current': includeNeutral ? `${nCurrent.toFixed(2)} A` : 'N/A',
+      'Estimated Copper Loss': `${estimatedLoss.toFixed(2)} W`,
+      'Copper Loss Percentage': `${lossPercentage.toFixed(2)}%`
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
   
   return (
+    <CalculatorWrapper
+      title="Maximum Copper Resistance Calculator"
+      discipline="electrical"
+      calculatorType="maxResistance"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Maximum Copper Resistance Calculator</h2>
@@ -364,6 +403,7 @@ const MaxCopperResistanceCalculator: React.FC<MaxCopperResistanceCalculatorProps
         </ul>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

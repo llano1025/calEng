@@ -18,6 +18,7 @@ interface DualNOHDResult {
 }
 
 const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
+
   const [power, setPower] = useState<number>(5);
   const [beamDiameter, setBeamDiameter] = useState<number>(2);
   const [beamDivergence, setBeamDivergence] = useState<number>(1);
@@ -193,14 +194,17 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
         maxNOHD = skinResult.nohd;
       }
 
-      setNohdResults({
+      const results = {
         eye: eyeResult,
         skin: skinResult,
         criticalNOHD: criticalNOHD,
         maxNOHD: maxNOHD
-      });
-
+      };
+      
+      setNohdResults(results);
       setCalculationPerformed(true);
+      
+      // Results calculated successfully
     } catch (error) {
       console.error('NOHD calculation error:', error);
       setNohdResults(null);
@@ -237,12 +241,8 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">NOHD Calculator - Eye & Skin</h2>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-medium text-lg mb-4">Laser Beam Parameters</h3>
@@ -624,8 +624,8 @@ const NOHDCalculator: React.FC<NOHDCalculatorProps> = ({ onShowTutorial }) => {
             </>
           )}
         </div>
+        </div>
       </div>
-    </div>
   );
 };
 

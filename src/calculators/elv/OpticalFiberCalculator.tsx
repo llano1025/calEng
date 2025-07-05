@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface OpticalFiberCalculatorProps {
   onShowTutorial?: () => void;
 }
 
 const OpticalFiberCalculator: React.FC<OpticalFiberCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Optical Fiber Power Budget Calculator',
+    discipline: 'elv',
+    calculatorType: 'opticalFiber'
+  });
   // Define fiber types and their attenuation rates
   const fiberTypes = [
     // Multi-mode fibers
@@ -121,7 +128,7 @@ const OpticalFiberCalculator: React.FC<OpticalFiberCalculatorProps> = ({ onShowT
     }
     
     // Set the calculation results
-    setOpticalLossResults({
+    const results = {
       connectorLoss: connectorLoss.toFixed(2),
       fiberLoss: fiberLoss.toFixed(2),
       spliceLoss: spliceLoss.toFixed(2),
@@ -135,22 +142,24 @@ const OpticalFiberCalculator: React.FC<OpticalFiberCalculatorProps> = ({ onShowT
       powerBudget: powerBudget.toFixed(2),
       powerMargin: powerMargin.toFixed(2),
       linkStatus
-    });
+    };
+    
+    setOpticalLossResults(results);
+    
+    // Save calculation and prepare export data
+    saveCalculation(opticalFiberInputs, results);
+    prepareExportData(opticalFiberInputs, results);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Optical Fiber Power Budget Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="flex items-center text-blue-600 hover:text-blue-800"
-          >
-            <Icons.InfoInline /> Tutorial
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Optical Fiber Power Budget Calculator"
+      discipline="elv"
+      calculatorType="opticalFiber"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
       <p className="mb-4 text-gray-600">
         Calculate power budget and signal loss in fiber optic transmission systems based on components and their attenuation.
       </p>
@@ -538,7 +547,8 @@ const OpticalFiberCalculator: React.FC<OpticalFiberCalculatorProps> = ({ onShowT
           SMF = Single-mode Fiber, DSF = Dispersion Shifted Fiber, NZDSF = Non-Zero Dispersion Shifted Fiber
         </p>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

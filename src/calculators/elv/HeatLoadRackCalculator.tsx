@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface HeatLoadRackCalculatorProps {
+  onBack?: () => void;
   onShowTutorial?: () => void;
 }
 
@@ -42,7 +45,13 @@ interface SystemTotals {
   coolingAirflowRequired: number;
 }
 
-const HeatLoadRackCalculator: React.FC<HeatLoadRackCalculatorProps> = ({ onShowTutorial }) => {
+const HeatLoadRackCalculator: React.FC<HeatLoadRackCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Heat Load Rack Calculator',
+    discipline: 'elv',
+    calculatorType: 'heat-load-rack'
+  });
   // State for system parameters (removed unused temperature states)
   const [numberOfRacks, setNumberOfRacks] = useState<number>(3);
   const [safetyFactor, setSafetyFactor] = useState<number>(1.2); // 20% safety factor
@@ -251,7 +260,37 @@ const HeatLoadRackCalculator: React.FC<HeatLoadRackCalculatorProps> = ({ onShowT
     });
     
     setCalculationPerformed(true);
-  }, [numberOfRacks, safetyFactor, powerEfficiencyFactor, coolingEfficiency, equipment]);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      numberOfRacks,
+      safetyFactor,
+      powerEfficiencyFactor,
+      coolingEfficiency,
+      equipment: equipment.map(item => ({
+        name: item.name,
+        powerDraw: item.powerDraw,
+        quantity: item.quantity,
+        utilizationFactor: item.utilizationFactor,
+        rackLocation: item.rackLocation
+      }))
+    };
+    
+    const results = {
+      totalPowerConsumption,
+      totalHeatGeneration,
+      coolingRequirement,
+      coolingPowerConsumption,
+      totalSystemPower: totalSystemPowerConsumption,
+      estimatedUPSCapacity,
+      powerDensityPerRack,
+      coolingAirflowRequired,
+      rackTotals: rackData
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
+  }, [numberOfRacks, safetyFactor, powerEfficiencyFactor, coolingEfficiency, equipment, saveCalculation, prepareExportData]);
 
   // Reset calculation with useCallback
   const resetCalculation = useCallback(() => {
@@ -278,20 +317,14 @@ const HeatLoadRackCalculator: React.FC<HeatLoadRackCalculatorProps> = ({ onShowT
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Heat Load / Rack Power Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
+    <CalculatorWrapper
+      title="Heat Load Rack Calculator"
+      discipline="elv"
+      calculatorType="heat-load-rack"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -711,6 +744,7 @@ const HeatLoadRackCalculator: React.FC<HeatLoadRackCalculatorProps> = ({ onShowT
         </div>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

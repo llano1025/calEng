@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface ImpedanceMatchingCalculatorProps {
+  onBack?: () => void;
   onShowTutorial?: () => void;
 }
 
@@ -78,25 +81,24 @@ interface Matrix2x2 {
 
 // ======================== MAIN COMPONENT ========================
 
-const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = ({ onShowTutorial }) => {
+const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = ({ onBack, onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Impedance Matching Calculator',
+    discipline: 'elv',
+    calculatorType: 'impedance-matching'
+  });
   // State for the active tab
   const [activeTab, setActiveTab] = useState<'impedance' | 'microstrip' | 'parameters'>('impedance');
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">RF Impedance Matching Calculators</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
+    <CalculatorWrapper
+      title="Impedance Matching Calculator"
+      discipline="elv"
+      calculatorType="impedance-matching"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -132,10 +134,10 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
       </div>
       
       {/* Content Based on Active Tab */}
-      {activeTab === 'impedance' && <ImpedanceMatchingSubCalculator onShowTutorial={onShowTutorial} />}
+      {activeTab === 'impedance' && <ImpedanceMatchingSubCalculator onShowTutorial={onShowTutorial} saveCalculation={saveCalculation} prepareExportData={prepareExportData} />}
       {activeTab === 'microstrip' && <MicrostripSubCalculator onShowTutorial={onShowTutorial} />}
       {activeTab === 'parameters' && <ParameterConverterSubCalculator onShowTutorial={onShowTutorial} />}
-    </div>
+    </CalculatorWrapper>
   );
 };
 
@@ -143,9 +145,11 @@ const ImpedanceMatchingCalculator: React.FC<ImpedanceMatchingCalculatorProps> = 
 
 interface ImpedanceMatchingSubCalculatorProps {
   onShowTutorial?: () => void;
+  saveCalculation?: (inputs: Record<string, any>, results: Record<string, any>, notes?: string) => void;
+  prepareExportData?: (inputs: Record<string, any>, results: Record<string, any>, projectName?: string) => void;
 }
 
-const ImpedanceMatchingSubCalculator: React.FC<ImpedanceMatchingSubCalculatorProps> = ({ onShowTutorial }) => {
+const ImpedanceMatchingSubCalculator: React.FC<ImpedanceMatchingSubCalculatorProps> = ({ onShowTutorial, saveCalculation, prepareExportData }) => {
   // Reference constants
   const Z0 = 50; // Standard characteristic impedance (ohms)
   

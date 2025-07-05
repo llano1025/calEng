@@ -16,8 +16,6 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
     switch (calculatorType) {
       case 'elevator_traffic':
         return <div className="p-6 text-center text-gray-500">Elevator Traffic Analysis - Coming Soon</div>;
-      case 'escalator_capacity':
-        return <div className="p-6 text-center text-gray-500">Escalator Capacity Calculator - Coming Soon</div>;
       case 'lift_power':
         return <div className="p-6 text-center text-gray-500">Lift Power Calculation - Coming Soon</div>;
       case 'shaft_sizing':
@@ -30,13 +28,6 @@ const VerticalTransportationCalculator: React.FC<VerticalTransportationCalculato
   // Main return for VerticalTransportationCalculator
   return (
     <div className="animate-fade-in">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="mb-6 inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-      >
-        <Icons.ArrowLeft /> Back to Disciplines
-      </button>
 
       {/* Title specific to this discipline */}
       <h1 className="text-2xl font-bold text-center mb-6 text-blue-700">

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface MicrostripCalculatorProps {
   onShowTutorial?: () => void;
@@ -68,6 +70,13 @@ const calculateMicrostripCoreParams = (
 
 // Main calculator component
 const MicrostripCalculator: React.FC<MicrostripCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'RF Microstrip Line Calculator',
+    discipline: 'elv',
+    calculatorType: 'microstrip'
+  });
+
   // Substrate parameters
   const [substrateHeight, setSubstrateHeight] = useState<number>(1.6); // mm
   const [substrateThickness, setSubstrateThickness] = useState<number>(0.035); // mm (copper thickness)
@@ -342,7 +351,7 @@ const MicrostripCalculator: React.FC<MicrostripCalculatorProps> = ({ onShowTutor
       calculatedLength_val = wavelength_mm / 4;
     }
     
-    setResults({
+    const calculatedResults = {
       impedance: Z0_final,
       effectiveDielectricConstant: er_eff_final,
       wavelength: wavelength_mm,
@@ -354,23 +363,40 @@ const MicrostripCalculator: React.FC<MicrostripCalculatorProps> = ({ onShowTutor
       propagationDelay: propagation_delay_ns,
       calculatedWidth: calculatedWidth_val,
       calculatedLength: calculatedLength_val
-    });
+    };
+    
+    setResults(calculatedResults);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      substrateHeight,
+      substrateThickness,
+      selectedMaterialId,
+      customDielectricConstant,
+      customLossTangent,
+      useCustomMaterial,
+      calculationMode,
+      frequency,
+      targetImpedance,
+      stripWidth,
+      stripLength,
+      temperature,
+      roughness
+    };
+    
+    saveCalculation(inputs, calculatedResults);
+    prepareExportData(inputs, calculatedResults);
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">RF Microstrip Line Calculator</h2>
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="RF Microstrip Line Calculator"
+      discipline="elv"
+      calculatorType="microstrip"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -774,7 +800,8 @@ const MicrostripCalculator: React.FC<MicrostripCalculatorProps> = ({ onShowTutor
           <li>The accuracy of the results depends on the accuracy of the input parameters (especially substrate properties like εr and tanδ, which can vary with frequency and manufacturing tolerances).</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

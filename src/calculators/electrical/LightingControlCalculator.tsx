@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Interface for the merged component props
 interface LightingControlCalculatorProps {
@@ -37,6 +39,13 @@ const MAX_ALLOWABLE_LPD = 7.8; // W/m²
 
 // The merged component that has both calculators
 const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Lighting Control Calculator',
+    discipline: 'electrical',
+    calculatorType: 'lightingControl'
+  });
+
   // State to track which calculator is active
   const [activeCalculator, setActiveCalculator] = useState<'control' | 'lpd'>('control');
 
@@ -99,12 +108,31 @@ const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = ({ o
       : baseControlPoints;
     
     // Set calculation results
-    setResults({
+    const calculationResults = {
       baseControlPoints,
       reductionRatio,
       finalControlPoints,
       isReductionApplicable
-    });
+    };
+    setResults(calculationResults);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Office Area': `${area} m²`,
+      'Actual LPD': `${lpd} W/m²`,
+      'Maximum Allowable LPD': `${MAX_ALLOWABLE_LPD} W/m²`
+    };
+    
+    const exportResults = {
+      'Base Control Points': baseControlPoints,
+      'Reduction Applicable': isReductionApplicable ? 'Yes' : 'No',
+      'Reduction Ratio': `${(reductionRatio * 100).toFixed(1)}%`,
+      'Final Control Points': finalControlPoints,
+      'LPD Compliance': lpd <= MAX_ALLOWABLE_LPD ? 'Compliant' : 'Non-compliant'
+    };
+    
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   };
 
   // ======== LIGHTING POWER DENSITY CALCULATOR STATE AND FUNCTIONS ========
@@ -757,21 +785,14 @@ const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = ({ o
 
   // Main return for LightingControlCalculator
   return (
+    <CalculatorWrapper
+      title="Lighting Calculator"
+      discipline="electrical"
+      calculatorType="lightingControl"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Lighting Calculator</h2>
-        
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-      
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -1327,6 +1348,7 @@ const LightingControlCalculator: React.FC<LightingControlCalculatorProps> = ({ o
         </div>
       )}
     </div>
+    </CalculatorWrapper>
   );
 };
 

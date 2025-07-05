@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Type definitions
 type ContainmentType = 'conduit' | 'trunking';
@@ -21,6 +23,13 @@ interface CableContainmentCalculatorProps {
 }
 
 const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Cable Containment Calculator',
+    discipline: 'electrical',
+    calculatorType: 'cableContainment'
+  });
+
   // State for the active tab
   const [activeTab, setActiveTab] = useState<string>('conduitTable');
   
@@ -228,6 +237,27 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
     // Check compliance: containment factor should be >= total cable factor
     setIsCompliant(factor >= totalFactor);
     setIsCalculated(true);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      containmentType: 'conduit',
+      calculationMethod: 'table',
+      conduitDiameter,
+      conduitLength,
+      customConduitLength,
+      numberOfBends,
+      cables
+    };
+    
+    const results = {
+      totalCableFactor,
+      containmentFactor: factor,
+      isCompliant: factor >= totalFactor,
+      complianceStatus: factor >= totalFactor ? 'Compliant' : 'Non-compliant'
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Calculate compliance for conduit using space factor method
@@ -257,6 +287,25 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
     // Check compliance: space factor should be <= 45%
     setIsCompliant(spaceFactor <= 45);
     setIsCalculated(true);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      containmentType: 'conduit',
+      calculationMethod: 'spaceFactor',
+      conduitDiameter,
+      cables
+    };
+    
+    const results = {
+      totalCableArea,
+      conduitArea: containmentArea,
+      spaceFactorPercentage: spaceFactor,
+      isCompliant: spaceFactor <= 45,
+      complianceStatus: spaceFactor <= 45 ? 'Compliant' : 'Non-compliant'
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Calculate compliance for trunking using table method
@@ -285,6 +334,24 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
     // Check compliance: containment factor should be >= total cable factor
     setIsCompliant(factor >= totalFactor);
     setIsCalculated(true);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      containmentType: 'trunking',
+      calculationMethod: 'table',
+      trunkingSize,
+      cables
+    };
+    
+    const results = {
+      totalCableFactor,
+      containmentFactor: factor,
+      isCompliant: factor >= totalFactor,
+      complianceStatus: factor >= totalFactor ? 'Compliant' : 'Non-compliant'
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Calculate compliance for trunking using space factor method
@@ -321,6 +388,25 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
     // Check compliance: space factor should be <= 45%
     setIsCompliant(spaceFactor <= 45);
     setIsCalculated(true);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      containmentType: 'trunking',
+      calculationMethod: 'spaceFactor',
+      trunkingSize,
+      cables
+    };
+    
+    const results = {
+      totalCableArea,
+      trunkingArea: containmentArea,
+      spaceFactorPercentage: spaceFactor,
+      isCompliant: spaceFactor <= 45,
+      complianceStatus: spaceFactor <= 45 ? 'Compliant' : 'Non-compliant'
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Main calculation function
@@ -364,20 +450,14 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
   const isTableMethod = activeTab === 'conduitTable' || activeTab === 'trunkingTable';
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Cable Containment Calculator</h2>
-        
-        {onShowTutorial && (
-          <button 
-            onClick={onShowTutorial} 
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
+    <CalculatorWrapper
+      title="Cable Containment Calculator"
+      discipline="electrical"
+      calculatorType="cableContainment"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6 p-6">{/* Remove the outer div styling since it's handled by CalculatorWrapper */}
         
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
@@ -1281,7 +1361,8 @@ const CableContainmentCalculator: React.FC<CableContainmentCalculatorProps> = ({
           <li>Always ensure proper cable support and appropriate bending radii during installation.</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

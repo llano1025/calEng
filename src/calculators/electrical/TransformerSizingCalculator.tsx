@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface TransformerSizingCalculatorProps {
   onShowTutorial?: () => void;
@@ -110,6 +112,13 @@ interface LoadDetail {
 }
 
 const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Transformer Sizing Calculator',
+    discipline: 'electrical',
+    calculatorType: 'transformer'
+  });
+
   // State for transformers
   const [transformers, setTransformers] = useState<Transformer[]>([
     {
@@ -472,6 +481,41 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
     });
 
     setTransformerResults(results);
+    
+    // Save calculation and prepare export data for transformer sizing
+    const inputs = {
+      'Number of Transformers': transformers.length,
+      'Number of Loads': loads.length,
+      'Transformer Configurations': transformers.map(t => ({
+        'Name': t.name,
+        'Rating': `${t.rating} kVA`,
+        'Primary Voltage': `${t.primaryVoltage} V`,
+        'Secondary Voltage': `${t.secondaryVoltage} V`,
+        'Type': t.type,
+        'Installation': t.installation
+      }))
+    };
+    
+    const exportResults = Object.fromEntries(
+      transformers.map(transformer => {
+        const result = results[transformer.id];
+        if (result) {
+          return [`${transformer.name} Results`, {
+            'Total Active Power': `${result.totalActivePower.toFixed(1)} kW`,
+            'Total Apparent Power': `${result.totalApparentPower.toFixed(1)} kVA`,
+            'Utilization': `${result.utilizationPercentage.toFixed(1)}%`,
+            'Power Factor': result.powerFactor.toFixed(2),
+            'Secondary Voltage Drop': `${result.secondaryVoltageDropAtFullLoad.toFixed(2)}%`,
+            'Overall Derating Factor': result.overallDeratingFactor.toFixed(3),
+            'Assigned Loads': result.loadDetails.length
+          }];
+        }
+        return [`${transformer.name} Results`, 'No data'];
+      })
+    );
+    
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   }, [transformers, loads]);
 
   // Function to add a new transformer
@@ -627,9 +671,15 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
   };
 
   return (
+    <CalculatorWrapper
+      title="Transformer Sizing Calculator"
+      discipline="electrical"
+      calculatorType="transformerSizing"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Transformer Sizing Calculator</h2>
         <div className="flex items-center space-x-2">
           <label
             htmlFor="import-electrical-data"
@@ -644,15 +694,6 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
             onChange={handleImportData}
             className="hidden"
           />
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
-            </button>
-          )}
         </div>
       </div>
 
@@ -1371,6 +1412,7 @@ const TransformerSizingCalculator: React.FC<TransformerSizingCalculatorProps> = 
         </ul>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

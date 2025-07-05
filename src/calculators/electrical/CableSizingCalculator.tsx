@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
 import { copTables, VoltageDropTable } from '../../data/cop_tables';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define TypeScript interfaces for our data structures
 interface TableLookupDetails {
@@ -53,6 +55,13 @@ interface CableSizingCalculatorProps {
 
 // Cable Sizing Calculator Component
 const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Cable Sizing Calculator',
+    discipline: 'electrical',
+    calculatorType: 'cableSizing'
+  });
+
   // State for table modal
   const [showTableModal, setShowTableModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState<any>(null);
@@ -980,6 +989,35 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
 
     // Calculate protective conductor now that we have the phase conductor size
     calculateProtectiveConductor(finalCableSize);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      ...cableSizingInputs,
+      protectiveConductor: protectiveConductorInputs
+    };
+    
+    const results = {
+      cableSizing: {
+        requiredCCC: minimumCCC,
+        temperatureFactor,
+        groupingFactor,
+        recommendedCableSize: {
+          forCurrentCapacity: cableSizeForCCC,
+          forVoltageDrop: cableSizeForVoltageDrop,
+          final: finalCableSize
+        },
+        selectedCableCurrentCapacity,
+        actualCurrentCapacityWithFactors,
+        voltageDropV,
+        voltageDropPercent,
+        voltageDropStatus,
+        systemType: systemType,
+        tableDetails: tableDetails
+      }
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Calculate protective conductor size based on the phase conductor
@@ -1228,24 +1266,21 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
   const availableConfigurations = getAvailableConfigurations();
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Cable Sizing Calculator (CoP Appendix 6)</h2>
-        <div className="space-x-2 flex">
-          <button onClick={() => showTableData()} className="text-blue-600 hover:text-blue-800 text-sm flex items-center">
-            <Icons.Table/> View Tables
-          </button>
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
+    <CalculatorWrapper
+      title="Cable Sizing Calculator"
+      discipline="electrical"
+      calculatorType="cableSizing"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6 p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div className="space-x-2 flex">
+            <button onClick={() => showTableData()} className="text-blue-600 hover:text-blue-800 text-sm flex items-center">
+              <Icons.Table/> View Tables
             </button>
-          )}
+          </div>
         </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -1774,7 +1809,8 @@ const CableSizingCalculator: React.FC<CableSizingCalculatorProps> = ({ onShowTut
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

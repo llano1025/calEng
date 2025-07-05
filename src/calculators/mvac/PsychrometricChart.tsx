@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 interface PsychrometricChartProps {
   onShowTutorial?: () => void;
@@ -111,6 +113,13 @@ const POINT_COLORS = [
 ];
 
 const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial, onBack }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Psychrometric Chart & Air Property Calculator',
+    discipline: 'mvac',
+    calculatorType: 'psychrometricChart'
+  });
+
   // State for altitude (affects pressure)
   const [altitude, setAltitude] = useState<number>(0); // meters above sea level
   const [barometricPressure, setBarometricPressure] = useState<number>(STANDARD_PRESSURE); // kPa
@@ -204,6 +213,29 @@ const PsychrometricChart: React.FC<PsychrometricChartProps> = ({ onShowTutorial,
     // Calculate energy changes for processes
     if (updatedPoints.length > 0) {
       calculateProcessProperties(updatedPoints);
+      
+      // Save calculation and prepare export data
+      const inputs = {
+        altitude,
+        barometricPressure,
+        unitSystem,
+        pointInputs: points.map(p => ({
+          id: p.id,
+          name: p.name,
+          parameterOne: p.parameterOne,
+          parameterTwo: p.parameterTwo,
+          inputValue1: p[p.parameterOne],
+          inputValue2: p[p.parameterTwo]
+        }))
+      };
+      
+      const calculationResults = {
+        calculatedPoints: updatedPoints,
+        processes: processes
+      };
+      
+      saveCalculation(inputs, calculationResults);
+      prepareExportData(inputs, calculationResults);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points.map(p => `${p.id}-${p.parameterOne}-${p[p.parameterOne]}-${p.parameterTwo}-${p[p.parameterTwo]}`).join(','), barometricPressure]);
@@ -1427,36 +1459,26 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Psychrometric Chart & Air Property Calculator</h2>
-        <div className="flex space-x-4 items-center">
-          <button 
-            onClick={() => setIsChartExpanded(true)} 
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm flex items-center"
-          >
-            <Icons.Table />
-            <span className="ml-2">Show Chart</span>
-          </button>
-          {onShowTutorial && (
-            <button 
-              onClick={onShowTutorial} 
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            >
-              <span className="mr-1">Tutorial</span>
-              <Icons.InfoInline />
-            </button>
-          )}
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-            >
-              <Icons.ArrowLeft /> Back to Disciplines
-            </button>
-          )}
-        </div>
-      </div>
+    <CalculatorWrapper
+      title="Psychrometric Chart & Air Property Calculator"
+      discipline="mvac"
+      calculatorType="psychrometricChart"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 font-sans">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex space-x-4 items-center">
+              <button 
+                onClick={() => setIsChartExpanded(true)} 
+                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm flex items-center"
+              >
+                <Icons.Table />
+                <span className="ml-2">Show Chart</span>
+              </button>
+            </div>
+          </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
         {/* Chart Controls and Input Section */}
@@ -2137,7 +2159,9 @@ const calculateSaturationHumidityRatio = (temp: number, pressure: number): numbe
           <li>Volumetric flow rate (L/s) is converted to mass flow rate (kg/s) using: ṁ = V̇ ÷ v, where V̇ is in m³/s and v is specific volume in m³/kg.</li>
         </ul>
       </div>
-    </div>
+        </div>
+      </div>
+    </CalculatorWrapper>
   );
 };
 

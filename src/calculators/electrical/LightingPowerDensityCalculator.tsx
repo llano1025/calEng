@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Define props type for the component
 interface LightingPowerDensityCalculatorProps {
@@ -34,6 +36,13 @@ interface Space {
 
 // LPD Calculator Component
 const LightingPowerDensityCalculator: React.FC<LightingPowerDensityCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Lighting Power Density Calculator',
+    discipline: 'electrical',
+    calculatorType: 'lpd'
+  });
+
   // State for managing luminaires
   const [luminaires, setLuminaires] = useState<Luminaire[]>([
   ]);
@@ -673,6 +682,33 @@ const LightingPowerDensityCalculator: React.FC<LightingPowerDensityCalculatorPro
     });
     
     setCalculationResults(results);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Number of Spaces': spaces.length,
+      'Number of Luminaire Types': luminaires.length,
+      'Total Area': `${spaces.reduce((sum, space) => sum + space.area, 0)} m²`
+    };
+    
+    const exportResults = {
+      'Space Results': Object.fromEntries(
+        spaces.map(space => {
+          const result = results[space.id];
+          return [space.name, {
+            'Area': `${space.area} m²`,
+            'Total Wattage': `${result.totalWattage} W`,
+            'LPD': `${result.lpd.toFixed(2)} W/m²`,
+            'Max Allowable LPD': `${result.maxAllowableLpd} W/m²`,
+            'Compliance': result.compliant ? 'Compliant' : 'Non-compliant',
+            'Control Required': result.controlRequired ? 'Yes' : 'No'
+          }];
+        })
+      ),
+      'Overall Compliance': Object.values(results).every(r => r.compliant) ? 'All spaces compliant' : 'Some spaces non-compliant'
+    };
+    
+    saveCalculation(inputs, exportResults);
+    prepareExportData(inputs, exportResults);
   };
 
   // Effect to calculate LPD when spaces or luminaires change
@@ -683,6 +719,13 @@ const LightingPowerDensityCalculator: React.FC<LightingPowerDensityCalculatorPro
   }, [spaces, luminaires]);
 
   return (
+    <CalculatorWrapper
+      title="Lighting Power Density Calculator"
+      discipline="electrical"
+      calculatorType="lpd"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Lighting Power Density (LPD) Calculator</h2>
@@ -1040,6 +1083,7 @@ const LightingPowerDensityCalculator: React.FC<LightingPowerDensityCalculatorPro
         </div>
       </div>
     </div>
+    </CalculatorWrapper>
   );
 };
 

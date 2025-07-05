@@ -31,13 +31,6 @@ const FireServicesCalculator: React.FC<FireServicesCalculatorProps> = ({ onBack 
   // Main return for FireServicesCalculator
   return (
     <div className="animate-fade-in">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="mb-6 inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-      >
-        <Icons.ArrowLeft /> Back to Disciplines
-      </button>
 
       {/* Title specific to this discipline */}
       <h1 className="text-2xl font-bold text-center mb-6 text-blue-700">

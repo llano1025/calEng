@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import CalculatorWrapper from '../../components/CalculatorWrapper';
+import { useCalculatorActions } from '../../hooks/useCalculatorActions';
 
 // Interface for the component props
 interface CopperLossCalculatorProps {
@@ -72,6 +74,13 @@ interface CalculationDetail {
 }
 
 const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutorial }) => {
+  // Calculator actions hook
+  const { exportData, saveCalculation, prepareExportData } = useCalculatorActions({
+    title: 'Copper Loss Calculator',
+    discipline: 'electrical',
+    calculatorType: 'copperLoss'
+  });
+
   // State to track which calculator is active
   const [activeCalculator, setActiveCalculator] = useState<'loss' | 'resistance'>('loss');
 
@@ -838,7 +847,38 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
     const maxAllowedPercentage = getMaxAllowablePercentage(circuitType);
     
     // Check compliance
-    setIsCompliant(lossPercentage <= maxAllowedPercentage);
+    const compliant = lossPercentage <= maxAllowedPercentage;
+    setIsCompliant(compliant);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Circuit Type': circuitType,
+      'Common Portion': {
+        'Fundamental Current': `${commonPortion.fundamentalCurrent} A`,
+        'THD': `${commonPortion.thd}%`,
+        'Design Current': `${commonPortion.designCurrent} A`,
+        'Cable Type': commonPortion.cableType.toUpperCase(),
+        'Cable Configuration': commonPortion.cableConfig,
+        'Cable Size': `${commonPortion.cableSize} mm²`,
+        'Length': `${commonPortion.length} m`,
+        'Power Factor': commonPortion.powerFactor,
+        'Resistance': `${commonPortion.resistance} mΩ/m`
+      },
+      'Branch Portions': branchPortions.length,
+      'Diversity Factor': calculatedDiversityFactor || 'N/A'
+    };
+    
+    const results = {
+      'Total Copper Loss': `${totalLoss.toFixed(2)} W`,
+      'Copper Loss Percentage': `${lossPercentage.toFixed(2)}%`,
+      'Total Active Power': `${totalActivePower.toFixed(2)} W`,
+      'Maximum Allowable Loss': `${maxAllowedPercentage}%`,
+      'Compliance Status': compliant ? 'PASS' : 'FAIL',
+      'Calculation Details': details
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
   
   // Reset results when circuit type changes
@@ -921,6 +961,29 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
     const activePower = Math.sqrt(3) * mrLineVoltage * i1 * mrPowerFactor;
     const lossPercentage = (estimatedLoss / activePower) * 100;
     setMrCopperLossPercentage(lossPercentage);
+    
+    // Save calculation and prepare export data
+    const inputs = {
+      'Line Voltage': `${mrLineVoltage} V`,
+      'Power Factor': mrPowerFactor,
+      'Design Current': `${mrDesignCurrent} A`,
+      'Cable Length': `${mrCableLength} m`,
+      'Max Loss Percentage': `${mrMaxLossPercentage}%`,
+      'THD': `${mrThd}%`,
+      'Include Neutral': mrIncludeNeutral ? 'Yes' : 'No',
+      'Neutral Current Ratio': mrIncludeNeutral ? mrNeutralCurrentRatio : 'N/A'
+    };
+    
+    const results = {
+      'Maximum Resistance': `${maxR.toFixed(4)} mΩ/m`,
+      'Fundamental Current': `${i1.toFixed(2)} A`,
+      'Neutral Current': mrIncludeNeutral ? `${nCurrent.toFixed(2)} A` : 'N/A',
+      'Estimated Copper Loss': `${estimatedLoss.toFixed(2)} W`,
+      'Copper Loss Percentage': `${lossPercentage.toFixed(2)}%`
+    };
+    
+    saveCalculation(inputs, results);
+    prepareExportData(inputs, results);
   };
 
   // Reset fields when changing calculator
@@ -943,21 +1006,14 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
 
   // Main render method
   return (
+    <CalculatorWrapper
+      title="Copper Loss Calculator"
+      discipline="electrical"
+      calculatorType="copperLoss"
+      onShowTutorial={onShowTutorial}
+      exportData={exportData}
+    >
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Copper Loss Calculator</h2>
-        
-        {onShowTutorial && (
-          <button
-            onClick={onShowTutorial}
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-          >
-            <span className="mr-1">Tutorial</span>
-            <Icons.InfoInline />
-          </button>
-        )}
-      </div>
-
       {/* Tab Selector */}
       <div className="flex border-b mb-6">
         <button
@@ -1894,6 +1950,7 @@ const CopperLossCalculator: React.FC<CopperLossCalculatorProps> = ({ onShowTutor
         </>
       )}
     </div>
+    </CalculatorWrapper>
   );
 };
 

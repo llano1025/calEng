@@ -13,6 +13,7 @@ interface ProtectiveEyewearProps {
 }
 
 const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowTutorial }) => {
+
   const [power, setPower] = useState<number>(1000);
   const [wavelength, setWavelength] = useState<number>(1064);
   const [beamDiameter, setBeamDiameter] = useState<number>(5);
@@ -230,7 +231,7 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
         recommendations.push("High OD requirement may significantly reduce visibility. Ensure adequate illumination and consider beam path modification.");
       }
 
-      setEyewearResults({
+      const results = {
         requiredOD: Math.max(0, requiredOD),
         exposureLevel,
         mpe: mpeValue,
@@ -238,9 +239,12 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
         lbRating: en207Marking,
         dirRating: dirRating,
         recommendations
-      });
-
+      };
+      
+      setEyewearResults(results);
       setCalculationPerformed(true);
+      
+      // Results calculated successfully
     } catch (error) {
       console.error('Eyewear calculation error:', error);
       setEyewearResults(null);
@@ -264,12 +268,8 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Protective Eyewear Calculator</h2>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input Section */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-medium text-lg mb-4">Laser Parameters for Eyewear Calculation</h3>
@@ -608,8 +608,8 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
             </p>
           </div> */}
         </div>
+        </div>
       </div>
-    </div>
   );
 };
 

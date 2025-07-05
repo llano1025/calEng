@@ -4,6 +4,12 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Breadcrumb from './components/Breadcrumb';
 import Sidebar from './components/Sidebar';
+import CalculationHistory from './components/CalculationHistory';
+import Favorites from './components/FavoritesManager';
+import ExportResults from './components/ExportResults';
+import { ExportData } from './utils/exportResults';
+import CalculationHistoryManager, { CalculationEntry } from './utils/calculationHistory';
+import { FavoritesManager } from './components/FavoritesManager';
 import DisciplineSelection from './components/DisciplineSelection'; // Import selection component
 import GenericCalculator from './calculators/GenericCalculator'; // Import generic calc
 import BroadcastReceptionCalculator from './calculators/ELVCalculator'; // Import specific calc
@@ -25,6 +31,11 @@ function AppContent() {
     const [activeDiscipline, setActiveDiscipline] = useState<string | null>(null);
     // State to control sidebar visibility
     const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+    // State to control modal visibility
+    const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+    const [isFavoritesOpen, setIsFavoritesOpen] = useState<boolean>(false);
+    const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+    const [exportData, setExportData] = useState<ExportData | null>(null);
 
     // Handler to switch view to the calculator for a specific discipline
     const handleSelectDiscipline = (disciplineKey: string) => {
@@ -46,6 +57,40 @@ function AppContent() {
     // Handler to close sidebar
     const handleCloseSidebar = () => {
         setIsSidebarOpen(false);
+    };
+
+    // Handler to show/hide modals
+    const handleShowHistory = () => {
+        setIsHistoryOpen(true);
+    };
+
+    const handleShowFavorites = () => {
+        setIsFavoritesOpen(true);
+    };
+
+    const handleShowExport = (data: ExportData) => {
+        setExportData(data);
+        setIsExportOpen(true);
+    };
+
+    // Handler to load calculation from history
+    const handleLoadCalculation = (calculation: CalculationEntry) => {
+        // Navigate to the appropriate calculator
+        setActiveDiscipline(calculation.discipline);
+        setCurrentView('calculator');
+        
+        // TODO: Pass the calculation data to the calculator component
+        // This would require updating each calculator to accept initial data
+        console.log('Loading calculation:', calculation);
+    };
+
+    // Handler to select calculator from favorites
+    const handleSelectFromFavorites = (discipline: string, calculatorType: string) => {
+        setActiveDiscipline(discipline);
+        setCurrentView('calculator');
+        
+        // Update usage statistics
+        FavoritesManager.updateLastUsed(discipline, calculatorType);
     };
 
     // Use memoized data to avoid redefining on every render (optional but good practice)
@@ -74,6 +119,8 @@ function AppContent() {
                 activeDiscipline={activeDiscipline}
                 onBackToHome={currentView === 'calculator' ? handleBackToHome : undefined}
                 onToggleSidebar={handleToggleSidebar}
+                onShowHistory={handleShowHistory}
+                onShowFavorites={handleShowFavorites}
             />
 
             {/* Layout with Sidebar */}
@@ -175,6 +222,28 @@ function AppContent() {
                     </div>
                 </main>
             </div>
+
+            {/* Modal Components */}
+            <CalculationHistory
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                onLoadCalculation={handleLoadCalculation}
+                discipline={activeDiscipline || undefined}
+            />
+
+            <Favorites
+                isOpen={isFavoritesOpen}
+                onClose={() => setIsFavoritesOpen(false)}
+                onSelectCalculator={handleSelectFromFavorites}
+            />
+
+            {exportData && (
+                <ExportResults
+                    data={exportData}
+                    isOpen={isExportOpen}
+                    onClose={() => setIsExportOpen(false)}
+                />
+            )}
         </div>
     );
 }
