@@ -56,7 +56,7 @@ const UPSCalculator: React.FC<UPSCalculatorProps> = ({ onShowTutorial }) => {
     batteryVoltage: '12', // in volts
     batteryString: '1',
     batteryPerString: '34',
-    agingFactor: '1.15',
+    agingFactor: '1.25',
     
     // Ventilation
     batteryType: 'lead_acid_vrla' as BatteryType,

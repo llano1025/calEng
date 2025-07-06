@@ -45,7 +45,7 @@ const ElectricalCalculator: React.FC<ElectricalCalculatorProps> = ({ onBack }) =
       case 'circuitProtection':
         return <CircuitProtectionCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'lightingControl':
-        return <LightingControlCalculator />;
+        return <LightingControlCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'lpd':
         return <LightingPowerDensityCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'loadBalancing':
