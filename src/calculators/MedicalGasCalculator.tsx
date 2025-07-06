@@ -188,7 +188,7 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
               <Icons.Calculator className={`${calculatorType === 'agss' ? 'text-white' : 'text-green-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Anaesthetic gas scavenging systems</h3>
+              <h3 className="font-semibold text-sm sm:text-base">Anaesthetic Gas Scavenging Systems</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'agss' ? 'text-green-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate Anaesthetic gas scavenging system
               </p>
