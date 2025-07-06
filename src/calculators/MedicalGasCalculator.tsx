@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
 import MedicalGasPressureDropCalculator from './mgps/MedicalGasPressureDropCalculator';
 import OxygenFlowCalculator from './mgps/OxygenFlowCalculator';
+import NitrousOxideFlowCalculator from './mgps/NitrousOxideFlowCalculator';
+import MedicalAirFlowCalculator from './mgps/MedicalAirFlowCalculator';
+import SurgicalAirFlowCalculator from './mgps/SurgicalAirFlowCalculator';
+import VacuumFlowCalculator from './mgps/VacuumFlowCalculator';
 
 // Define props type for the component
 interface MedicalGasCalculatorProps {
@@ -21,12 +25,14 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
         return <MedicalGasPressureDropCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'oxygen_system':
         return <OxygenFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
-      case 'compressed_air':
-        return <div className="p-6 text-center text-gray-500">Compressed Air Calculator - Coming Soon</div>;
+      case 'medical_air':
+        return <MedicalAirFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'surgical_air':
+        return <SurgicalAirFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'vacuum_system':
-        return <div className="p-6 text-center text-gray-500">Vacuum System Calculator - Coming Soon</div>;
+        return <VacuumFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'nitrous_oxide':
-        return <div className="p-6 text-center text-gray-500">Nitrous Oxide Calculator - Coming Soon</div>;
+        return <NitrousOxideFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -89,19 +95,39 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
           {/* Compressed Air */}
           <button
             className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
-              calculatorType === 'compressed_air'
+              calculatorType === 'medical_air'
                 ? 'bg-green-600 text-white ring-2 ring-green-400 ring-offset-1'
                 : 'bg-green-50 hover:bg-green-100 border-green-100'
             }`}
-            onClick={() => setCalculatorType('compressed_air')}
+            onClick={() => setCalculatorType('medical_air')}
           >
             <div className="flex-shrink-0 pt-1">
-              <Icons.Calculator className={`${calculatorType === 'compressed_air' ? 'text-white' : 'text-green-500'}`} />
+              <Icons.Calculator className={`${calculatorType === 'medical_air' ? 'text-white' : 'text-green-500'}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Compressed Air</h3>
-              <p className={`text-xs sm:text-sm ${calculatorType === 'compressed_air' ? 'text-green-100' : 'text-gray-600'}`}>
+              <h3 className="font-semibold text-sm sm:text-base">Medical Air</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'medical_air' ? 'text-green-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate medical compressed air requirements
+              </p>
+            </div>
+          </button>
+
+          {/* Surgical Air */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'surgical_air'
+                ? 'bg-green-600 text-white ring-2 ring-green-400 ring-offset-1'
+                : 'bg-green-50 hover:bg-green-100 border-green-100'
+            }`}
+            onClick={() => setCalculatorType('surgical_air')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'surgical_air' ? 'text-white' : 'text-green-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Surgical Air</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'surgical_air' ? 'text-green-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate surgical compressed air requirements
               </p>
             </div>
           </button>
