@@ -6,6 +6,7 @@ import NitrousOxideFlowCalculator from './mgps/NitrousOxideFlowCalculator';
 import MedicalAirFlowCalculator from './mgps/MedicalAirFlowCalculator';
 import SurgicalAirFlowCalculator from './mgps/SurgicalAirFlowCalculator';
 import VacuumFlowCalculator from './mgps/VacuumFlowCalculator';
+import AGSSFlowCalculator from './mgps/AGSSFlowCalculator';
 
 // Define props type for the component
 interface MedicalGasCalculatorProps {
@@ -33,6 +34,8 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
         return <VacuumFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'nitrous_oxide':
         return <NitrousOxideFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
+      case 'agss':
+        return <AGSSFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       default:
         return null;
     }
@@ -168,6 +171,26 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
               <h3 className="font-semibold text-sm sm:text-base">Nitrous Oxide</h3>
               <p className={`text-xs sm:text-sm ${calculatorType === 'nitrous_oxide' ? 'text-green-100' : 'text-gray-600'}`}>
                 <Icons.InfoInline /> Calculate N2O distribution systems
+              </p>
+            </div>
+          </button>
+
+          {/* AGSS */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'agss'
+                ? 'bg-green-600 text-white ring-2 ring-green-400 ring-offset-1'
+                : 'bg-green-50 hover:bg-green-100 border-green-100'
+            }`}
+            onClick={() => setCalculatorType('agss')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'agss' ? 'text-white' : 'text-green-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Anaesthetic gas scavenging systems</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'agss' ? 'text-green-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Calculate Anaesthetic gas scavenging system
               </p>
             </div>
           </button>
