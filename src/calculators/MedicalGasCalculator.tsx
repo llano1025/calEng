@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
+import MedicalGasPressureDropCalculator from './mgps/MedicalGasPressureDropCalculator';
+import OxygenFlowCalculator from './mgps/OxygenFlowCalculator';
 
 // Define props type for the component
 interface MedicalGasCalculatorProps {
@@ -15,8 +17,10 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
   // Placeholder for future sub-calculators
   const renderCalculator = () => {
     switch (calculatorType) {
+      case 'pipe':
+        return <MedicalGasPressureDropCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'oxygen_system':
-        return <div className="p-6 text-center text-gray-500">Oxygen System Calculator - Coming Soon</div>;
+        return <OxygenFlowCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'compressed_air':
         return <div className="p-6 text-center text-gray-500">Compressed Air Calculator - Coming Soon</div>;
       case 'vacuum_system':
@@ -41,6 +45,26 @@ const MedicalGasCalculator: React.FC<MedicalGasCalculatorProps> = ({ onBack }) =
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h2 className="text-2xl font-semibold mb-5 text-gray-700 border-b pb-2">Select Calculator Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          
+          {/* Pipework */}
+          <button
+            className={`p-4 rounded-lg transition-all duration-300 ease-in-out shadow hover:shadow-md border text-left flex items-start space-x-3 ${
+              calculatorType === 'pipe'
+                ? 'bg-green-600 text-white ring-2 ring-green-400 ring-offset-1'
+                : 'bg-green-50 hover:bg-green-100 border-green-100'
+            }`}
+            onClick={() => setCalculatorType('pipe')}
+          >
+            <div className="flex-shrink-0 pt-1">
+              <Icons.Calculator className={`${calculatorType === 'pipe' ? 'text-white' : 'text-green-500'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Pipe Pressure Loss</h3>
+              <p className={`text-xs sm:text-sm ${calculatorType === 'pipe' ? 'text-green-100' : 'text-gray-600'}`}>
+                <Icons.InfoInline /> Design medical gas pipeline pressure loss
+              </p>
+            </div>
+          </button>
           
           {/* Oxygen System */}
           <button
