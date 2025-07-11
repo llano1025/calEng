@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/Icons';
 import SprinklerCalculator from './fs/SprinklerCalculator';
+import FSSupplyPumpCalculator from './fs/FSSupplyPumpCalculator';
 
 // Define props type for the component
 interface FireServicesCalculatorProps {
@@ -19,7 +20,7 @@ const FireServicesCalculator: React.FC<FireServicesCalculatorProps> = ({ onBack 
       case 'sprinkler_system':
         return <SprinklerCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'fire_pump':
-        return <div className="p-6 text-center text-gray-500">Fire Pump Calculator - Coming Soon</div>;
+        return <FSSupplyPumpCalculator onShowTutorial={() => setShowTutorial(true)} />;
       case 'smoke_extraction':
         return <div className="p-6 text-center text-gray-500">Smoke Extraction Calculator - Coming Soon</div>;
       case 'fire_alarm':

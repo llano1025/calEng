@@ -7,14 +7,12 @@ interface SprinklerTankCalculatorProps {}
 // Define interfaces for calculation results
 interface TankSizingResult {
   basicCapacity: number;
-  requiredInflowRate: number;
   pumpSuctionCapacity: number;
   hazardGroup: string;
   systemType: string;
   height: number;
   effectiveWaterCapacity: number;
   systemFlowRate: number;
-  maxInflowPeriod: number;
   designDensity: number;
   areaOfOperation: number;
   systemFlow: number;
@@ -59,13 +57,13 @@ const TANK_CAPACITY_TABLE = {
   }
 };
 
-// Double-end-feed inflow parameters table
-const INFLOW_PARAMETERS = {
-  'LH': { minCapacity: 2.5, maxInflowPeriod: 30 },
-  'OH1': { minCapacity: 25, maxInflowPeriod: 60 },
-  'OH2': { minCapacity: 50, maxInflowPeriod: 60 },
-  'OH3': { minCapacity: 75, maxInflowPeriod: 60 },
-  'OH4': { minCapacity: 100, maxInflowPeriod: 90 }
+// Pump suction parameters table
+const PUMP_SUCTION_PARAMETERS = {
+  'LH': { minCapacity: 2.5 },
+  'OH1': { minCapacity: 25 },
+  'OH2': { minCapacity: 50 },
+  'OH3': { minCapacity: 75 },
+  'OH4': { minCapacity: 100 }
 };
 
 // Design criteria table (Table 3 from image)
@@ -339,39 +337,15 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
         calculations.push(`No flow/pressure data available for ${systemType} ${hazardGroup} system`);
       }
       
-      // Step 4: Required Water Inflow for Double-End-Feed
-      calculations.push('\n=== REQUIRED WATER INFLOW FOR DOUBLE-END-FEED ===');
-      const inflowData = INFLOW_PARAMETERS[hazardGroup as keyof typeof INFLOW_PARAMETERS];
-      const maxInflowPeriod = inflowData.maxInflowPeriod; // minutes
-      const effectiveWaterCapacityLiters = effectiveWaterCapacity * 1000; // Convert m³ to liters
-      
-      // Use the higher of user input or system requirement
-      const actualSystemFlowRate = Math.max(systemFlowRate, systemFlow);
-      
-      // Formula: [required water flow rate × minimum period - effective water capacity] / maximum period of in-fill
-      const totalWaterRequired = actualSystemFlowRate * maxInflowPeriod; // L
-      const requiredInflowRate = (totalWaterRequired - effectiveWaterCapacityLiters) / maxInflowPeriod;
-      
-      calculations.push(`User Input Flow Rate: ${systemFlowRate} L/min`);
-      calculations.push(`System Required Flow Rate: ${systemFlow} L/min`);
-      calculations.push(`Design Flow Rate (higher of above): ${actualSystemFlowRate} L/min`);
-      calculations.push(`Maximum Inflow Period: ${maxInflowPeriod} minutes`);
-      calculations.push(`Effective Water Storage: ${effectiveWaterCapacity} m³ (${effectiveWaterCapacityLiters.toLocaleString()} L)`);
-      calculations.push(`Total Water Required: ${actualSystemFlowRate} × ${maxInflowPeriod} = ${totalWaterRequired.toLocaleString()} L`);
-      calculations.push(`Required Water Inflow Calculation:`);
-      calculations.push(`  = [${totalWaterRequired.toLocaleString()} L - ${effectiveWaterCapacityLiters.toLocaleString()} L] / ${maxInflowPeriod} min`);
-      calculations.push(`  = ${(totalWaterRequired - effectiveWaterCapacityLiters).toLocaleString()} L / ${maxInflowPeriod} min`);
-      calculations.push(`  = ${requiredInflowRate.toFixed(0)} L/min`);
-      calculations.push(`Inflow Duration: ${maxInflowPeriod} minutes`);
-      
-      // Step 5: Pump Suction Tank
+      // Step 4: Pump Suction Tank
       calculations.push('\n=== PUMP SUCTION TANK SIZING ===');
-      const pumpSuctionCapacity = inflowData.minCapacity;
+      const pumpSuctionData = PUMP_SUCTION_PARAMETERS[hazardGroup as keyof typeof PUMP_SUCTION_PARAMETERS];
+      const pumpSuctionCapacity = pumpSuctionData.minCapacity;
       
       calculations.push(`Minimum Pump Suction Tank Capacity: ${pumpSuctionCapacity} m³`);
       calculations.push(`Based on ${hazardGroup} hazard classification`);
       
-      // Step 6: Sprinkler Spacing and Location Requirements
+      // Step 5: Sprinkler Spacing and Location Requirements
       calculations.push('\n=== SPRINKLER SPACING AND LOCATION REQUIREMENTS ===');
       const spacingData = SPRINKLER_SPACING_LOCATION[hazardGroup as keyof typeof SPRINKLER_SPACING_LOCATION];
       
@@ -400,14 +374,12 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
       
       setResult({
         basicCapacity,
-        requiredInflowRate,
         pumpSuctionCapacity,
         hazardGroup,
         systemType,
         height,
         effectiveWaterCapacity,
-        systemFlowRate: actualSystemFlowRate,
-        maxInflowPeriod,
+        systemFlowRate,
         designDensity,
         areaOfOperation,
         systemFlow,
@@ -554,16 +526,12 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
                     <div className="font-bold text-blue-600">{result.basicCapacity} m³</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Required Inflow Rate:</span>
-                    <div className="font-bold text-red-600">{result.requiredInflowRate.toFixed(0)} L/min</div>
+                    <span className="text-gray-600">System Flow Rate:</span>
+                    <div className="font-bold text-red-600">{result.systemFlowRate} L/min</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Inflow Duration:</span>
-                    <div className="font-bold text-orange-600">{result.maxInflowPeriod} minutes</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Pump Suction Capacity:</span>
-                    <div className="font-bold text-green-600">{result.pumpSuctionCapacity} m³</div>
+                    <span className="text-gray-600">Water Storage:</span>
+                    <div className="font-bold text-orange-600">{result.effectiveWaterCapacity} m³</div>
                   </div>
                 </div>
               </div>
@@ -742,7 +710,6 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
                   <li>Clearance requirements per Clauses 12.1.2, 26.6 & TB11, 12.4.10, 12.4.4</li>
                   <li>Minimum 150mm clearance from adjacent wall required for rectangular canopies</li>
                   <li>Effective storage excludes unusable volumes and reserves</li>
-                  <li>City supply integration requires double-end-fed supply</li>
                   <li>System compatibility verified against hazard classification</li>
                   <li>Regular testing and maintenance schedules required</li>
                   <li>Consider freeze protection in cold climates</li>
