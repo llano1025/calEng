@@ -11,14 +11,13 @@ interface TankSizingResult {
   hazardGroup: string;
   systemType: string;
   height: number;
-  effectiveWaterCapacity: number;
-  systemFlowRate: number;
   designDensity: number;
   areaOfOperation: number;
   systemFlow: number;
   pressureAtControlValve: number;
   maxDemandFlow: number;
   maxDemandPressure: number;
+  pumpCharacteristics: any;
   spacingData: any;
   calculations: string[];
 }
@@ -112,6 +111,124 @@ const DESIGN_CRITERIA = {
       'dry': 0, // Not allowed
       'alternate': 0 // Not allowed
     }
+  }
+};
+
+// Table 16 — Minimum pump characteristics for LH and OH (pre-calculated systems)
+const PUMP_CHARACTERISTICS = {
+  'LH': {
+    'wet': {
+      15: { nominal: { pressure: 1.5, flow: 300 }, characteristic: { pressure: 3.7, flow: 225 } },
+      30: { nominal: { pressure: 1.8, flow: 340 }, characteristic: { pressure: 5.2, flow: 225 } },
+      45: { nominal: { pressure: 2.3, flow: 375 }, characteristic: { pressure: 6.7, flow: 225 } }
+    },
+    'pre-action': {
+      15: { nominal: { pressure: 1.5, flow: 300 }, characteristic: { pressure: 3.7, flow: 225 } },
+      30: { nominal: { pressure: 1.8, flow: 340 }, characteristic: { pressure: 5.2, flow: 225 } },
+      45: { nominal: { pressure: 2.3, flow: 375 }, characteristic: { pressure: 6.7, flow: 225 } }
+    }
+  },
+  'OH1': {
+    'wet': {
+      15: { nominal: { pressure: 1.2, flow: 900 }, characteristic: { pressure: 2.2, flow: 540 }, additional: { pressure: 2.5, flow: 375 } },
+      30: { nominal: { pressure: 1.9, flow: 1150 }, characteristic: { pressure: 3.7, flow: 540 }, additional: { pressure: 4.0, flow: 375 } },
+      45: { nominal: { pressure: 2.7, flow: 1360 }, characteristic: { pressure: 5.2, flow: 540 }, additional: { pressure: 5.5, flow: 375 } }
+    },
+    'pre-action': {
+      15: { nominal: { pressure: 1.2, flow: 900 }, characteristic: { pressure: 2.2, flow: 540 }, additional: { pressure: 2.5, flow: 375 } },
+      30: { nominal: { pressure: 1.9, flow: 1150 }, characteristic: { pressure: 3.7, flow: 540 }, additional: { pressure: 4.0, flow: 375 } },
+      45: { nominal: { pressure: 2.7, flow: 1360 }, characteristic: { pressure: 5.2, flow: 540 }, additional: { pressure: 5.5, flow: 375 } }
+    },
+    'dry': {
+      15: { nominal: { pressure: 1.4, flow: 1750 }, characteristic: { pressure: 2.5, flow: 1000 }, additional: { pressure: 2.9, flow: 725 } },
+      30: { nominal: { pressure: 2.0, flow: 2050 }, characteristic: { pressure: 4.0, flow: 1000 }, additional: { pressure: 4.4, flow: 725 } },
+      45: { nominal: { pressure: 2.6, flow: 2350 }, characteristic: { pressure: 5.5, flow: 1000 }, additional: { pressure: 5.9, flow: 725 } }
+    },
+    'alternate': {
+      15: { nominal: { pressure: 1.4, flow: 1750 }, characteristic: { pressure: 2.5, flow: 1000 }, additional: { pressure: 2.9, flow: 725 } },
+      30: { nominal: { pressure: 2.0, flow: 2050 }, characteristic: { pressure: 4.0, flow: 1000 }, additional: { pressure: 4.4, flow: 725 } },
+      45: { nominal: { pressure: 2.6, flow: 2350 }, characteristic: { pressure: 5.5, flow: 1000 }, additional: { pressure: 5.9, flow: 725 } }
+    }
+  },
+  'OH2': {
+    'wet': {
+      15: { nominal: { pressure: 1.4, flow: 1750 }, characteristic: { pressure: 2.5, flow: 1000 }, additional: { pressure: 2.9, flow: 725 } },
+      30: { nominal: { pressure: 2.0, flow: 2050 }, characteristic: { pressure: 4.0, flow: 1000 }, additional: { pressure: 4.4, flow: 725 } },
+      45: { nominal: { pressure: 2.6, flow: 2350 }, characteristic: { pressure: 5.5, flow: 1000 }, additional: { pressure: 5.9, flow: 725 } }
+    },
+    'pre-action': {
+      15: { nominal: { pressure: 1.4, flow: 1750 }, characteristic: { pressure: 2.5, flow: 1000 }, additional: { pressure: 2.9, flow: 725 } },
+      30: { nominal: { pressure: 2.0, flow: 2050 }, characteristic: { pressure: 4.0, flow: 1000 }, additional: { pressure: 4.4, flow: 725 } },
+      45: { nominal: { pressure: 2.6, flow: 2350 }, characteristic: { pressure: 5.5, flow: 1000 }, additional: { pressure: 5.9, flow: 725 } }
+    },
+    'dry': {
+      15: { nominal: { pressure: 1.4, flow: 2250 }, characteristic: { pressure: 2.9, flow: 1350 }, additional: { pressure: 3.2, flow: 1100 } }
+    },
+    'alternate': {
+      15: { nominal: { pressure: 1.4, flow: 2250 }, characteristic: { pressure: 2.9, flow: 1350 }, additional: { pressure: 3.2, flow: 1100 } }
+    }
+  },
+  'OH3': {
+    'wet': {
+      30: { nominal: { pressure: 2.0, flow: 2700 }, characteristic: { pressure: 4.4, flow: 1350 }, additional: { pressure: 4.7, flow: 1100 } },
+      45: { nominal: { pressure: 2.5, flow: 3100 }, characteristic: { pressure: 5.9, flow: 1350 }, additional: { pressure: 6.2, flow: 1100 } }
+    },
+    'pre-action': {
+      30: { nominal: { pressure: 2.0, flow: 2700 }, characteristic: { pressure: 4.4, flow: 1350 }, additional: { pressure: 4.7, flow: 1100 } },
+      45: { nominal: { pressure: 2.5, flow: 3100 }, characteristic: { pressure: 5.9, flow: 1350 }, additional: { pressure: 6.2, flow: 1100 } }
+    },
+    'dry': {
+      15: { nominal: { pressure: 1.9, flow: 2650 }, characteristic: { pressure: 3.0, flow: 2100 }, additional: { pressure: 3.5, flow: 1800 } },
+      30: { nominal: { pressure: 2.4, flow: 3050 }, characteristic: { pressure: 4.5, flow: 2100 }, additional: { pressure: 5.0, flow: 1800 } },
+      45: { nominal: { pressure: 3.0, flow: 3350 }, characteristic: { pressure: 6.0, flow: 2100 }, additional: { pressure: 6.5, flow: 1800 } }
+    },
+    'alternate': {
+      15: { nominal: { pressure: 1.9, flow: 2650 }, characteristic: { pressure: 3.0, flow: 2100 }, additional: { pressure: 3.5, flow: 1800 } },
+      30: { nominal: { pressure: 2.4, flow: 3050 }, characteristic: { pressure: 4.5, flow: 2100 }, additional: { pressure: 5.0, flow: 1800 } },
+      45: { nominal: { pressure: 3.0, flow: 3350 }, characteristic: { pressure: 6.0, flow: 2100 }, additional: { pressure: 6.5, flow: 1800 } }
+    }
+  },
+  'OH4': {
+    'wet': {
+      15: { nominal: { pressure: 1.9, flow: 2650 }, characteristic: { pressure: 3.0, flow: 2100 }, additional: { pressure: 3.5, flow: 1800 } },
+      30: { nominal: { pressure: 2.4, flow: 3050 }, characteristic: { pressure: 4.5, flow: 2100 }, additional: { pressure: 5.0, flow: 1800 } },
+      45: { nominal: { pressure: 3.0, flow: 3350 }, characteristic: { pressure: 6.0, flow: 2100 }, additional: { pressure: 6.5, flow: 1800 } }
+    },
+    'pre-action': {
+      15: { nominal: { pressure: 1.9, flow: 2650 }, characteristic: { pressure: 3.0, flow: 2100 }, additional: { pressure: 3.5, flow: 1800 } },
+      30: { nominal: { pressure: 2.4, flow: 3050 }, characteristic: { pressure: 4.5, flow: 2100 }, additional: { pressure: 5.0, flow: 1800 } },
+      45: { nominal: { pressure: 3.0, flow: 3350 }, characteristic: { pressure: 6.0, flow: 2100 }, additional: { pressure: 6.5, flow: 1800 } }
+    }
+  }
+};
+
+// Flow and pressure requirements at control valve
+const FLOW_PRESSURE_REQUIREMENTS = {
+  'LH': {
+    'wet': { flow: 225, pressure: 2.2, maxDemandFlow: 540, maxDemandPressure: 0 },
+    'pre-action': { flow: 225, pressure: 2.2, maxDemandFlow: 540, maxDemandPressure: 0 }
+  },
+  'OH1': {
+    'wet': { flow: 375, pressure: 1.0, maxDemandFlow: 540, maxDemandPressure: 0.7 },
+    'pre-action': { flow: 375, pressure: 1.0, maxDemandFlow: 540, maxDemandPressure: 0.7 },
+    'dry': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
+    'alternate': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 }
+  },
+  'OH2': {
+    'wet': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
+    'pre-action': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
+    'dry': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
+    'alternate': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 }
+  },
+  'OH3': {
+    'wet': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
+    'pre-action': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
+    'dry': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 },
+    'alternate': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 }
+  },
+  'OH4': {
+    'wet': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 },
+    'pre-action': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 }
   }
 };
 
@@ -243,33 +360,23 @@ const SPRINKLER_SPACING_LOCATION = {
     maxExtentCanopyFromBuilding: 1.5 // m
   }
 };
-const FLOW_PRESSURE_REQUIREMENTS = {
-  'LH': {
-    'wet': { flow: 225, pressure: 2.2, maxDemandFlow: 540, maxDemandPressure: 0 },
-    'pre-action': { flow: 225, pressure: 2.2, maxDemandFlow: 540, maxDemandPressure: 0 }
-  },
-  'OH1': {
-    'wet': { flow: 375, pressure: 1.0, maxDemandFlow: 540, maxDemandPressure: 0.7 },
-    'pre-action': { flow: 375, pressure: 1.0, maxDemandFlow: 540, maxDemandPressure: 0.7 },
-    'dry': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
-    'alternate': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 }
-  },
-  'OH2': {
-    'wet': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
-    'pre-action': { flow: 725, pressure: 1.4, maxDemandFlow: 1000, maxDemandPressure: 1.0 },
-    'dry': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
-    'alternate': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 }
-  },
-  'OH3': {
-    'wet': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
-    'pre-action': { flow: 1100, pressure: 1.7, maxDemandFlow: 1350, maxDemandPressure: 1.4 },
-    'dry': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 },
-    'alternate': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 }
-  },
-  'OH4': {
-    'wet': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 },
-    'pre-action': { flow: 1800, pressure: 2.0, maxDemandFlow: 2100, maxDemandPressure: 1.5 }
+
+// Helper function to get appropriate height range for pump characteristics
+const getHeightRange = (height: number, hazardGroup: string, systemType: string): number | null => {
+  const pumpData = PUMP_CHARACTERISTICS[hazardGroup as keyof typeof PUMP_CHARACTERISTICS]?.[systemType as keyof typeof PUMP_CHARACTERISTICS.LH];
+  
+  if (!pumpData) return null;
+  
+  const availableHeights = Object.keys(pumpData).map(Number).sort((a, b) => a - b);
+  
+  // Find the appropriate height range
+  for (const availableHeight of availableHeights) {
+    if (height <= availableHeight) {
+      return availableHeight;
+    }
   }
+  
+  return availableHeights[availableHeights.length - 1]; // Return the highest available
 };
 
 // Main Sprinkler Tank Calculator Component
@@ -278,8 +385,6 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
   const [hazardGroup, setHazardGroup] = useState<string>('OH3');
   const [systemType, setSystemType] = useState<string>('wet');
   const [height, setHeight] = useState<number>(15);
-  const [effectiveWaterCapacity, setEffectiveWaterCapacity] = useState<number>(90);
-  const [systemFlowRate, setSystemFlowRate] = useState<number>(3600);
 
   // Results
   const [result, setResult] = useState<TankSizingResult | null>(null);
@@ -337,7 +442,37 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
         calculations.push(`No flow/pressure data available for ${systemType} ${hazardGroup} system`);
       }
       
-      // Step 4: Pump Suction Tank
+      // Step 4: Pump Characteristics (Table 16)
+      calculations.push('\n=== PUMP CHARACTERISTICS ===');
+      const heightRange = getHeightRange(height, hazardGroup, systemType);
+      let pumpCharacteristics = null;
+      
+      if (heightRange !== null) {
+        const pumpData = PUMP_CHARACTERISTICS[hazardGroup as keyof typeof PUMP_CHARACTERISTICS]?.[systemType as keyof typeof PUMP_CHARACTERISTICS.LH];
+        if (pumpData && typeof pumpData === 'object' && heightRange in pumpData) {
+          pumpCharacteristics = (pumpData as any)[heightRange];
+        }
+      }
+      
+      if (pumpCharacteristics) {
+        calculations.push(`Height Range Applied: ≤${heightRange} m`);
+        calculations.push(`Nominal Data:`);
+        calculations.push(`  Pressure: ${pumpCharacteristics.nominal.pressure} bar`);
+        calculations.push(`  Flow: ${pumpCharacteristics.nominal.flow} L/min`);
+        calculations.push(`Characteristic Data:`);
+        calculations.push(`  Pressure: ${pumpCharacteristics.characteristic.pressure} bar`);
+        calculations.push(`  Flow: ${pumpCharacteristics.characteristic.flow} L/min`);
+        
+        if (pumpCharacteristics.additional) {
+          calculations.push(`Additional Characteristic:`);
+          calculations.push(`  Pressure: ${pumpCharacteristics.additional.pressure} bar`);
+          calculations.push(`  Flow: ${pumpCharacteristics.additional.flow} L/min`);
+        }
+      } else {
+        calculations.push(`No pump characteristics data available for ${systemType} ${hazardGroup} system at ${height}m height`);
+      }
+      
+      // Step 5: Pump Suction Tank
       calculations.push('\n=== PUMP SUCTION TANK SIZING ===');
       const pumpSuctionData = PUMP_SUCTION_PARAMETERS[hazardGroup as keyof typeof PUMP_SUCTION_PARAMETERS];
       const pumpSuctionCapacity = pumpSuctionData.minCapacity;
@@ -345,7 +480,7 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
       calculations.push(`Minimum Pump Suction Tank Capacity: ${pumpSuctionCapacity} m³`);
       calculations.push(`Based on ${hazardGroup} hazard classification`);
       
-      // Step 5: Sprinkler Spacing and Location Requirements
+      // Step 6: Sprinkler Spacing and Location Requirements
       calculations.push('\n=== SPRINKLER SPACING AND LOCATION REQUIREMENTS ===');
       const spacingData = SPRINKLER_SPACING_LOCATION[hazardGroup as keyof typeof SPRINKLER_SPACING_LOCATION];
       
@@ -378,14 +513,13 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
         hazardGroup,
         systemType,
         height,
-        effectiveWaterCapacity,
-        systemFlowRate,
         designDensity,
         areaOfOperation,
         systemFlow,
         pressureAtControlValve,
         maxDemandFlow,
         maxDemandPressure,
+        pumpCharacteristics: pumpCharacteristics || null,
         spacingData,
         calculations
       });
@@ -459,50 +593,6 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
             </div>
           </div>
 
-          {/* Effective Water Capacity */}
-          <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-700 mb-3">Effective Water Capacity</h4>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Effective Water Storage (m³)
-              </label>
-              <input
-                type="number"
-                value={effectiveWaterCapacity}
-                onChange={(e) => setEffectiveWaterCapacity(Number(e.target.value))}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                min="0"
-                step="0.1"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                This is the actual usable water volume excluding dead storage, reserves, and unusable volumes.
-              </p>
-            </div>
-          </div>
-
-          {/* System Flow Parameters */}
-          <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-700 mb-3">System Flow Parameters</h4>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Required System Flow Rate (L/min)
-              </label>
-              <input
-                type="number"
-                value={systemFlowRate}
-                onChange={(e) => setSystemFlowRate(Number(e.target.value))}
-                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                min="0"
-                step="100"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Water flow rate required by the sprinkler system during fire conditions. System will use the higher of this value or the standard requirement.
-              </p>
-            </div>
-          </div>
-
           <button
             onClick={calculateTankSizing}
             className="w-full bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
@@ -525,38 +615,20 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
                     <span className="text-gray-600">Basic Tank Capacity:</span>
                     <div className="font-bold text-blue-600">{result.basicCapacity} m³</div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">System Flow Rate:</span>
-                    <div className="font-bold text-red-600">{result.systemFlowRate} L/min</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Water Storage:</span>
-                    <div className="font-bold text-orange-600">{result.effectiveWaterCapacity} m³</div>
-                  </div>
                 </div>
               </div>
 
               {/* Design Criteria */}
               <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-                <h4 className="font-medium text-blue-800 mb-3">Design Criteria</h4>
+                <h4 className="font-medium text-blue-800 mb-3">Sprinkler Control Valve</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Design Density:</span>
-                    <div className="font-bold text-purple-600">{result.designDensity} mm/min</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Area of Operation:</span>
-                    <div className={`font-bold ${result.areaOfOperation === 0 ? 'text-red-600' : 'text-purple-600'}`}>
-                      {result.areaOfOperation === 0 ? 'Not Allowed' : `${result.areaOfOperation} m²`}
-                    </div>
-                  </div>
                   <div>
                     <span className="text-gray-600">System Flow:</span>
                     <div className="font-bold text-blue-600">{result.systemFlow} L/min</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Control Valve Pressure:</span>
-                    <div className="font-bold text-blue-600">{result.pressureAtControlValve} bar</div>
+                    <div className="font-bold text-blue-600">{result.pressureAtControlValve} bar + ps</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Max Demand Flow:</span>
@@ -564,15 +636,83 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
                   </div>
                   <div>
                     <span className="text-gray-600">Max Demand Pressure:</span>
-                    <div className="font-bold text-green-600">{result.maxDemandPressure} bar</div>
+                    <div className="font-bold text-green-600">{result.maxDemandPressure} bar + ps</div>
                   </div>
                 </div>
               </div>
+
+              {/* Pump Characteristics */}
+              {result.pumpCharacteristics && (
+                <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+                  <h4 className="font-medium text-blue-800 mb-3">Pump Characteristics</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Nominal Data</h5>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Pressure:</span>
+                          <div className="font-bold text-blue-600">{result.pumpCharacteristics.nominal.pressure} bar</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Flow:</span>
+                          <div className="font-bold text-blue-600">{result.pumpCharacteristics.nominal.flow} L/min</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Characteristic Data</h5>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Pressure:</span>
+                          <div className="font-bold text-green-600">{result.pumpCharacteristics.characteristic.pressure} bar</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Flow:</span>
+                          <div className="font-bold text-green-600">{result.pumpCharacteristics.characteristic.flow} L/min</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {result.pumpCharacteristics.additional && (
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2">Additional Characteristic</h5>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Pressure:</span>
+                            <div className="font-bold text-orange-600">{result.pumpCharacteristics.additional.pressure} bar</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Flow:</span>
+                            <div className="font-bold text-orange-600">{result.pumpCharacteristics.additional.flow} L/min</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Sprinkler Spacing and Location Requirements */}
               <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
                 <h4 className="font-medium text-blue-800 mb-3">Sprinkler Spacing and Location Requirements</h4>
                 
+                <div className="mb-4">
+                  <h5 className="font-medium text-gray-700 mb-2">Design criteria</h5>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Design Density:</span>
+                      <div className="font-bold text-purple-600">{result.designDensity} mm/min</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Area of Operation:</span>
+                      <div className={`font-bold ${result.areaOfOperation === 0 ? 'text-red-600' : 'text-purple-600'}`}>
+                        {result.areaOfOperation === 0 ? 'Not Allowed' : `${result.areaOfOperation} m²`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mb-4">
                   <h5 className="font-medium text-gray-700 mb-2">Maximum Area Coverage per Sprinkler</h5>
                   <div className="grid grid-cols-3 gap-4 text-sm">
@@ -687,34 +827,21 @@ const SprinklerTankCalculator: React.FC<SprinklerTankCalculatorProps> = () => {
                 </div>
               )}
 
-              {/* Detailed Calculations */}
-              <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-                <h4 className="font-medium text-gray-800 mb-3">Detailed Calculations</h4>
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
-                    {result.calculations.join('\n')}
-                  </pre>
+              {/* Pump Characteristics Availability Notice */}
+              {!result.pumpCharacteristics && result.areaOfOperation > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
+                  <div className="flex items-center">
+                    <div className="text-yellow-600 mr-2">ℹ️</div>
+                    <div>
+                      <h5 className="font-medium text-yellow-800">Pump Characteristics Notice</h5>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Pump characteristics data is not available for {result.systemType} {result.hazardGroup} system at {result.height}m height range. 
+                        Refer to manufacturer specifications or engineer's design.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              {/* Design Notes */}
-              <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-                <h4 className="font-medium text-gray-800 mb-3">Design Notes</h4>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  <li>All calculations based on BS 12485 standards</li>
-                  <li>Design density and area values from Table 3 (LH, OH and HHP criteria)</li>
-                  <li>Flow and pressure requirements from Table 6 (Pre-calculated systems)</li>
-                  <li>Sprinkler spacing and location requirements per BS EN 12845 standards</li>
-                  <li>Special area coverage may require additional considerations (Tables 19 & 20)</li>
-                  <li>Distance requirements comply with Clauses 12.3, 12.4.1, 12.4.2, 12.4.6, 12.4.7, 12.4.9</li>
-                  <li>Clearance requirements per Clauses 12.1.2, 26.6 & TB11, 12.4.10, 12.4.4</li>
-                  <li>Minimum 150mm clearance from adjacent wall required for rectangular canopies</li>
-                  <li>Effective storage excludes unusable volumes and reserves</li>
-                  <li>System compatibility verified against hazard classification</li>
-                  <li>Regular testing and maintenance schedules required</li>
-                  <li>Consider freeze protection in cold climates</li>
-                </ul>
-              </div>
+              )}
             </div>
           ) : (
             <div className="text-center text-gray-500 py-8">
