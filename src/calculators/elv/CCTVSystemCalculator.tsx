@@ -1,7 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Icons } from '../../components/Icons';
 import CalculatorWrapper from '../../components/CalculatorWrapper';
 import { useCalculatorActions } from '../../hooks/useCalculatorActions';
+
+type CCTVTab = 'storage' | 'bandwidth' | 'coverage' | 'power';
+type ResultsHandler = (inputs: Record<string, any>, results: Record<string, any>) => void;
+
+interface CameraGroupSummary {
+  id: string;
+  name: string;
+  quantity: number;
+  bitrate: number; // Mbps per camera (stream bitrate)
+}
+
+const TAB_NAMES: Record<CCTVTab, string> = {
+  storage: 'Storage Calculator',
+  bandwidth: 'Bandwidth Calculator',
+  coverage: 'Camera Coverage',
+  power: 'Power Consumption'
+};
 
 interface CCTVSystemCalculatorProps {
   onBack?: () => void; // MODIFIED: Made onBack optional
@@ -18,7 +35,41 @@ const CCTVSystemCalculator: React.FC<CCTVSystemCalculatorProps> = ({ onBack, onS
   });
   
   // State for the active tab
-  const [activeTab, setActiveTab] = useState<'storage' | 'bandwidth' | 'coverage' | 'power'>('storage');
+  const [activeTab, setActiveTab] = useState<CCTVTab>('storage');
+  const activeTabRef = useRef<CCTVTab>('storage');
+  activeTabRef.current = activeTab;
+
+  // Camera groups defined in the Storage tab, offered to the Bandwidth tab
+  const [cameraGroups, setCameraGroups] = useState<CameraGroupSummary[]>([]);
+
+  // Latest results of each tab; the active tab feeds the export / history actions
+  const resultsRef = useRef<Partial<Record<CCTVTab, { inputs: Record<string, any>; results: Record<string, any> }>>>({});
+  const saveTimer = useRef<number | undefined>(undefined);
+
+  const handleResults = useCallback((tab: CCTVTab, inputs: Record<string, any>, results: Record<string, any>) => {
+    resultsRef.current[tab] = { inputs, results };
+    if (tab !== activeTabRef.current) return;
+    const taggedInputs = { calculator: TAB_NAMES[tab], ...inputs };
+    const taggedResults = { calculator: TAB_NAMES[tab], ...results };
+    prepareExportData(taggedInputs, taggedResults);
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveCalculation(taggedInputs, taggedResults), 1000);
+  }, [prepareExportData, saveCalculation]);
+
+  const onStorageResults = useCallback<ResultsHandler>((i, r) => handleResults('storage', i, r), [handleResults]);
+  const onBandwidthResults = useCallback<ResultsHandler>((i, r) => handleResults('bandwidth', i, r), [handleResults]);
+  const onCoverageResults = useCallback<ResultsHandler>((i, r) => handleResults('coverage', i, r), [handleResults]);
+  const onPowerResults = useCallback<ResultsHandler>((i, r) => handleResults('power', i, r), [handleResults]);
+
+  // When the user switches tab, export the results of that tab
+  useEffect(() => {
+    const entry = resultsRef.current[activeTab];
+    if (entry) {
+      prepareExportData({ calculator: TAB_NAMES[activeTab], ...entry.inputs }, { calculator: TAB_NAMES[activeTab], ...entry.results });
+    }
+  }, [activeTab, prepareExportData]);
+
+  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
 
   return (
     <CalculatorWrapper
@@ -75,16 +126,19 @@ const CCTVSystemCalculator: React.FC<CCTVSystemCalculatorProps> = ({ onBack, onS
           </button>
         </div>
         
-        {/* Content Based on Active Tab */}
-        {activeTab === 'storage' ? (
-          <StorageCalculator onShowTutorial={onShowTutorial} />
-        ) : activeTab === 'bandwidth' ? (
-          <BandwidthCalculator onShowTutorial={onShowTutorial} />
-        ) : activeTab === 'coverage' ? (
-          <CoverageCalculator onShowTutorial={onShowTutorial} />
-        ) : (
-          <PowerConsumptionCalculator onShowTutorial={onShowTutorial} />
-        )}
+        {/* Content: all tabs stay mounted so that their inputs are kept when switching tabs */}
+        <div className={activeTab === 'storage' ? '' : 'hidden'}>
+          <StorageCalculator onShowTutorial={onShowTutorial} onResults={onStorageResults} onCameraGroupsChange={setCameraGroups} />
+        </div>
+        <div className={activeTab === 'bandwidth' ? '' : 'hidden'}>
+          <BandwidthCalculator onShowTutorial={onShowTutorial} onResults={onBandwidthResults} cameraGroups={cameraGroups} />
+        </div>
+        <div className={activeTab === 'coverage' ? '' : 'hidden'}>
+          <CoverageCalculator onShowTutorial={onShowTutorial} onResults={onCoverageResults} />
+        </div>
+        <div className={activeTab === 'power' ? '' : 'hidden'}>
+          <PowerConsumptionCalculator onShowTutorial={onShowTutorial} onResults={onPowerResults} />
+        </div>
       </div>
     </div>
     </CalculatorWrapper>
@@ -95,6 +149,8 @@ const CCTVSystemCalculator: React.FC<CCTVSystemCalculatorProps> = ({ onBack, onS
 
 interface StorageCalculatorProps {
   onShowTutorial?: () => void;
+  onResults?: ResultsHandler;
+  onCameraGroupsChange?: (groups: CameraGroupSummary[]) => void;
 }
 
 // Define interface for camera configurations
@@ -104,6 +160,7 @@ interface CameraConfig {
   resolution: string;
   frameRate: number;
   compressionType: string;
+  sceneComplexity: string;
   recordingHours: number;
   motionDetection: boolean;
   motionPercentage: number;
@@ -133,6 +190,31 @@ const COMPRESSION_OPTIONS = [
   { value: 'mpeg4', label: 'MPEG-4', multiplier: 1.2 }
 ];
 
+// Scene complexity factors (engineering allowance on the typical bitrate)
+const SCENE_COMPLEXITY_OPTIONS = [
+  { value: 'low', label: 'Low (indoor, static scene)', multiplier: 0.7 },
+  { value: 'medium', label: 'Medium (typical)', multiplier: 1.0 },
+  { value: 'high', label: 'High (busy, outdoor, low light, foliage)', multiplier: 1.5 }
+];
+
+// Bitrate and storage of one camera, step by step
+const computeCamera = (camera: Pick<CameraConfig, 'resolution' | 'compressionType' | 'frameRate' | 'sceneComplexity' | 'motionDetection' | 'motionPercentage' | 'recordingHours'>) => {
+  const resolution = RESOLUTION_OPTIONS.find(r => r.value === camera.resolution);
+  const baseBitrate = resolution ? resolution.baseBitrate : 4.0; // default to 1080p
+  const compression = COMPRESSION_OPTIONS.find(c => c.value === camera.compressionType);
+  const compressionMultiplier = compression ? compression.multiplier : 1.0;
+  const complexity = SCENE_COMPLEXITY_OPTIONS.find(c => c.value === camera.sceneComplexity);
+  const complexityMultiplier = complexity ? complexity.multiplier : 1.0;
+  const frameRateFactor = (camera.frameRate > 0 ? camera.frameRate : REFERENCE_FRAME_RATE) / REFERENCE_FRAME_RATE;
+  // Stream bitrate: what the camera sends over the network while streaming.
+  // Motion-triggered recording reduces the recorded time, not the stream bitrate.
+  const streamBitrate = baseBitrate * compressionMultiplier * frameRateFactor * complexityMultiplier;
+  const recordingDuty = camera.motionDetection ? camera.motionPercentage / 100 : 1;
+  // Storage in MB (10^6 bytes) per day: Mbps × 3600 s/h × hours × duty ÷ 8 bits/byte
+  const storageMBPerDay = (streamBitrate * 3600 * camera.recordingHours * recordingDuty) / 8;
+  return { baseBitrate, compressionMultiplier, frameRateFactor, complexityMultiplier, streamBitrate, recordingDuty, storageMBPerDay };
+};
+
 // Hard drive size options
 const DRIVE_SIZE_OPTIONS = [
   { value: 18, label: '18TB' },
@@ -155,7 +237,7 @@ const RAID_TYPES = [
   { value: 'raid6', label: 'RAID 6 (N+2)', description: 'Dual parity, requires two extra drives' }
 ];
 
-const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial }) => {
+const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial, onResults, onCameraGroupsChange }) => {
   // State for storage parameters
   const [retentionDays, setRetentionDays] = useState<number>(31);
   const [raidType, setRaidType] = useState<string>('none');
@@ -170,6 +252,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
       resolution: '1080p',
       frameRate: 25,
       compressionType: 'h264',
+      sceneComplexity: 'medium',
       recordingHours: 24,
       motionDetection: false,
       motionPercentage: 30,
@@ -204,32 +287,11 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
   // Calculate bitrates and storage requirements whenever camera configurations change
   useEffect(() => {
     const updatedCameras = cameras.map(camera => {
-      // Get base bitrate from resolution
-      const resolution = RESOLUTION_OPTIONS.find(r => r.value === camera.resolution);
-      const baseBitrate = resolution ? resolution.baseBitrate : 3.0; // Default to 1080p if not found
-      
-      // Get compression multiplier
-      const compression = COMPRESSION_OPTIONS.find(c => c.value === camera.compressionType);
-      const compressionMultiplier = compression ? compression.multiplier : 1.0; // Default to H.264 if not found
-      
-      // Scale bitrate linearly with frame rate (base bitrates are referenced to 30 fps)
-      const frameRateFactor = (camera.frameRate > 0 ? camera.frameRate : REFERENCE_FRAME_RATE) / REFERENCE_FRAME_RATE;
-      let adjustedBitrate = baseBitrate * compressionMultiplier * frameRateFactor;
-      
-      // Apply motion detection reduction if enabled
-      if (camera.motionDetection) {
-        // Reduce bitrate based on motion percentage (assuming percentage is how much time motion is detected)
-        adjustedBitrate = adjustedBitrate * (camera.motionPercentage / 100);
-      }
-      
-      // Calculate storage in MB per day for this camera
-      // Formula: (bitrate_in_Mbps * 3600_seconds_per_hour * recording_hours_per_day) / 8_bits_per_byte = MegaBytes_per_day
-      const storageMBPerDay = (adjustedBitrate * 3600 * camera.recordingHours) / 8;
-      
+      const calc = computeCamera(camera);
       return {
         ...camera,
-        bitrate: adjustedBitrate,
-        storageMB: storageMBPerDay // This is now correctly MB per day per camera
+        bitrate: calc.streamBitrate,
+        storageMB: calc.storageMBPerDay // MB per day per camera
       };
     });
     
@@ -240,10 +302,9 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
     // Calculate total storage required
     // totalMBPerDay sums the (storageMB_per_camera * quantity) for all camera groups
     const totalMBPerDayForAllCameras = updatedCameras.reduce((sum, camera) => sum + (camera.storageMB * camera.quantity), 0);
-    // Convert total MB for the entire retention period to TB
-    // (Total_MB_per_day * days) / (MB_per_GB * GB_per_TB) = TB
-    // (Total_MB_per_day * days) / (1024 * 1024) = TB
-    const rawStorageTB = (totalMBPerDayForAllCameras * retentionDays) / (1024 * 1024);
+    // Convert total MB for the entire retention period to TB.
+    // Drive capacities are quoted in decimal TB (10^12 bytes), so use decimal units: 1 TB = 1,000,000 MB.
+    const rawStorageTB = (totalMBPerDayForAllCameras * retentionDays) / 1_000_000;
     setTotalRawStorage(rawStorageTB);
     
     // Calculate effective storage needed based on RAID type
@@ -251,7 +312,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
     setTotalEffectiveStorage(effectiveStorageTB);
     
     // Calculate required drives based on RAID type and selected drive size
-    calculateRequiredDrives(rawStorageTB, raidType, selectedDriveSize, spareFactor);
+    const drives = calculateRequiredDrives(rawStorageTB, raidType, selectedDriveSize, spareFactor);
     
     // Calculate total bandwidth
     const totalMbps = updatedCameras.reduce((sum, camera) => sum + (camera.bitrate * camera.quantity), 0);
@@ -260,7 +321,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
     // Create storage breakdown by camera group
     const breakdown = updatedCameras.map(camera => {
       const dailyStorageForGroupMB = camera.storageMB * camera.quantity; // MB per day for this group
-      const totalStorageForGroupTB = (dailyStorageForGroupMB * retentionDays) / (1024 * 1024); // TB for this group
+      const totalStorageForGroupTB = (dailyStorageForGroupMB * retentionDays) / 1_000_000; // TB for this group
       return {
         id: camera.id,
         name: camera.name,
@@ -272,7 +333,20 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
     });
     setStorageBreakdown(breakdown);
     
-    // Note: saveCalculation and prepareExportData handled by CalculatorWrapper
+    // Share the camera groups with the Bandwidth tab and report results for export / history
+    onCameraGroupsChange?.(updatedCameras.map(c => ({ id: c.id, name: c.name, quantity: c.quantity, bitrate: c.bitrate })));
+    onResults?.(
+      { retentionDays, raidType, capacityHeadroomPercent: spareFactor, driveSizeTB: selectedDriveSize, cameraGroups: updatedCameras.map(c => ({ name: c.name, resolution: c.resolution, frameRate: c.frameRate, compression: c.compressionType, sceneComplexity: c.sceneComplexity, recordingHours: c.recordingHours, motionDetection: c.motionDetection, motionPercentage: c.motionPercentage, quantity: c.quantity })) },
+      {
+        totalRawStorageTB: rawStorageTB.toFixed(2),
+        storageWithHeadroomTB: (rawStorageTB * (1 + spareFactor / 100)).toFixed(2),
+        totalStreamBandwidthMbps: totalMbps.toFixed(2),
+        totalDrives: drives.count,
+        totalCapacityTB: drives.totalCapacity.toFixed(2),
+        usableCapacityTB: drives.usableCapacity.toFixed(2),
+        breakdown: breakdown.map(b => ({ group: b.name, quantity: b.quantity, bitrateMbps: b.bitrate.toFixed(2), dailyGB: (b.dailyStorage / 1000).toFixed(2), totalTB: b.totalStorage.toFixed(2) }))
+      }
+    );
     
   }, [cameras, retentionDays, raidType, selectedDriveSize, spareFactor]);
 
@@ -297,12 +371,14 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
         break;
       case 'raid5':
         // RAID 5: Need 1 extra drive for parity
-        raidDisks = dataDisks > 0 ? dataDisks + 1 : 0;
+        // RAID 5 needs at least 3 drives
+        raidDisks = dataDisks > 0 ? Math.max(dataDisks + 1, 3) : 0;
         usableCapacity = raidDisks > 0 ? (raidDisks - 1) * driveSize : 0;
         break;
       case 'raid6':
         // RAID 6: Need 2 extra drives for dual parity
-        raidDisks = dataDisks > 0 ? dataDisks + 2 : 0;
+        // RAID 6 needs at least 4 drives
+        raidDisks = dataDisks > 0 ? Math.max(dataDisks + 2, 4) : 0;
         usableCapacity = raidDisks > 0 ? (raidDisks - 2) * driveSize : 0;
         break;
       default: // 'none' or any other value
@@ -314,13 +390,15 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
     const totalDrives = raidDisks;
     const totalCapacity = totalDrives * driveSize;
     
-    setRequiredDrives({
+    const drives = {
       count: totalDrives,
       raidDrives: raidDisks,
       spareDrives: 0, // No separate spare drives, as spare is included in the storage capacity
       totalCapacity: totalCapacity,
       usableCapacity: usableCapacity
-    });
+    };
+    setRequiredDrives(drives);
+    return drives;
   };
 
   // Function to add a new camera
@@ -335,6 +413,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
         resolution: '1080p',
         frameRate: 15,
         compressionType: 'h264',
+        sceneComplexity: 'medium',
         recordingHours: 24,
         motionDetection: false,
         motionPercentage: 30,
@@ -369,10 +448,10 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Input Section */}
-      <div className="bg-gray-50 p-4 rounded-lg shadow-md">
-        <h3 className="font-medium text-xl mb-4 text-gray-800">Storage Parameters</h3>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-4">Storage Parameters</h3>
         
         <div className="mb-4">
           <label htmlFor="retentionDays" className="block text-sm font-medium text-gray-700 mb-1">
@@ -414,7 +493,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
           
           <div>
             <label htmlFor="spareFactor" className="block text-sm font-medium text-gray-700 mb-1">
-              Spare Drive Factor (%)
+              Capacity Headroom (%)
             </label>
             <input
               id="spareFactor"
@@ -425,7 +504,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
               onChange={(e) => setSpareFactor(Number(e.target.value))}
               className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Percentage of additional spare drives.</p>
+            <p className="text-xs text-gray-500 mt-1">Extra capacity above the calculated storage (growth, pre/post-event buffer, file-system overhead).</p>
           </div>
         </div>
         
@@ -451,7 +530,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
         {/* CAMERA CONFIGURATION SECTION */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-medium text-xl text-gray-800">Camera Configuration</h3>
+            <h3 className="font-medium text-lg text-gray-700">Camera Configuration</h3>
             <button
               onClick={addCamera}
               className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
@@ -531,6 +610,21 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
                         {COMPRESSION_OPTIONS.map(option => (
                           <option key={option.value} value={option.value}>
                             {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor={`complexity-${camera.id}`} className="block text-sm font-medium text-gray-700 mb-1">Scene Complexity</label>
+                      <select
+                        id={`complexity-${camera.id}`}
+                        value={camera.sceneComplexity}
+                        onChange={(e) => updateCamera(camera.id, 'sceneComplexity', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {SCENE_COMPLEXITY_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label} (×{option.multiplier})
                           </option>
                         ))}
                       </select>
@@ -672,8 +766,8 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
       </div>
 
       {/* Results Section */}
-      <div className="bg-blue-50 p-4 rounded-lg shadow-md">
-        <h3 className="font-medium text-xl mb-4 text-gray-800">Storage Requirements</h3>
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
         
         <div className="bg-white p-4 rounded-md shadow mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -694,6 +788,50 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
           </div>
         </div>
         
+        <h4 className="font-medium mb-3 text-blue-700">Step-by-Step Calculation</h4>
+        <div className="bg-white p-4 rounded-md shadow mb-6">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  <th className="py-2 pr-3">Camera group</th>
+                  <th className="py-2 pr-3 text-right">Base (Mbps)</th>
+                  <th className="py-2 pr-3 text-right">Codec ×</th>
+                  <th className="py-2 pr-3 text-right">fps ×</th>
+                  <th className="py-2 pr-3 text-right">Scene ×</th>
+                  <th className="py-2 pr-3 text-right">Stream (Mbps)</th>
+                  <th className="py-2 pr-3 text-right">Rec. duty</th>
+                  <th className="py-2 text-right">MB/day/cam</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {cameras.map((camera) => {
+                  const calc = computeCamera(camera);
+                  return (
+                    <tr key={camera.id}>
+                      <td className="py-2 pr-3 font-medium text-gray-800">{camera.name}</td>
+                      <td className="py-2 pr-3 text-right text-gray-700">{calc.baseBitrate.toFixed(1)}</td>
+                      <td className="py-2 pr-3 text-right text-gray-700">{calc.compressionMultiplier.toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right text-gray-700">{calc.frameRateFactor.toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right text-gray-700">{calc.complexityMultiplier.toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right font-semibold text-gray-800">{calc.streamBitrate.toFixed(2)}</td>
+                      <td className="py-2 pr-3 text-right text-gray-700">{(calc.recordingDuty * 100).toFixed(0)}%</td>
+                      <td className="py-2 text-right font-semibold text-gray-800">{calc.storageMBPerDay.toFixed(0)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <ol className="list-decimal pl-5 mt-3 space-y-1 text-sm text-gray-700">
+            <li>Stream bitrate = base bitrate (at {REFERENCE_FRAME_RATE} fps) × codec × (fps ÷ {REFERENCE_FRAME_RATE}) × scene complexity.</li>
+            <li>Storage per camera per day = stream bitrate × 3600 s/h × recording hours × recording duty ÷ 8 bits/byte.</li>
+            <li>Raw storage = Σ (storage per camera × quantity) × {retentionDays} days ÷ 1,000,000 = <span className="font-semibold">{totalRawStorage.toFixed(2)} TB</span>.</li>
+            <li>With {spareFactor}% capacity headroom: {totalRawStorage.toFixed(2)} × {(1 + spareFactor / 100).toFixed(2)} = <span className="font-semibold">{(totalRawStorage * (1 + spareFactor / 100)).toFixed(2)} TB</span>.</li>
+            <li>Data drives = ⌈{(totalRawStorage * (1 + spareFactor / 100)).toFixed(2)} ÷ {selectedDriveSize} TB⌉ = {Math.ceil((totalRawStorage * (1 + spareFactor / 100)) / selectedDriveSize)}; with {RAID_TYPES.find(r => r.value === raidType)?.label || 'no redundancy'} the array needs <span className="font-semibold">{requiredDrives.count} drives</span> ({requiredDrives.usableCapacity.toFixed(1)} TB usable).</li>
+          </ol>
+        </div>
+
         <h4 className="font-medium mb-3 text-blue-700">Storage Breakdown by Camera Group</h4>
         <div className="overflow-x-auto bg-white rounded-md shadow mb-6">
           <table className="min-w-full">
@@ -712,8 +850,8 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
                   <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{item.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.quantity}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.bitrate.toFixed(2)} Mbps</td>
-                  {/* item.dailyStorage is total MB/day for the group. Divide by 1024 for GB. */}
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{(item.dailyStorage / 1024).toFixed(2)} GB</td>
+                  {/* item.dailyStorage is total MB/day for the group. Divide by 1000 for (decimal) GB. */}
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{(item.dailyStorage / 1000).toFixed(2)} GB</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.totalStorage.toFixed(2)} TB</td>
                 </tr>
               ))}
@@ -727,7 +865,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
                   <td className="px-4 py-3 text-sm text-gray-900">Total</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{cameras.reduce((sum, camera) => sum + camera.quantity, 0)}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{totalBandwidth.toFixed(2)} Mbps</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{(storageBreakdown.reduce((sum, item) => sum + item.dailyStorage, 0) / 1024).toFixed(2)} GB</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{(storageBreakdown.reduce((sum, item) => sum + item.dailyStorage, 0) / 1000).toFixed(2)} GB</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{totalRawStorage.toFixed(2)} TB</td>
                 </tr>
               )}
@@ -744,7 +882,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
             </div>
             <div className="mt-2 sm:mt-0">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                {spareFactor > 0 ? `Including ${spareFactor}% spare drives` : 'No spare drives'}
+                {spareFactor > 0 ? `${spareFactor}% capacity headroom` : 'No capacity headroom'}
               </span>
             </div>
           </div>
@@ -755,7 +893,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
                 <p className="text-sm text-gray-600">Total Drives:</p>
                 <p className="font-medium text-xl text-blue-700">{requiredDrives.count}</p>
                 <p className="text-xs text-gray-500">
-                  {requiredDrives.raidDrives} RAID + {requiredDrives.spareDrives} spare
+                  {requiredDrives.raidDrives} drives in the array (hot spares not included)
                 </p>
               </div>
               <div>
@@ -791,11 +929,11 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
           <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
             <li>Daily storage per camera (MB/day) = Bitrate (Mbps) × 3600 (seconds/hour) × Recording Hours (hours/day) / 8 (bits/Byte).</li>
             <li>Total storage is calculated based on this daily figure, retention period, and camera quantity.</li>
-            <li>Motion detection reduces storage by recording only when motion is detected, estimated by the motion percentage.</li>
-            <li>Bitrate = Base bitrate (at 30 fps) × Compression multiplier × (Frame rate / 30). Higher resolutions and frame rates increase bandwidth and storage requirements.</li>
+            <li>Motion detection reduces storage (recorded time) but not the network bandwidth, because the camera still streams continuously. Add pre/post-event buffer time to the motion percentage.</li>
+            <li>Bitrate = base bitrate (at 30 fps) × codec multiplier × (frame rate ÷ 30) × scene complexity. Base bitrates are typical engineering values, not standard values; use the camera datasheet bitrate when available.</li>
             <li>H.265/HEVC compression can reduce storage requirements by about 50% compared to H.264.</li>
-            <li>RAID 5 requires N+1 drives (1 drive for parity), RAID 6 requires N+2 drives (2 drives for parity).</li>
-            <li>The spare factor adds extra drives as a percentage of the RAID configuration for hot spares.</li>
+            <li>RAID 5 requires N+1 drives (minimum 3), RAID 6 requires N+2 drives (minimum 4). Storage uses decimal units (1 TB = 10¹² bytes) to match drive capacities.</li>
+            <li>Capacity headroom adds extra capacity as a percentage of the calculated storage. Hot-spare drives are not included; add them separately.</li>
             <li>Actual storage requirements may vary based on scene complexity, lighting conditions, and specific camera implementations.</li>
           </ul>
         </div>
@@ -819,6 +957,8 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
 
 interface BandwidthCalculatorProps {
   onShowTutorial?: () => void;
+  onResults?: ResultsHandler;
+  cameraGroups?: CameraGroupSummary[];
 }
 
 interface NetworkSection {
@@ -832,7 +972,7 @@ interface NetworkSection {
   totalBandwidth: number; // Calculated
 }
 
-const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutorial }) => {
+const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutorial, onResults, cameraGroups = [] }) => {
   // State for network sections
   const [networkSections, setNetworkSections] = useState<NetworkSection[]>([
     {
@@ -850,6 +990,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
   // State for network parameters
   const [networkUtilization, setNetworkUtilization] = useState<number>(70); // percentage
   const [networkBufferFactor, setNetworkBufferFactor] = useState<number>(1.2);
+  const [protocolOverhead, setProtocolOverhead] = useState<number>(8); // Ethernet/IP/UDP/RTP header overhead (%)
   
   // State for editing section
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
@@ -857,6 +998,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
   // State for calculation results
   const [totalRawBandwidth, setTotalRawBandwidth] = useState<number>(0);
   const [totalRequiredBandwidth, setTotalRequiredBandwidth] = useState<number>(0);
+  const [bandwidthWithOverhead, setBandwidthWithOverhead] = useState<number>(0);
   const [recommendedNetwork, setRecommendedNetwork] = useState<string>('');
   
   // Calculate bandwidth requirements whenever inputs change
@@ -875,30 +1017,45 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
     const rawBandwidth = updatedSections.reduce((sum, section) => sum + section.totalBandwidth, 0);
     setTotalRawBandwidth(rawBandwidth);
     
-    const required = (rawBandwidth / (networkUtilization / 100)) * networkBufferFactor;
+    // Stream payload + protocol overhead, derated to the utilization target, plus the expansion buffer
+    const withOverhead = rawBandwidth * (1 + protocolOverhead / 100);
+    setBandwidthWithOverhead(withOverhead);
+    const required = (withOverhead / (networkUtilization / 100)) * networkBufferFactor;
     setTotalRequiredBandwidth(required);
     
+    // 'required' already includes the utilization target and buffer factor,
+    // so it is compared with the nominal link rates (not derated again).
     if (required <= 10) {
         setRecommendedNetwork('10/100 Mbps Ethernet (Consider Gigabit for future)');
-    } else if (required <= 80) { // Typical max for 100Mbps before issues
+    } else if (required <= 100) {
         setRecommendedNetwork('100 Mbps Fast Ethernet (Consider Gigabit)');
-    } else if (required <= 800) { // Typical max for 1Gbps
+    } else if (required <= 1000) {
         setRecommendedNetwork('1 Gbps Gigabit Ethernet');
-    } else if (required <= 8000) { // Typical max for 10Gbps
+    } else if (required <= 10000) {
         setRecommendedNetwork('10 Gbps Ethernet');
     } else {
         setRecommendedNetwork('Multiple 10 Gbps links or higher capacity backbone');
     }
     
-  }, [networkSections, networkUtilization, networkBufferFactor]);
+    onResults?.(
+      { networkUtilizationPercent: networkUtilization, bufferFactor: networkBufferFactor, protocolOverheadPercent: protocolOverhead, sections: updatedSections.map(sec => ({ name: sec.name, cameras: sec.cameras, avgBitrateMbps: sec.avgBitrate, peakUsagePercent: sec.peakUsage, viewingStations: sec.viewingStations, viewingBitrateMbps: sec.viewingBitrate })) },
+      {
+        rawBandwidthMbps: rawBandwidth.toFixed(2),
+        withProtocolOverheadMbps: withOverhead.toFixed(2),
+        requiredCapacityMbps: required.toFixed(2),
+        recommendedNetwork: required <= 10 ? '10/100 Mbps Ethernet' : required <= 100 ? '100 Mbps Fast Ethernet' : required <= 1000 ? '1 Gbps Ethernet' : required <= 10000 ? '10 Gbps Ethernet' : 'Multiple 10 Gbps links',
+        sections: updatedSections.map(sec => ({ section: sec.name, totalMbps: sec.totalBandwidth.toFixed(2) }))
+      }
+    );
+  }, [networkSections, networkUtilization, networkBufferFactor, protocolOverhead]);
 
   const addNetworkSection = () => {
-    const newId = (networkSections.length + 1).toString();
+    const newId = `${Date.now()}`;
     setNetworkSections(prev => [
       ...prev,
       {
         id: newId,
-        name: `Section ${newId}`,
+        name: `Section ${networkSections.length + 1}`,
         cameras: 5,
         avgBitrate: 3,
         peakUsage: 100,
@@ -907,6 +1064,22 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
         totalBandwidth: 0
       }
     ]);
+  };
+
+  // Replace the sections by one section per camera group of the Storage tab
+  const importFromStorage = () => {
+    if (cameraGroups.length === 0) return;
+    const viewing = networkSections[0];
+    setNetworkSections(cameraGroups.map((group, index) => ({
+      id: `${Date.now()}-${index}`,
+      name: group.name,
+      cameras: group.quantity,
+      avgBitrate: Number(group.bitrate.toFixed(2)),
+      peakUsage: 100,
+      viewingStations: index === 0 && viewing ? viewing.viewingStations : 0,
+      viewingBitrate: viewing ? viewing.viewingBitrate : 6,
+      totalBandwidth: 0
+    })));
   };
 
   const removeNetworkSection = (id: string) => {
@@ -938,7 +1111,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
               max="90"
               value={networkUtilization}
               onChange={(e) => setNetworkUtilization(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
             <span className="ml-2 text-sm text-gray-500">%</span>
           </div>
@@ -956,9 +1129,24 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
             step="0.1"
             value={networkBufferFactor}
             onChange={(e) => setNetworkBufferFactor(Number(e.target.value))}
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
           <p className="text-xs text-gray-500 mt-1">Additional capacity for future expansion (e.g., 1.2 = 20% extra)</p>
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Protocol Overhead (%)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            value={protocolOverhead}
+            onChange={(e) => setProtocolOverhead(Math.max(0, Number(e.target.value)))}
+            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">Ethernet / IP / UDP / RTP header overhead added to the video payload (5–10% typical).</p>
         </div>
         
         <div className="border-t border-gray-300 my-4"></div>
@@ -967,12 +1155,22 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
         <div className="mb-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-medium text-lg text-gray-700">Network Sections</h3>
-            <button
-              onClick={addNetworkSection}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-            >
-              Add Section
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={importFromStorage}
+                disabled={cameraGroups.length === 0}
+                title="Create one section per camera group defined in the Storage Calculator tab"
+                className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm disabled:opacity-50"
+              >
+                Import from Storage
+              </button>
+              <button
+                onClick={addNetworkSection}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+              >
+                Add Section
+              </button>
+            </div>
           </div>
           
           {networkSections.map((section) => (
@@ -1120,7 +1318,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
 
       {/* Results Section */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Bandwidth Requirements</h3>
+        <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
         
         <div className="bg-white p-4 rounded-md shadow mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1135,7 +1333,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
               <h4 className="font-medium text-base text-gray-700">Required Network Capacity</h4>
               <div className="mt-2">
                 <p className="font-bold text-2xl text-green-600">{totalRequiredBandwidth.toFixed(2)} Mbps</p>
-                <p className="text-sm text-gray-600">With {networkUtilization}% utilization and {((networkBufferFactor - 1) * 100).toFixed(0)}% buffer</p>
+                <p className="text-sm text-gray-600">With {protocolOverhead}% overhead, {networkUtilization}% utilization and {((networkBufferFactor - 1) * 100).toFixed(0)}% buffer</p>
               </div>
             </div>
           </div>
@@ -1147,6 +1345,21 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
           <p className="text-sm text-green-600 mt-1">Based on calculated bandwidth requirements</p>
         </div>
         
+        <h4 className="font-medium mb-3 text-blue-700">Step-by-Step Calculation</h4>
+        <div className="bg-white p-4 rounded-md shadow mb-6">
+          <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+            {networkSections.map((section) => (
+              <li key={section.id}>
+                {section.name}: cameras {section.cameras} × {section.avgBitrate} Mbps × {section.peakUsage}% = {(section.cameras * section.avgBitrate * section.peakUsage / 100).toFixed(2)} Mbps; viewing {section.viewingStations} × {section.viewingBitrate} Mbps = {(section.viewingStations * section.viewingBitrate).toFixed(2)} Mbps; section total <span className="font-semibold">{section.totalBandwidth.toFixed(2)} Mbps</span>.
+              </li>
+            ))}
+            <li>Raw bandwidth = Σ sections = <span className="font-semibold">{totalRawBandwidth.toFixed(2)} Mbps</span>.</li>
+            <li>With {protocolOverhead}% protocol overhead: {totalRawBandwidth.toFixed(2)} × {(1 + protocolOverhead / 100).toFixed(2)} = <span className="font-semibold">{bandwidthWithOverhead.toFixed(2)} Mbps</span>.</li>
+            <li>Derated to {networkUtilization}% utilization: {bandwidthWithOverhead.toFixed(2)} ÷ {(networkUtilization / 100).toFixed(2)} = {(bandwidthWithOverhead / (networkUtilization / 100)).toFixed(2)} Mbps.</li>
+            <li>With the buffer factor {networkBufferFactor}: required capacity = <span className="font-semibold">{totalRequiredBandwidth.toFixed(2)} Mbps</span>, compared with the nominal link rate (100 / 1000 / 10000 Mbps).</li>
+          </ol>
+        </div>
+
         <h4 className="font-medium mb-3 text-blue-700">Bandwidth Breakdown by Section</h4>
         <div className="overflow-x-auto bg-white rounded-md shadow mb-6">
           <table className="min-w-full">
@@ -1220,7 +1433,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
         <div className="mt-6 bg-gray-100 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Bandwidth Calculation Notes</h4>
           <ul className="list-disc pl-5 space-y-1 text-sm">
-            <li>Network utilization target ensures network isn't saturated during peak times</li>
+            <li>Required capacity = raw bandwidth × (1 + protocol overhead) ÷ utilization target × buffer factor, compared with the nominal link rate.</li><li>Network utilization target ensures network isn't saturated during peak times</li>
             <li>Buffer factor provides headroom for future expansion</li>
             <li>Peak usage accounts for percentage of cameras that will stream simultaneously</li>
             <li>Viewing stations typically require higher bandwidth than cameras (for multiple views)</li>
@@ -1238,6 +1451,7 @@ const BandwidthCalculator: React.FC<BandwidthCalculatorProps> = ({ onShowTutoria
 
 interface CoverageCalculatorProps {
   onShowTutorial?: () => void;
+  onResults?: ResultsHandler;
 }
 
 interface Area {
@@ -1249,17 +1463,30 @@ interface Area {
   obstaclePercentage: number;
   mountHeight: number;
   cameraViewingAngle: number;
+  designDistance: number; // distance from camera to target (m)
   requiredCameras: number; // Calculated
 }
 
-const COVERAGE_TYPES = [
-  { value: 'general', label: 'General Surveillance (Overview)', pixelDensity: 20 }, // px/m
-  { value: 'detailed', label: 'Detailed Observation (Detect Person)', pixelDensity: 60 },
-  { value: 'recognition', label: 'Recognition (Known Person)', pixelDensity: 120 },
-  { value: 'identification', label: 'Identification (Unknown Person)', pixelDensity: 250 }
+// Nominal sensor widths (mm) of the standard optical formats, used for the lens focal length
+const SENSOR_FORMATS = [
+  { value: '1/3', label: '1/3" (4.8 mm wide)', width: 4.8 },
+  { value: '1/2.7', label: '1/2.7" (5.3 mm wide)', width: 5.33 },
+  { value: '1/2.5', label: '1/2.5" (5.8 mm wide)', width: 5.76 },
+  { value: '1/2', label: '1/2" (6.4 mm wide)', width: 6.4 },
+  { value: '1/1.8', label: '1/1.8" (7.2 mm wide)', width: 7.18 },
+  { value: '2/3', label: '2/3" (8.8 mm wide)', width: 8.8 },
+  { value: '1', label: '1" (12.8 mm wide)', width: 12.8 }
 ];
 
-const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial }) => {
+// DORI pixel-density requirements (pixels per metre on the target) from IEC 62676-4
+const COVERAGE_TYPES = [
+  { value: 'general', label: 'Detection (presence of a person)', pixelDensity: 25 }, // px/m
+  { value: 'detailed', label: 'Observation (characteristic details)', pixelDensity: 62 },
+  { value: 'recognition', label: 'Recognition (known person)', pixelDensity: 125 },
+  { value: 'identification', label: 'Identification (unknown person)', pixelDensity: 250 }
+];
+
+const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial, onResults }) => {
   const [areas, setAreas] = useState<Area[]>([
     {
       id: '1',
@@ -1270,12 +1497,14 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
       obstaclePercentage: 10,
       mountHeight: 3,
       cameraViewingAngle: 90,
+      designDistance: 5,
       requiredCameras: 0 
     }
   ]);
   
   const [selectedResolution, setSelectedResolution] = useState<string>('1080p');
-  const [aspectRatio, setAspectRatio] = useState<string>('16:9'); // Informational for now
+  const [overlapPercentage, setOverlapPercentage] = useState<number>(15); // overlap between adjacent camera views
+  const [sensorFormat, setSensorFormat] = useState<string>('1/2.7');
   const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
   const [totalCameras, setTotalCameras] = useState<number>(0);
   const [cameraDetails, setCameraDetails] = useState<any[]>([]);
@@ -1289,31 +1518,35 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
     { value: '12mp', label: '12MP (4000×3000)', width: 4000, height: 3000 } // Or 4096x3072 etc.
   ];
   
+  const RESOLUTION_PIXELS = (value: string) => resolutionOptions.find(r => r.value === value) ?? resolutionOptions[1];
+  
   useEffect(() => {
     const resolution = resolutionOptions.find(r => r.value === selectedResolution);
     if (!resolution) return;
     
     const cameraWidthPixels = resolution.width;
+    const cameraHeightPixels = resolution.height;
     
     const updatedAreas = areas.map(area => {
       const coverageTypeInfo = COVERAGE_TYPES.find(c => c.value === area.coverageType);
-      const pixelDensity = coverageTypeInfo ? coverageTypeInfo.pixelDensity : 60;
+      const pixelDensity = coverageTypeInfo ? coverageTypeInfo.pixelDensity : 62;
       
-      // Max width (in meters) a single camera can cover at the required detail horizontally
-      const effectiveCoverageWidthPerCamera = cameraWidthPixels / pixelDensity;
+      // Scene width and height (m) one camera can cover while still delivering the required pixels per metre
+      const sceneWidthPerCamera = cameraWidthPixels / pixelDensity;
+      const sceneHeightPerCamera = cameraHeightPixels / pixelDensity;
       
-      // Approximate area covered by one camera maintaining this detail level.
-      // This is a simplification; actual coverage depends on lens, aspect ratio, and how coverage is defined (e.g. circular, rectangular projection).
-      // Using a square area for simplicity, based on the limiting dimension (width for horizontal pixel density)
-      const effectiveAreaPerCamera = Math.pow(effectiveCoverageWidthPerCamera, 2); 
-                                       // A more nuanced calculation might use effectiveCoverageWidth * (effectiveCoverageWidth * (resolution.height/resolution.width)) if using aspect ratio.
-                                       // Or for circular approximation using radius = effectiveCoverageWidth/2: PI * (effectiveCoverageWidth/2)^2
+      // Area covered by one camera at the required pixel density (rectangular field of view)
+      const idealAreaPerCamera = sceneWidthPerCamera * sceneHeightPerCamera;
+      
+      // Obstructions (blind spots) and the overlap needed between adjacent views both reduce
+      // the useful area each camera contributes, so more cameras are required.
+      const usableFraction = Math.max(0.05, (1 - area.obstaclePercentage / 100) * (1 - overlapPercentage / 100));
+      const effectiveAreaPerCamera = idealAreaPerCamera * usableFraction;
 
       const areaToBeMonitored = area.length * area.width;
-      const effectiveAreaToMonitor = areaToBeMonitored * (1 - area.obstaclePercentage / 100);
       
-      const camerasNeeded = (effectiveAreaPerCamera > 0 && effectiveAreaToMonitor > 0) 
-                            ? Math.ceil(effectiveAreaToMonitor / effectiveAreaPerCamera) 
+      const camerasNeeded = (effectiveAreaPerCamera > 0 && areaToBeMonitored > 0) 
+                            ? Math.ceil(areaToBeMonitored / effectiveAreaPerCamera) 
                             : 0;
       
       return { ...area, requiredCameras: camerasNeeded };
@@ -1327,13 +1560,26 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
     
     const details = updatedAreas.map(area => {
       const coverageTypeInfo = COVERAGE_TYPES.find(c => c.value === area.coverageType);
-      const pixelDensity = coverageTypeInfo ? coverageTypeInfo.pixelDensity : 60;
+      const pixelDensity = coverageTypeInfo ? coverageTypeInfo.pixelDensity : 62;
       
       const viewingAngleRad = (area.cameraViewingAngle * Math.PI) / 180;
-      // Ground coverage width (diameter of FoV circle on ground if camera points straight down, or base of FoV triangle)
+      // Width of the field of view at a distance equal to the mount height
       const groundFoVWidth = 2 * area.mountHeight * Math.tan(viewingAngleRad / 2);
       
-      const maxDistanceForDetail = cameraWidthPixels / pixelDensity;
+      // Scene width that still meets the pixel density, and the distance at which the lens (horizontal FoV)
+      // produces exactly that scene width: D = (H_pixels / ppm) / (2 * tan(HFoV / 2))
+      const sceneWidthForDetail = cameraWidthPixels / pixelDensity;
+      const maxDistanceForDetail = viewingAngleRad > 0 && viewingAngleRad < Math.PI
+        ? sceneWidthForDetail / (2 * Math.tan(viewingAngleRad / 2))
+        : 0;
+      
+      // Lens check at the design distance (pinhole model)
+      const sensorWidth = (SENSOR_FORMATS.find(f => f.value === sensorFormat) ?? SENSOR_FORMATS[1]).width;
+      const sceneWidthAtDistance = viewingAngleRad > 0 && viewingAngleRad < Math.PI ? 2 * area.designDistance * Math.tan(viewingAngleRad / 2) : 0;
+      const achievedPixelDensity = sceneWidthAtDistance > 0 ? cameraWidthPixels / sceneWidthAtDistance : 0;
+      const requiredHFoVDeg = area.designDistance > 0 ? (2 * Math.atan(sceneWidthForDetail / (2 * area.designDistance)) * 180) / Math.PI : 0;
+      const requiredFocalLength = sceneWidthForDetail > 0 ? (sensorWidth * area.designDistance) / sceneWidthForDetail : 0;
+      const currentFocalLength = viewingAngleRad > 0 && viewingAngleRad < Math.PI ? sensorWidth / (2 * Math.tan(viewingAngleRad / 2)) : 0;
       
       return {
         areaId: area.id,
@@ -1344,26 +1590,47 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
         viewDiameter: groundFoVWidth.toFixed(2), // Width of FoV at mount height distance
         maxDistance: maxDistanceForDetail.toFixed(2), // Max distance for target pixel density
         viewingAngle: area.cameraViewingAngle,
-        mountHeight: area.mountHeight
+        mountHeight: area.mountHeight,
+        designDistance: area.designDistance,
+        sceneWidthAtDistance,
+        achievedPixelDensity,
+        meetsDensity: achievedPixelDensity >= pixelDensity,
+        requiredHFoVDeg,
+        requiredFocalLength,
+        currentFocalLength,
+        sceneWidthForDetail,
+        sceneHeightForDetail: cameraHeightPixels / pixelDensity,
+        idealArea: (cameraWidthPixels / pixelDensity) * (cameraHeightPixels / pixelDensity),
+        usableFraction: Math.max(0.05, (1 - area.obstaclePercentage / 100) * (1 - overlapPercentage / 100)),
+        areaToMonitor: area.length * area.width
       };
     });
     setCameraDetails(details);
     
-  }, [areas, selectedResolution, aspectRatio]); // aspectRatio is in deps but not directly used in calculation logic shown
+    onResults?.(
+      { resolution: selectedResolution, sensorFormat, overlapPercent: overlapPercentage, areas: updatedAreas.map(a => ({ name: a.name, lengthM: a.length, widthM: a.width, detailLevel: a.coverageType, obstructionPercent: a.obstaclePercentage, mountHeightM: a.mountHeight, horizontalFoVDeg: a.cameraViewingAngle, designDistanceM: a.designDistance })) },
+      {
+        totalCameras: updatedAreas.reduce((sum, a) => sum + a.requiredCameras, 0),
+        areas: details.map(d => ({ area: d.areaName, level: d.coverageType, requiredPxPerM: d.pixelDensity, cameras: d.requiredCameras, maxDistanceM: d.maxDistance, achievedPxPerMAtDesignDistance: d.achievedPixelDensity.toFixed(0), meetsRequirement: d.meetsDensity ? 'Yes' : 'No', requiredHFoVDeg: d.requiredHFoVDeg.toFixed(1), requiredFocalLengthMm: d.requiredFocalLength.toFixed(1) }))
+      }
+    );
+    
+  }, [areas, selectedResolution, overlapPercentage, sensorFormat]);
 
   const addArea = () => {
-    const newId = (areas.length + 1).toString();
+    const newId = `${Date.now()}`;
     setAreas(prev => [
       ...prev,
       {
         id: newId,
-        name: `Area ${newId}`,
+        name: `Area ${areas.length + 1}`,
         length: 10,
         width: 5,
         coverageType: 'general',
         obstaclePercentage: 10,
         mountHeight: 3,
         cameraViewingAngle: 90,
+        designDistance: 10,
         requiredCameras: 0
       }
     ]);
@@ -1394,7 +1661,7 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
           <select
             value={selectedResolution}
             onChange={(e) => setSelectedResolution(e.target.value)}
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           >
             {resolutionOptions.map(option => (
               <option key={option.value} value={option.value}>
@@ -1407,18 +1674,33 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Aspect Ratio (Informational)
+            Sensor Format
           </label>
           <select
-            value={aspectRatio}
-            onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full p-2 border rounded-md"
+            value={sensorFormat}
+            onChange={(e) => setSensorFormat(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="16:9">16:9 (Widescreen)</option>
-            <option value="4:3">4:3 (Standard)</option>
-            <option value="3:2">3:2 (Classic)</option>
+            {SENSOR_FORMATS.map(format => (
+              <option key={format.value} value={format.value}>{format.label}</option>
+            ))}
           </select>
-           <p className="text-xs text-gray-500 mt-1">Currently not directly used in area calculation logic.</p>
+          <p className="text-xs text-gray-500 mt-1">Used to convert the field of view to a lens focal length (check the camera datasheet).</p>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            View Overlap Between Cameras (%)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="50"
+            value={overlapPercentage}
+            onChange={(e) => setOverlapPercentage(Math.min(50, Math.max(0, Number(e.target.value))))}
+            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">Overlap avoids blind spots between adjacent fields of view (10–20% typical).</p>
         </div>
         
         <div className="border-t border-gray-300 my-4"></div>
@@ -1502,7 +1784,7 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Obstacle Percentage (%)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">View Obstruction (%)</label>
                       <input
                         type="number"
                         min="0"
@@ -1538,6 +1820,19 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">Horizontal field of view of the camera lens</p>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Design Distance to Target (m)</label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={area.designDistance}
+                      onChange={(e) => updateArea(area.id, 'designDistance', Number(e.target.value))}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Distance from the camera to the target (use the slant distance for elevated cameras). Used for the lens check.</p>
                   </div>
                   
                   <div className="flex justify-end mt-3">
@@ -1598,7 +1893,7 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
 
       {/* Results Section */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Camera Coverage Results</h3>
+        <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
         
         <div className="bg-white p-4 rounded-md shadow mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1624,6 +1919,25 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
           </div>
         </div>
         
+        <h4 className="font-medium mb-3 text-blue-700">Step-by-Step Calculation</h4>
+        <div className="bg-white p-4 rounded-md shadow mb-6">
+          {cameraDetails.map((d) => (
+            <div key={d.areaId} className="mb-4 pb-3 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0">
+              <p className="font-medium text-gray-800 mb-1">{d.areaName}</p>
+              <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-700">
+                <li>Required pixel density ({d.coverageType.split(' (')[0]}, IEC 62676-4): <span className="font-semibold">{d.pixelDensity} px/m</span>.</li>
+                <li>Scene covered by one camera = {RESOLUTION_PIXELS(selectedResolution).width} ÷ {d.pixelDensity} × {RESOLUTION_PIXELS(selectedResolution).height} ÷ {d.pixelDensity} = {d.sceneWidthForDetail.toFixed(2)} m × {d.sceneHeightForDetail.toFixed(2)} m = {d.idealArea.toFixed(1)} m².</li>
+                <li>Usable fraction = (1 − obstruction) × (1 − overlap) = {d.usableFraction.toFixed(3)}; effective area per camera = {(d.idealArea * d.usableFraction).toFixed(1)} m².</li>
+                <li>Cameras = ⌈{d.areaToMonitor.toFixed(1)} m² ÷ {(d.idealArea * d.usableFraction).toFixed(1)} m²⌉ = <span className="font-semibold">{d.requiredCameras}</span>.</li>
+                <li>
+                  Lens check at {d.designDistance} m: scene width = 2 × {d.designDistance} × tan({d.viewingAngle}° ÷ 2) = {d.sceneWidthAtDistance.toFixed(2)} m, so the density is {RESOLUTION_PIXELS(selectedResolution).width} ÷ {d.sceneWidthAtDistance.toFixed(2)} = <span className={`font-semibold ${d.meetsDensity ? 'text-green-600' : 'text-red-600'}`}>{d.achievedPixelDensity.toFixed(0)} px/m ({d.meetsDensity ? 'meets' : 'does not meet'} {d.pixelDensity} px/m)</span>.
+                </li>
+                <li>Required horizontal FoV = 2 × atan({d.sceneWidthForDetail.toFixed(2)} ÷ (2 × {d.designDistance})) = {d.requiredHFoVDeg.toFixed(1)}°; focal length = sensor width × distance ÷ scene width = <span className="font-semibold">{d.requiredFocalLength.toFixed(1)} mm</span> (current lens ≈ {d.currentFocalLength.toFixed(1)} mm).</li>
+              </ol>
+            </div>
+          ))}
+        </div>
+
         <h4 className="font-medium mb-3 text-blue-700">Detailed Camera Requirements (Estimates)</h4>
         <div className="overflow-x-auto bg-white rounded-md shadow mb-6">
           <table className="min-w-full">
@@ -1633,7 +1947,9 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage Level</th>
                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cameras</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Max Dist. (Detail)</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ground FoV Width</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">px/m at Design Dist.</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Result</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Req. FoV / Focal Length</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -1643,7 +1959,13 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
                   <td className="px-4 py-2 text-sm text-gray-900 text-center">{detail.coverageType.split(' (')[0]}</td>
                   <td className="px-4 py-2 text-sm text-gray-900 text-center font-medium">{detail.requiredCameras}</td>
                   <td className="px-4 py-2 text-sm text-gray-900 text-right">{detail.maxDistance}m</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 text-right">{detail.viewDiameter}m</td>
+                  <td className="px-4 py-2 text-sm text-gray-900 text-right">{detail.achievedPixelDensity.toFixed(0)} / {detail.pixelDensity}</td>
+                  <td className="px-4 py-2 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${detail.meetsDensity ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {detail.meetsDensity ? 'Pass' : 'Fail'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900 text-right">{detail.requiredHFoVDeg.toFixed(0)}° / {detail.requiredFocalLength.toFixed(1)} mm</td>
                 </tr>
               ))}
               <tr className="bg-gray-50 font-medium">
@@ -1651,6 +1973,8 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
                 <td className="px-4 py-2 text-sm text-gray-900 text-center">-</td>
                 <td className="px-4 py-2 text-sm text-gray-900 text-center">{totalCameras}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 text-right">-</td>
+                <td className="px-4 py-2 text-sm text-gray-900 text-right">-</td>
+                <td className="px-4 py-2 text-sm text-gray-900 text-center">-</td>
                 <td className="px-4 py-2 text-sm text-gray-900 text-right">-</td>
               </tr>
             </tbody>
@@ -1689,13 +2013,13 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
         <div className="mt-6 bg-gray-100 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Camera Coverage Notes</h4>
           <ul className="list-disc pl-5 space-y-1 text-sm">
-            <li>Pixel density requirements are based on industry standards (e.g., EN 62676-4).</li>
-            <li>Max Distance (Detail) is the max distance from the camera at which the target pixel density can be achieved horizontally.</li>
-            <li>Ground FoV Width is the width of the camera's field of view on the ground, assuming the camera is pointed perpendicular to the ground plane at that distance (simplification).</li>
+            <li>Pixel densities are the DORI values of IEC 62676-4: Detection 25, Observation 62, Recognition 125 and Identification 250 pixels per metre on the target.</li>
+            <li>Max Distance (Detail) = (horizontal pixels ÷ required px/m) ÷ (2 · tan(horizontal FoV ÷ 2)): the furthest distance at which the lens and sensor still deliver the required pixel density.</li>
+            <li>Lens check: scene width at the design distance = 2 · D · tan(HFoV ÷ 2); achieved density = horizontal pixels ÷ scene width; focal length = sensor width · D ÷ required scene width (pinhole model, nominal sensor widths).</li>
             <li>Cameras Estimated is a rough guide; actual count depends on precise placement, lens focal length, scene complexity, and desired overlap.</li>
-            <li>Obstacles reduce effective coverage area.</li>
+            <li>Cameras per area = area ÷ [ (H pixels ÷ ppm) × (V pixels ÷ ppm) × (1 − obstruction) × (1 − overlap) ]. Obstructions and overlap reduce the useful area per camera, so they increase the number of cameras.</li>
             <li>Higher camera mounting provides wider overview but can reduce detail if lens is fixed; consider varifocal or PTZ for flexibility.</li>
-            <li>For critical areas, ensure camera overlap to eliminate blind spots. This calculator does not account for overlap.</li>
+            <li>Pixel density is measured on a target facing the camera; at steep or oblique angles it falls, so check the far edge of each view and keep the vertical angle within the lens specification.</li>
             <li>This calculator provides a guideline; actual camera placement should be validated with site assessments, specific lens calculators, and potentially simulation software.</li>
           </ul>
         </div>
@@ -1708,6 +2032,7 @@ const CoverageCalculator: React.FC<CoverageCalculatorProps> = ({ onShowTutorial 
 
 interface PowerConsumptionCalculatorProps {
   onShowTutorial?: () => void;
+  onResults?: ResultsHandler;
 }
 
 interface DeviceConfig {
@@ -1749,11 +2074,25 @@ const POE_STANDARDS = [
   { value: 'poe', label: 'PoE (802.3af Type 1)', watts: 15.4, delivered: 12.95 }, // Max power at PSE, delivered at PD
   { value: 'poePlus', label: 'PoE+ (802.3at Type 2)', watts: 30, delivered: 25.5 },
   { value: 'poeType3', label: 'PoE++ (802.3bt Type 3)', watts: 60, delivered: 51 },
-  { value: 'poeType4', label: 'PoE++ (802.3bt Type 4)', watts: 100, delivered: 71 } // Or 90W depending on spec version
+  { value: 'poeType4', label: 'PoE++ (802.3bt Type 4)', watts: 90, delivered: 71.3 } // IEEE 802.3bt: 90 W at the PSE, 71.3 W at the PD
 ];
 
 
-const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({ onShowTutorial }) => {
+// Ratio of power drawn at the PSE (switch) to power delivered at the PD (device), including cable loss.
+// IEEE 802.3 specifies the PSE and PD power at the maximum 100 m of cable; shorter cables lose proportionally less.
+const poeCableLossFactor = (standardValue: string, lengthM: number): number => {
+  const std = POE_STANDARDS.find(x => x.value === standardValue);
+  if (!std) return 1;
+  const ratioAt100m = std.watts / std.delivered;
+  return 1 + (ratioAt100m - 1) * (Math.min(Math.max(lengthM, 0), 100) / 100);
+};
+
+// Standard UPS apparent-power ratings (VA)
+const UPS_STANDARD_VA = [500, 750, 1000, 1500, 2000, 3000, 5000, 6000, 8000, 10000, 15000, 20000, 30000, 40000, 60000, 80000, 100000];
+const UPS_BATTERY_DOD = 0.8; // usable depth of discharge
+const UPS_BATTERY_AGEING = 1.25; // end-of-life ageing factor (IEEE 485, VRLA batteries)
+
+const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({ onShowTutorial, onResults }) => {
   const [devices, setDevices] = useState<DeviceConfig[]>([
     {
       id: '1',
@@ -1791,14 +2130,19 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
   ]);
   
   const [backupTime, setBackupTime] = useState<number>(30); 
-  const [upsSizingFactor, setUpsSizingFactor] = useState<number>(70); // Combined Power Factor & Efficiency for VA calc
+  const [loadPowerFactor, setLoadPowerFactor] = useState<number>(0.9); // power factor of the connected load
+  const [inverterEfficiency, setInverterEfficiency] = useState<number>(90); // UPS efficiency on battery (%)
+  const [designMargin, setDesignMargin] = useState<number>(20); // growth / design margin on the load (%)
+  const [poeCableLength, setPoeCableLength] = useState<number>(50); // average PoE cable run (m)
+  const [poeSwitchBudget, setPoeSwitchBudget] = useState<number>(370); // total PoE power budget of the switch(es) (W)
+  const [totalPsePower, setTotalPsePower] = useState<number>(0); // PoE power drawn at the switch incl. cable loss (W)
   
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   
   const [totalPower, setTotalPower] = useState<number>(0); 
   const [totalPoePower, setTotalPoePower] = useState<number>(0); 
   const [totalNonPoePower, setTotalNonPoePower] = useState<number>(0); 
-  const [upsRequirements, setUpsRequirements] = useState<{capacity: number, recommendation: string, loadWatts: number}>({ capacity: 0, recommendation: '', loadWatts: 0 });
+  const [upsRequirements, setUpsRequirements] = useState<{capacity: number, recommendation: string, loadWatts: number, designWatts: number, requiredVA: number, batteryWh: number}>({ capacity: 0, recommendation: '', loadWatts: 0, designWatts: 0, requiredVA: 0, batteryWh: 0 });
   
   useEffect(() => {
     const updatedDevices = devices.map(device => ({
@@ -1827,39 +2171,71 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
       sum + (!device.poePowered ? device.totalWatts : 0), 0);
     setTotalNonPoePower(currentNonPoePower);
     
-    // UPS Sizing: VA = Watts / (Power Factor * Efficiency)
-    // upsSizingFactor is used as a combined (PF * Efficiency), e.g. 0.7 for 70%
-    const loadForUpsInWatts = currentNonPoePower;
-    const estimatedVA = loadForUpsInWatts > 0 && upsSizingFactor > 0 
-                        ? loadForUpsInWatts / (upsSizingFactor / 100)
-                        : 0;
-
-    const upsCapacityRounded = Math.ceil(estimatedVA / 100) * 100; 
+    // PoE power drawn at the switch (PSE) = device power plus cable loss
+    const currentPsePower = updatedDevices.reduce((sum, device) =>
+      sum + (device.poePowered ? device.totalWatts * poeCableLossFactor(device.poeStandard, poeCableLength) : 0), 0);
+    setTotalPsePower(currentPsePower);
+    
+    // UPS sizing (IEC 62040-3 ratings, IEEE 485 battery sizing practice)
+    // PoE cameras are fed from the PoE switch, which is itself on the UPS, so the UPS carries the
+    // non-PoE devices plus the PoE power drawn at the switch (device power + cable loss).
+    const loadForUpsInWatts = currentNonPoePower + currentPsePower;
+    const designWatts = loadForUpsInWatts * (1 + designMargin / 100);
+    // Apparent power the UPS must deliver: VA = W / PF
+    const requiredVA = loadPowerFactor > 0 ? designWatts / loadPowerFactor : 0;
+    // Select the next standard UPS rating
+    const standardRating = UPS_STANDARD_VA.find(rating => rating >= requiredVA);
+    const upsCapacityRounded = requiredVA <= 0 ? 0 : (standardRating ?? Math.ceil(requiredVA / 1000) * 1000);
+    
+    // Battery energy for the required autonomy:
+    // E = P * t / (inverter efficiency * depth of discharge) * ageing factor
+    const batteryWh = inverterEfficiency > 0
+      ? (designWatts * (backupTime / 60)) / ((inverterEfficiency / 100) * UPS_BATTERY_DOD) * UPS_BATTERY_AGEING
+      : 0;
     
     let upsRecommendation = '';
     if (loadForUpsInWatts <= 0) {
-        upsRecommendation = 'No non-PoE load for UPS.';
-    } else if (upsCapacityRounded <= 500) {
-      upsRecommendation = 'Small UPS (e.g., 500-750VA)';
-    } else if (upsCapacityRounded <= 1000) {
-      upsRecommendation = 'Medium UPS (e.g., 1000-1500VA)';
-    } else if (upsCapacityRounded <= 2000) {
-      upsRecommendation = 'Large UPS (e.g., 1500-2200VA)';
+        upsRecommendation = 'No load for UPS.';
+    } else if (upsCapacityRounded <= 750) {
+      upsRecommendation = 'Small line-interactive UPS (tower / rack, up to 750VA)';
+    } else if (upsCapacityRounded <= 1500) {
+      upsRecommendation = 'Medium line-interactive UPS (1000-1500VA)';
     } else if (upsCapacityRounded <= 3000) {
-      upsRecommendation = 'X-Large UPS (e.g., 2200-3000VA)';
+      upsRecommendation = 'Large online double-conversion UPS (2000-3000VA)';
     } else {
-      upsRecommendation = `High Capacity UPS (>3000VA) or multiple units`;
+      upsRecommendation = 'High-capacity online UPS (>3000VA), consider N+1 modules';
     }
     
     setUpsRequirements({
       capacity: upsCapacityRounded,
       recommendation: upsRecommendation,
-      loadWatts: loadForUpsInWatts
+      loadWatts: loadForUpsInWatts,
+      designWatts,
+      requiredVA,
+      batteryWh
     });
     
-  }, [devices, upsSizingFactor]); // Removed backupTime from deps as it's for runtime, not VA capacity typically.
-                                // If backupTime influences VA choice (e.g. larger VA for longer runtime at same load due to battery config), it could be added.
-                                // For this calculator, backupTime is informational for the user when selecting the VA-rated UPS.
+    onResults?.(
+      {
+        backupTimeMin: backupTime, loadPowerFactor, upsEfficiencyPercent: inverterEfficiency, designMarginPercent: designMargin,
+        poeCableLengthM: poeCableLength, poeSwitchBudgetW: poeSwitchBudget,
+        devices: updatedDevices.map(d => ({ name: d.name, type: d.deviceType, powerW: d.powerConsumption, quantity: d.quantity, poe: d.poePowered, poeStandard: d.poePowered ? d.poeStandard : '' }))
+      },
+      {
+        totalDevicePowerW: currentTotalPower.toFixed(1),
+        poePowerAtDevicesW: currentPoePower.toFixed(1),
+        poePowerAtSwitchW: currentPsePower.toFixed(1),
+        nonPoePowerW: currentNonPoePower.toFixed(1),
+        poeBudgetCheck: poeSwitchBudget > 0 ? (currentPsePower <= poeSwitchBudget ? 'Pass' : 'Fail') : 'Not set',
+        upsLoadW: loadForUpsInWatts.toFixed(1),
+        upsDesignLoadW: designWatts.toFixed(1),
+        upsRequiredVA: requiredVA.toFixed(0),
+        upsStandardRatingVA: upsCapacityRounded,
+        batteryEnergyWh: batteryWh.toFixed(0)
+      }
+    );
+    
+  }, [devices, loadPowerFactor, inverterEfficiency, designMargin, backupTime, poeCableLength, poeSwitchBudget]);
 
   const addDevice = () => {
     const newId = (devices.length + Date.now()).toString(); // More unique ID
@@ -1935,24 +2311,84 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
               max="480" 
               value={backupTime}
               onChange={(e) => setBackupTime(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
-            <p className="text-xs text-gray-500 mt-1">For non-PoE devices on UPS. Runtime affects UPS model choice.</p>
+            <p className="text-xs text-gray-500 mt-1">Autonomy of the UPS at the design load. Sets the battery energy.</p>
           </div>
           <div>
-            <label htmlFor="upsSizingFactor" className="block text-sm font-medium text-gray-700 mb-1">
-              UPS Sizing Factor (%)
+            <label htmlFor="loadPowerFactor" className="block text-sm font-medium text-gray-700 mb-1">
+              Load Power Factor
             </label>
             <input
-              id="upsSizingFactor"
+              id="loadPowerFactor"
               type="number"
-              min="50" 
-              max="95" // Max practical PF*Efficiency
-              value={upsSizingFactor}
-              onChange={(e) => setUpsSizingFactor(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
+              min="0.5"
+              max="1"
+              step="0.05"
+              value={loadPowerFactor}
+              onChange={(e) => setLoadPowerFactor(Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Combined Power Factor & Efficiency (e.g., 70 for 0.7 PF & 100% Eff, or 0.8 PF * 0.85 Eff = 68). Affects VA calculation.</p>
+            <p className="text-xs text-gray-500 mt-1">Typically 0.9 for IT loads with power-factor correction. Used for VA = W / PF.</p>
+          </div>
+          <div>
+            <label htmlFor="inverterEfficiency" className="block text-sm font-medium text-gray-700 mb-1">
+              UPS Efficiency on Battery (%)
+            </label>
+            <input
+              id="inverterEfficiency"
+              type="number"
+              min="50"
+              max="100"
+              value={inverterEfficiency}
+              onChange={(e) => setInverterEfficiency(Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Used for the battery energy only (not for the VA rating).</p>
+          </div>
+          <div>
+            <label htmlFor="designMargin" className="block text-sm font-medium text-gray-700 mb-1">
+              Design Margin (%)
+            </label>
+            <input
+              id="designMargin"
+              type="number"
+              min="0"
+              max="100"
+              value={designMargin}
+              onChange={(e) => setDesignMargin(Math.max(0, Number(e.target.value)))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Growth and loading margin on the connected load (a UPS is normally loaded to ≤ 80%).</p>
+          </div>
+          <div>
+            <label htmlFor="poeCableLength" className="block text-sm font-medium text-gray-700 mb-1">
+              Average PoE Cable Length (m)
+            </label>
+            <input
+              id="poeCableLength"
+              type="number"
+              min="1"
+              max="100"
+              value={poeCableLength}
+              onChange={(e) => setPoeCableLength(Math.max(0, Number(e.target.value)))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Channel limit is 100 m (ISO/IEC 11801, TIA-568). Longer runs lose more power in the cable.</p>
+          </div>
+          <div>
+            <label htmlFor="poeSwitchBudget" className="block text-sm font-medium text-gray-700 mb-1">
+              PoE Switch Power Budget (W)
+            </label>
+            <input
+              id="poeSwitchBudget"
+              type="number"
+              min="0"
+              value={poeSwitchBudget}
+              onChange={(e) => setPoeSwitchBudget(Math.max(0, Number(e.target.value)))}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Total PoE budget of the switch(es) from the datasheet. Enter 0 to skip the check.</p>
           </div>
         </div>
         
@@ -2153,7 +2589,7 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
 
       {/* Results Section */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-medium text-lg mb-4">Power Requirements</h3>
+        <h3 className="font-medium text-lg mb-4">Calculation Results</h3>
         
         <div className="bg-white p-4 rounded-md shadow mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2180,13 +2616,49 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
           </div>
         </div>
         
+        <div className={`p-4 rounded-md border shadow mb-6 ${poeSwitchBudget <= 0 ? 'bg-white border-gray-200' : totalPsePower <= poeSwitchBudget ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-300'}`}>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-medium text-base text-gray-800">PoE Switch Budget</h4>
+            {poeSwitchBudget > 0 && (
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${totalPsePower <= poeSwitchBudget ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {totalPsePower <= poeSwitchBudget ? 'PASS' : 'FAIL'}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-700">
+            <div>At devices: <span className="font-semibold">{totalPoePower.toFixed(1)} W</span></div>
+            <div>At switch (incl. {poeCableLength} m cable loss): <span className="font-semibold">{totalPsePower.toFixed(1)} W</span></div>
+            <div>Switch budget: <span className="font-semibold">{poeSwitchBudget > 0 ? `${poeSwitchBudget} W` : 'not set'}</span></div>
+          </div>
+          {poeCableLength > 100 && (
+            <p className="text-xs text-red-600 mt-2">The PoE cable length exceeds the 100 m channel limit.</p>
+          )}
+        </div>
+
         <div className="bg-green-50 p-4 rounded-md border border-green-200 shadow mb-6">
-          <h4 className="font-medium text-base text-green-800 mb-2">UPS Requirements (for {upsRequirements.loadWatts.toFixed(0)}W Non-PoE Load)</h4>
-          <p className="font-bold text-xl text-green-700">{upsRequirements.capacity > 0 ? `${upsRequirements.capacity} VA` : "N/A"} (Estimated)</p>
+          <h4 className="font-medium text-base text-green-800 mb-2">UPS Requirements (for {upsRequirements.loadWatts.toFixed(0)}W total load, including PoE devices)</h4>
+          <p className="font-bold text-xl text-green-700">{upsRequirements.capacity > 0 ? `${upsRequirements.capacity} VA` : "N/A"} (Standard rating)</p>
           <p className="text-sm text-green-600 mt-1">Recommended UPS Category: {upsRequirements.recommendation}</p>
-          <p className="text-sm text-green-600 mt-1">Provides approx. {backupTime} minutes backup. Sizing factor: {upsSizingFactor}%. Verify with UPS mfg. for exact runtime.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm text-green-700">
+            <div>Design load: <span className="font-semibold">{upsRequirements.designWatts.toFixed(0)} W</span></div>
+            <div>Required apparent power: <span className="font-semibold">{upsRequirements.requiredVA.toFixed(0)} VA</span></div>
+            <div>Battery energy for {backupTime} min: <span className="font-semibold">{upsRequirements.batteryWh.toFixed(0)} Wh</span></div>
+          </div>
+          <p className="text-xs text-green-600 mt-2">Battery energy = design load × time ÷ (efficiency × {UPS_BATTERY_DOD * 100}% depth of discharge) × {UPS_BATTERY_AGEING} ageing factor. Verify the runtime with the UPS manufacturer.</p>
         </div>
         
+        <h4 className="font-medium mb-3 text-blue-700">Step-by-Step Calculation</h4>
+        <div className="bg-white p-4 rounded-md shadow mb-6">
+          <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-700">
+            <li>Total device power = Σ (power × quantity) = <span className="font-semibold">{totalPower.toFixed(1)} W</span> ({totalPoePower.toFixed(1)} W PoE + {totalNonPoePower.toFixed(1)} W non-PoE).</li>
+            <li>PoE power at the switch = PoE device power × cable-loss factor ({totalPoePower > 0 ? (totalPsePower / totalPoePower).toFixed(3) : '1.000'} for {poeCableLength} m) = <span className="font-semibold">{totalPsePower.toFixed(1)} W</span>.</li>
+            <li>UPS load = non-PoE {totalNonPoePower.toFixed(1)} W + PoE at switch {totalPsePower.toFixed(1)} W = <span className="font-semibold">{upsRequirements.loadWatts.toFixed(1)} W</span>.</li>
+            <li>Design load = {upsRequirements.loadWatts.toFixed(1)} × (1 + {designMargin}%) = <span className="font-semibold">{upsRequirements.designWatts.toFixed(1)} W</span>.</li>
+            <li>Apparent power = {upsRequirements.designWatts.toFixed(1)} W ÷ {loadPowerFactor} = {upsRequirements.requiredVA.toFixed(0)} VA, rounded up to the standard rating <span className="font-semibold">{upsRequirements.capacity} VA</span>.</li>
+            <li>Battery energy = {upsRequirements.designWatts.toFixed(1)} W × {(backupTime / 60).toFixed(2)} h ÷ ({(inverterEfficiency / 100).toFixed(2)} × {UPS_BATTERY_DOD}) × {UPS_BATTERY_AGEING} = <span className="font-semibold">{upsRequirements.batteryWh.toFixed(0)} Wh</span>.</li>
+          </ol>
+        </div>
+
         <h4 className="font-medium mb-3 text-blue-700">Power Distribution Breakdown</h4>
         <div className="overflow-x-auto bg-white rounded-md shadow mb-6">
           <table className="min-w-full">
@@ -2255,11 +2727,11 @@ const PowerConsumptionCalculator: React.FC<PowerConsumptionCalculatorProps> = ({
         <div className="mt-6 bg-gray-100 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Power Calculation Notes</h4>
           <ul className="list-disc pl-5 space-y-1 text-sm">
-            <li>UPS capacity (VA) is an estimation: `Watts / (SizingFactor/100)`. SizingFactor combines typical Power Factor (PF) and UPS efficiency. Consult UPS manufacturer tools for precise runtime and model selection.</li>
-            <li>PoE devices are powered by PoE switches. The switch itself requires AC power and should be on UPS if PoE devices need backup. This calculator sums PoE device power for switch budget consideration.</li>
+            <li>UPS rating: VA = (total load W × (1 + design margin)) ÷ power factor, rounded up to the next standard rating (IEC 62040-3). The battery energy uses the autonomy time, efficiency, depth of discharge and an ageing factor (IEEE 485).</li>
+            <li>PoE devices are powered by PoE switches, which are fed from the UPS, so PoE load is included in the UPS load. Add PoE switch self-consumption as a device. Power at the PSE is higher than at the device because of cable loss (IEEE 802.3at/bt: 15.4 / 30 / 60 / 90 W at the PSE for 12.95 / 25.5 / 51 / 71.3 W at the PD).</li>
             <li>Device power consumptions are typical; use custom values or datasheets for accuracy. IR LEDs, PTZ motors, heaters can significantly increase camera power draw.</li>
             <li>For mission-critical systems, consider N+1 redundancy for power supplies and UPS.</li>
-            <li>Total PoE budget of a switch must exceed the sum of power for all connected PoE devices. This calculator only checks individual device draw vs. PoE standard per port.</li>
+            <li>The PoE budget check compares the PoE power at the switch (device power plus cable loss, scaled linearly from the 100 m values of IEEE 802.3) with the switch's total budget. Each device is also checked against the power per port of its PoE standard.</li>
             <li>Cable runs (length, quality) affect PoE power delivery. Adhere to TIA/IEEE standards.</li>
           </ul>
         </div>
