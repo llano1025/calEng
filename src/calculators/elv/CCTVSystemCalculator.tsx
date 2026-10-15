@@ -112,7 +112,10 @@ interface CameraConfig {
   storageMB: number; // Calculated (MB per day per camera)
 }
 
-// Resolution options with respective bitrates (Mbps per camera)
+// Frame rate (fps) at which the base bitrates below are specified
+const REFERENCE_FRAME_RATE = 30;
+
+// Resolution options with respective bitrates (Mbps per camera at REFERENCE_FRAME_RATE)
 const RESOLUTION_OPTIONS = [
   { value: '720p', label: '720p (1280×720)', baseBitrate: 2.0 },
   { value: '1080p', label: '1080p (1920×1080)', baseBitrate: 4.0 },
@@ -209,8 +212,9 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
       const compression = COMPRESSION_OPTIONS.find(c => c.value === camera.compressionType);
       const compressionMultiplier = compression ? compression.multiplier : 1.0; // Default to H.264 if not found
       
-      // Calculate adjusted bitrate based on frame rate (assume 30fps as reference)
-      let adjustedBitrate = baseBitrate * compressionMultiplier;
+      // Scale bitrate linearly with frame rate (base bitrates are referenced to 30 fps)
+      const frameRateFactor = (camera.frameRate > 0 ? camera.frameRate : REFERENCE_FRAME_RATE) / REFERENCE_FRAME_RATE;
+      let adjustedBitrate = baseBitrate * compressionMultiplier * frameRateFactor;
       
       // Apply motion detection reduction if enabled
       if (camera.motionDetection) {
@@ -788,7 +792,7 @@ const StorageCalculator: React.FC<StorageCalculatorProps> = ({ onShowTutorial })
             <li>Daily storage per camera (MB/day) = Bitrate (Mbps) × 3600 (seconds/hour) × Recording Hours (hours/day) / 8 (bits/Byte).</li>
             <li>Total storage is calculated based on this daily figure, retention period, and camera quantity.</li>
             <li>Motion detection reduces storage by recording only when motion is detected, estimated by the motion percentage.</li>
-            <li>Higher resolutions and frame rates increase storage requirements but provide better image quality.</li>
+            <li>Bitrate = Base bitrate (at 30 fps) × Compression multiplier × (Frame rate / 30). Higher resolutions and frame rates increase bandwidth and storage requirements.</li>
             <li>H.265/HEVC compression can reduce storage requirements by about 50% compared to H.264.</li>
             <li>RAID 5 requires N+1 drives (1 drive for parity), RAID 6 requires N+2 drives (2 drives for parity).</li>
             <li>The spare factor adds extra drives as a percentage of the RAID configuration for hot spares.</li>
