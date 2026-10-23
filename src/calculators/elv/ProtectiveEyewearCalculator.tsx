@@ -177,14 +177,16 @@ const ProtectiveEyewearCalculator: React.FC<ProtectiveEyewearProps> = ({ onShowT
         calculationSteps.push(`Beam area: π × (${beamDiameter}/2)² = ${beamArea_cm2.toFixed(4)} cm²`);
         calculationSteps.push(`Exposure level: ${pulseEnergy} mJ / ${beamArea_cm2.toFixed(4)} cm² = ${exposureLevel.toExponential(3)} J/cm²`);
         
-        // Determine scale factor based on pulse characteristics
-        if (pulseWidthSeconds >= 1e-9 && pulseWidthSeconds < 0.25) {
-          scaleFactorLetter = 'I'; // Incoherent/short pulse
-        } else if (pulseWidthSeconds >= 0.25) {
-          scaleFactorLetter = 'R'; // Giant pulse
+        // EN 207 mode of operation by pulse duration:
+        // D: ≥ 0.25 s, I: 1 µs - 0.25 s, R (giant pulse): 1 ns - 1 µs, M (mode-locked): < 1 ns
+        if (pulseWidthSeconds >= 0.25) {
+          scaleFactorLetter = 'D';
+        } else if (pulseWidthSeconds >= 1e-6) {
+          scaleFactorLetter = 'I';
+        } else if (pulseWidthSeconds >= 1e-9) {
+          scaleFactorLetter = 'R';
         } else {
-          scaleFactorLetter = 'M'; // Mode-locked
-          if (pulseWidth >= 1) scaleFactorLetter = 'I';
+          scaleFactorLetter = 'M';
         }
       }
 
