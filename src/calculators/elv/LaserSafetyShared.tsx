@@ -170,6 +170,18 @@ export const calculateC5Factor = (
   const pulseWidthSeconds = pulseWidth * MPE_CONSTANTS.NS_TO_S;
   const Ti = TIME_BASE_TI.getTimeBase(wavelength);
   
+  // Table 9: C5 = 1 for 180-400 nm and 1400 nm - 1 mm; the pulse-train correction applies to 400-1400 nm only
+  if (wavelength < 400 || wavelength > 1400) {
+    steps.push(`Wavelength ${wavelength} nm is outside 400-1400 nm: C5 = 1.0 (Table 9)`);
+    return {
+      c5Factor: 1.0,
+      numberOfPulses: Math.floor(exposureTime * repetitionRate),
+      timeBase: Ti,
+      pulseGrouping: 'C5 not applicable outside 400-1400 nm',
+      c5Steps: steps
+    };
+  }
+
   steps.push(`Wavelength: ${wavelength} nm`);
   steps.push(`Pulse width: ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s`);
   steps.push(`Repetition rate: ${repetitionRate} Hz`);
@@ -291,7 +303,8 @@ export const assessPulsedLaserAELs = (
   exposureTime: number,
   repetitionRate: number,
   c5Factor: number,
-  pulseWidth: number // ADDED: Pulse width in nanoseconds
+  pulseWidth: number, // Pulse width in nanoseconds
+  angularSubtense: number = 1.5 // mrad (C6 / T2 for extended sources)
 ): PulsedAELAssessment => {
   const steps: string[] = [];
   
@@ -302,7 +315,7 @@ export const assessPulsedLaserAELs = (
   steps.push(`C5 factor: ${c5Factor.toFixed(4)}`);
   
   // Get appropriate AEL function
-  let getAEL: (wl: number, t: number, c5: number) => AELResult;
+  let getAEL: (wl: number, t: number, c5: number, alpha?: number) => AELResult;
   switch (className) {
     case 'Class 1':
       getAEL = IEC_AEL_TABLES.getClass1AEL;
@@ -320,15 +333,22 @@ export const assessPulsedLaserAELs = (
   
   // CORRECTED: Use actual pulse width instead of hardcoded 1e-6
   const pulseWidthSeconds = pulseWidth * MPE_CONSTANTS.NS_TO_S;
-  const singlePulseAELResult = getAEL(wavelength, pulseWidthSeconds, 1.0);
+  const singlePulseAELResult = getAEL(wavelength, pulseWidthSeconds, 1.0, angularSubtense);
   steps.push(`\nSingle pulse AEL (using pulse width ${pulseWidth} ns = ${pulseWidthSeconds.toExponential(3)} s): ${singlePulseAELResult.value.toExponential(3)} ${singlePulseAELResult.unit}`);
   
   // Average power AEL (converted to pulse energy)
-  const avgPowerAELResult = getAEL(wavelength, exposureTime, 1.0);
+  const avgPowerAELResult = getAEL(wavelength, exposureTime, 1.0, angularSubtense);
   let avgPowerAsPulseEnergy: number;
   let avgPowerUnit: string;
   
-  if (avgPowerAELResult.unit === 'W') {
+  if (avgPowerAELResult.unit === 'J') {
+    // Energy limit over the exposure time T -> average power limit (J / T) -> per-pulse energy
+    const avgPowerW = avgPowerAELResult.value / exposureTime;
+    avgPowerAsPulseEnergy = avgPowerW / repetitionRate;
+    avgPowerUnit = 'J';
+    steps.push(`Average power AEL (energy limit ${avgPowerAELResult.value.toExponential(3)} J over ${exposureTime} s = ${avgPowerW.toExponential(3)} W)`);
+    steps.push(`\nAverage power AEL (converted to pulse energy): AEL_T / PRF = ${avgPowerW.toExponential(3)} / ${repetitionRate} = ${avgPowerAsPulseEnergy.toExponential(3)} J/pulse`);
+  } else if (avgPowerAELResult.unit === 'W') {
     // Convert average power limit to pulse energy limit
     avgPowerAsPulseEnergy = avgPowerAELResult.value / repetitionRate;
     avgPowerUnit = 'J';
@@ -364,6 +384,22 @@ export const assessPulsedLaserAELs = (
 };
 
 // ======================== IEC 60825-1 COMPLIANT AEL IMPLEMENTATION ========================
+
+// Tables 3 / 6 / 7 note d (1250-1400 nm): the AEL is limited to the Class 3B AEL and to the anterior-eye
+// limits derived from the skin MPE (1 mm aperture stop)
+const limitFor1250to1400 = (retinal: AELResult, wavelength: number, t: number, c5Factor: number): AELResult => {
+  if (wavelength < 1250 || wavelength > 1400) return retinal;
+  const skin: AELResult =
+    t < 1e-9 ? { value: 7.9e5, unit: 'W' } :
+    t < 1e-7 ? { value: 7.9e-4, unit: 'J' } :
+    t < 0.35 ? { value: 4.3e-2 * Math.pow(t, 0.25), unit: 'J' } :
+    { value: 0.1, unit: 'W' };
+  const class3B = IEC_AEL_TABLES.getClass3BAEL(wavelength, t, c5Factor);
+  // Express every limit in the unit of the retinal AEL (J <-> W via the emission duration)
+  const asUnit = (l: AELResult): number =>
+    l.unit === retinal.unit ? l.value : (retinal.unit === 'J' ? l.value * t : l.value / t);
+  return { value: Math.min(retinal.value, asUnit(class3B), asUnit(skin)), unit: retinal.unit };
+};
 
 // IEC 60825-1:2014 Table-based AEL implementation
 export const IEC_AEL_TABLES = {
@@ -479,10 +515,10 @@ export const IEC_AEL_TABLES = {
     }
     
     // C4 correction (400-450 nm and 1150-1200 nm)
-    if (wavelength >= 700 && wavelength <= 1050) {
+    if (wavelength >= 700 && wavelength < 1050) {
       C4 = Math.pow(10, 0.002 * (wavelength - 700));
-    } else{
-        C4 = 5;
+    } else if (wavelength >= 1050 && wavelength <= 1400) {
+        C4 = 5; // Table 9: C4 = 5 for 1050-1400 nm
     }
     
     // C6 correction (400-1400 nm, angular subtense dependent)
@@ -505,9 +541,12 @@ export const IEC_AEL_TABLES = {
       }
     }
     
-    // C7 correction (700-1150 nm and 1150-1400 nm)
+    // C7 correction (IEC 60825-1:2014 Table 9)
+    //   700-1150 nm:  C7 = 1
+    //   1150-1200 nm: C7 = 10^(0.018(λ-1150))
+    //   1200-1400 nm: C7 = 8 + 10^(0.04(λ-1250))
     if (wavelength >= 1150 && wavelength <= 1200) {
-      C7 = Math.pow(10, 0.0018 * (wavelength - 1150));
+      C7 = Math.pow(10, 0.018 * (wavelength - 1150));
     } else if (wavelength > 1200 && wavelength <= 1400) {
       C7 = 8 + Math.pow(10, 0.04 * (wavelength - 1250));
     }
@@ -516,8 +555,8 @@ export const IEC_AEL_TABLES = {
   },
 
   // Table 3: Class 1 AEL values (general) - Enhanced with C5 application and units
-  getClass1AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  getClass1AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): AELResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime, angularSubtense);
     const t = exposureTime;
 
     let baseAEL = 0;
@@ -529,22 +568,22 @@ export const IEC_AEL_TABLES = {
     if (corrections.C6 === 1) {
       // Table 3: Point source case
       if (wavelength >= 180 && wavelength < 302.5) {
-        if (t < 1e-8) {
+        if (t < 1e-9) {
           baseAEL = 3e10; // W/m²
           unit = 'W/m²';
-        } else if (t >= 1e-8 && t < 3e4) {
+        } else if (t >= 1e-9 && t < 3e4) {
           baseAEL = 30; // J/m²
           unit = 'J/m²';
         }
         return { value: baseAEL, unit }; // No C5 correction for UV skin hazard
       } else if (wavelength >= 302.5 && wavelength < 315) {
-        if (t < 1e-8) {
+        if (t < 1e-9) {
           baseAEL = 2.4e4; // W
           unit = 'W';
-        } else if (t >= 1e-8 && t < 10 && t <= corrections.T1) {
+        } else if (t >= 1e-9 && t < 10 && t <= corrections.T1) {
           baseAEL = 7.9e-7 * corrections.C1; // J
           unit = 'J';
-        } else if (t >= 1e-8 && t < 10 && t > corrections.T1) {
+        } else if (t >= 1e-9 && t < 10 && t > corrections.T1) {
           baseAEL = 7.9e-7 * corrections.C2; // J
           unit = 'J';
         } else if (t >= 10 && t < 3e4) {
@@ -552,11 +591,11 @@ export const IEC_AEL_TABLES = {
           unit = 'J';
         }
       } else if (wavelength >= 315 && wavelength < 400) {
-        if (t < 1e-8) {
+        if (t < 1e-9) {
           baseAEL = 2.4e4; // W
           unit = 'W';
-        } else if (t >= 1e-8 && t < 10) {
-          baseAEL = 7.9e-4 * corrections.C1; // J
+        } else if (t >= 1e-9 && t < 10) {
+          baseAEL = 7.9e-7 * corrections.C1; // J
           unit = 'J';
         } else if (t >= 10 && t < 1000) {
           baseAEL = 7.9e-3; // J
@@ -593,15 +632,11 @@ export const IEC_AEL_TABLES = {
           baseAEL = 7e-4 * Math.pow(t, 0.75); // J
           unit = 'J';
         } else if (t >= 10 && t < 100) {
-          baseAEL = 3.9e-3 * corrections.C3; // J
+          // Dual limits (Table A.3 note c): exposure must not exceed either 3.9e-3·C3 J or 3.9e-4 W
+          baseAEL = Math.min(3.9e-3 * corrections.C3, 3.9e-4 * t); // J
           unit = 'J';
-        } else if (t >= 100 && t < 1000) {
-          const limit1_J = 3.9e-3 * corrections.C3; // J
-          const limit2_Power_W = 3.9e-4; // W
-          baseAEL = Math.min(limit1_J, limit2_Power_W * t); // J
-          unit = 'J';
-        } else if (t >= 1000 && t < 3e4) {
-          baseAEL = 3.9e-5 * corrections.C3; // W
+        } else if (t >= 100 && t < 3e4) {
+          baseAEL = 3.9e-5 * corrections.C3; // W (= 3.9e-3·C3 J over 100 s)
           unit = 'W';
         }
       } else if (wavelength >= 500 && wavelength < 700) {
@@ -625,10 +660,10 @@ export const IEC_AEL_TABLES = {
         } else if (t >= 1e-11 && t < 5e-6) {
           baseAEL = 7.7e-8 * corrections.C4; // J
           unit = 'J';
-        } else if (t >= 5e-6 && t < 100) {
+        } else if (t >= 5e-6 && t < 10) {
           baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4; // J
           unit = 'J';
-        } else if (t >= 100 && t < 3e4) {
+        } else if (t >= 10 && t < 3e4) {
           baseAEL = 3.9e-4 * corrections.C4 * corrections.C7; // W
           unit = 'W';
         }
@@ -744,77 +779,20 @@ export const IEC_AEL_TABLES = {
         } else if (t >= 5e-6 && t < 10) {
           baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
           unit = 'J';
-        } else if (t >= 10 && t < 100) {
-          // Retinal photochemical hazard limit (400-600 nm)
-          if (wavelength >= 400 && wavelength <= 600) {
-            // Photochemical limit
-            photochemicalLimit = [3.9e-3 * corrections.C3, 'J']; // J using αlim = 11 mrad
-            // Thermal limit
-            if (t <= corrections.T2) {
-              thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
-            } else {
-              thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
-            }
-            
-            if (photochemicalLimit[1] === thermalLimit[1]) {
-              baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
-              unit = photochemicalLimit[1];
-            } else {
-              const photochemicalPower = photochemicalLimit[0] / t;
-              if (photochemicalPower <= thermalLimit[0]) {
-                baseAEL = photochemicalLimit[0];
-                unit = photochemicalLimit[1];
-              } else {
-                baseAEL = thermalLimit[0];
-                unit = thermalLimit[1];
-              }
-            }
+        } else if (t >= 10 && t < 3e4) {
+          // Thermal limit as power: (7e-4·t^0.75·C6 J)/t up to T2, constant 7e-4·T2^-0.25·C6 W beyond T2
+          const thermalW = t <= corrections.T2
+            ? 7e-4 * Math.pow(t, 0.75) * corrections.C6 / t
+            : 7e-4 * Math.pow(corrections.T2, -0.25) * corrections.C6;
+          if (wavelength <= 600) {
+            // Retinal photochemical limit (400-600 nm, αlim = 11 mrad): 3.9e-3·C3 J (t < 100 s), 3.9e-5·C3 W (t ≥ 100 s)
+            const photochemicalW = t < 100 ? 3.9e-3 * corrections.C3 / t : 3.9e-5 * corrections.C3;
+            baseAEL = Math.min(photochemicalW, thermalW);
           } else {
-            // Retinal thermal hazard (600-700 nm)
-            if (t <= corrections.T2) {
-              baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
-              unit = 'J';
-            } else {
-              baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
-              unit = 'W';
-            }
+            baseAEL = thermalW;
           }
-        } else if (t >= 100 && t < 3e4) {
-          // Retinal photochemical hazard limit (400-600 nm)
-          if (wavelength >= 400 && wavelength <= 600) {
-            // Photochemical limit
-            photochemicalLimit = [3.9e-5 * corrections.C3, 'J']; // J using αlim = 11 mrad
-            // Thermal limit
-            if (t <= corrections.T2) {
-              thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
-            } else {
-              thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
-            }
-            
-            if (photochemicalLimit[1] === thermalLimit[1]) {
-              baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
-              unit = photochemicalLimit[1];
-            } else {
-              const photochemicalPower = photochemicalLimit[0] / t;
-              if (photochemicalPower <= thermalLimit[0]) {
-                baseAEL = photochemicalLimit[0];
-                unit = photochemicalLimit[1];
-              } else {
-                baseAEL = thermalLimit[0];
-                unit = thermalLimit[1];
-              }
-            }
-          } else {
-            // Retinal thermal hazard (600-700 nm)
-            if (t <= corrections.T2) {
-              baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
-              unit = 'J';
-            } else {
-              baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
-              unit = 'W';
-            }
-          }
-        } 
+          unit = 'W';
+        }
       } else if (wavelength >= 700 && wavelength < 1050) {
         // 700 nm to 1050 nm range
         if (t < 1e-11) {
@@ -832,7 +810,7 @@ export const IEC_AEL_TABLES = {
             baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6 / t; // W (t ≤ T2)
             unit = 'W';
           } else {
-            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C4 * corrections.C6 / t; // W (t > T2)
+            baseAEL = 7e-4 * Math.pow(corrections.T2, -0.25) * corrections.C4 * corrections.C6; // W (t > T2)
             unit = 'W';
           }
         }
@@ -853,36 +831,38 @@ export const IEC_AEL_TABLES = {
             baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7 / t; // W (t ≤ T2)
             unit = 'W';
           } else {
-            baseAEL = 3.5e-3 * Math.pow(corrections.T2, 0.75) * corrections.C6 * corrections.C7 / t; // W (t > T2)
+            baseAEL = 3.5e-3 * Math.pow(corrections.T2, -0.25) * corrections.C6 * corrections.C7; // W (t > T2)
             unit = 'W';
           }
         }
       }
     }
 
-    // Apply C5 correction for pulse trains (only for retinal hazard wavelengths)
-    if (wavelength >= 302.5 && wavelength < 4000) {
-      return { value: baseAEL * c5Factor, unit };
-    }
-    return { value: baseAEL, unit };
+    // Apply C5 correction for pulse trains (Table 9: C5 applies to 400-1400 nm only, C5 = 1 elsewhere)
+    const retinal: AELResult = (wavelength >= 400 && wavelength <= 1400)
+      ? { value: baseAEL * c5Factor, unit }
+      : { value: baseAEL, unit };
+
+    // Table 3 note d (1250-1400 nm)
+    return limitFor1250to1400(retinal, wavelength, t, c5Factor);
   },
 
   // Table 5: Class 2 AEL values (visible only) - Enhanced with C5 application and units
-  getClass2AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  getClass2AEL: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): AELResult => {
     if (wavelength >= 400 && wavelength <= 700) {
       if (exposureTime < 0.25) {
-        return { value: 1e-3 * corrections.C6 * c5Factor, unit: 'W' };
-      } else {
-        return { value: 1e-3 * corrections.C6 * c5Factor, unit: 'W' };
+        // Table 5: same as Class 1 AEL for t < 0.25 s
+        return IEC_AEL_TABLES.getClass1AEL(wavelength, exposureTime, c5Factor, angularSubtense);
       }
+      const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime, angularSubtense);
+      return { value: 1e-3 * corrections.C6, unit: 'W' }; // C6 × 1e-3 W for t >= 0.25 s
     }
     return { value: 0, unit: 'W' };
   },
 
   // Table 6: Class 3R AEL values - Enhanced with C5 application and units
-  getClass3RAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  getClass3RAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): AELResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime, angularSubtense);
     const t = exposureTime;
     let baseAEL = 0;
     let unit = 'W';
@@ -905,7 +885,7 @@ export const IEC_AEL_TABLES = {
           baseAEL = 4e-6 * corrections.C1; // J
           unit = 'J';
         } else if (t >= 1e-9 && t > corrections.T1 && t < 10) {
-          baseAEL = 4.0e-5 * corrections.C2; // J
+          baseAEL = 4.0e-6 * corrections.C2; // J
           unit = 'J';
         } else if (t >= 10 && t < 3e4) {
           baseAEL = 4.0e-6 * corrections.C2; // J
@@ -1083,8 +1063,8 @@ export const IEC_AEL_TABLES = {
           } else if (t >= 10 && t < 3e4) {
             // Check T₂ condition
             if (t <= corrections.T2) {
-              baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J (t ≤ T₂)
-              unit = 'J';
+              baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6 / t; // W (t ≤ T₂)
+              unit = 'W';
             } else {
               baseAEL = 3.5e-3 * corrections.C4 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W (t > T₂)
               unit = 'W';
@@ -1104,8 +1084,8 @@ export const IEC_AEL_TABLES = {
           } else if (t >= 10 && t < 3e4) {
             // Check T₂ condition
             if (t <= corrections.T2) {
-              baseAEL = 1.75e-2 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J (t ≤ T₂)
-              unit = 'J';
+              baseAEL = 1.75e-2 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7 / t; // W (t ≤ T₂)
+              unit = 'W';
             } else {
               baseAEL = 1.75e-2 * corrections.C6 * corrections.C7 * Math.pow(corrections.T2, -0.25); // W (t > T₂)
               unit = 'W';
@@ -1113,16 +1093,17 @@ export const IEC_AEL_TABLES = {
           } 
         }
     }
-    // Apply C5 correction for retinal hazard wavelengths
-    if (wavelength >= 302.5 && wavelength < 4000) {
-      return { value: baseAEL * c5Factor, unit };
-    }
-    return { value: baseAEL, unit };
+    // Apply C5 correction (Table 9: C5 applies to 400-1400 nm only, C5 = 1 elsewhere)
+    const retinal: AELResult = (wavelength >= 400 && wavelength <= 1400)
+      ? { value: baseAEL * c5Factor, unit }
+      : { value: baseAEL, unit };
+    // Tables 6 / 7 note d (1250-1400 nm)
+    return limitFor1250to1400(retinal, wavelength, t, c5Factor);
   },
 
   // Table 8: Class 3B AEL values - Enhanced with C5 application and units
-  getClass3BAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1): AELResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  getClass3BAEL: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): AELResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime, angularSubtense);
     const t = exposureTime;
     let baseAEL = 0;
     let unit = 'W';
@@ -1152,7 +1133,7 @@ export const IEC_AEL_TABLES = {
       }
     } else if (wavelength >= 315 && wavelength < 400) {
       if (t < 1e-9) {
-        baseAEL = 1.25e3; // W
+        baseAEL = 1.25e8; // W
         unit = 'W';
       } else if (t >= 1e-9 && t <= 0.25) {
         baseAEL = 0.125; // J
@@ -1163,7 +1144,7 @@ export const IEC_AEL_TABLES = {
       }
     } else if (wavelength >= 400 && wavelength <= 700) {
       if (t < 1e-9) {
-        baseAEL = 3e5; // W
+        baseAEL = 3e7; // W
         unit = 'W';
       } else if (t >= 1e-9 && t <= 0.25) {
         if (t < 0.06) {
@@ -1217,16 +1198,16 @@ export const IEC_AEL_TABLES = {
         unit = 'W';
       }
     }
-    // Apply C5 correction for retinal hazard wavelengths
-    if (wavelength >= 302.5 && wavelength < 4000) {
+    // Apply C5 correction (Table 9: C5 applies to 400-1400 nm only, C5 = 1 elsewhere)
+    if (wavelength >= 400 && wavelength <= 1400) {
       return { value: baseAEL * c5Factor, unit };
     }
     return { value: baseAEL, unit };
   },
 
   // Maximum permissible exposure (MPE)
-  getMPEIrriance: (wavelength: number, exposureTime: number, c5Factor: number = 1): MPEResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
+  getMPEIrriance: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): MPEResult => {
+    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime, angularSubtense);
     const t = exposureTime;
 
     let baseAEL = 0;
@@ -1338,9 +1319,9 @@ export const IEC_AEL_TABLES = {
         }
         
       } else if (wavelength >= 700 && wavelength < 1050) {
-        // Near-infrared region
+        // Near-infrared region (Table A.1: 1×10^-3 J/m² below 10^-11 s, no C4)
         if (t < 1e-11) {
-          baseAEL = 1e-3 * corrections.C4; // J/m²
+          baseAEL = 1e-3; // J/m²
           unit = 'J/m²';
         } else if (t >= 1e-11 && t < 5e-6) {
           baseAEL = 2e-3 * corrections.C4; // J/m²
@@ -1370,11 +1351,11 @@ export const IEC_AEL_TABLES = {
         }
         
       } else if (wavelength >= 1400 && wavelength < 1500) {
-        // Mid-infrared region
-        if (t < 1e-8) {
+        // Mid-infrared region (Table A.1: 10^12 W/m² below 10^-9 s)
+        if (t < 1e-9) {
           baseAEL = 1e12; // W/m²
           unit = 'W/m²';
-        } else if (t >= 1e-8 && t < 1e-3) {
+        } else if (t >= 1e-9 && t < 1e-3) {
           baseAEL = 1e3; // J/m²
           unit = 'J/m²';
         } else if (t >= 1e-3 && t < 10) {
@@ -1386,8 +1367,8 @@ export const IEC_AEL_TABLES = {
         }
         
       } else if (wavelength >= 1500 && wavelength < 1800) {
-        // Mid-infrared region
-        if (t < 1e-8) {
+        // Mid-infrared region (Table A.1: 10^13 W/m² below 10^-9 s)
+        if (t < 1e-9) {
           baseAEL = 1e13; // W/m²
           unit = 'W/m²';
         } else if (t >= 1e-9 && t < 10) {
@@ -1433,305 +1414,18 @@ export const IEC_AEL_TABLES = {
       }
       
     } else {
-      // =================== TABLE A.2: EXTENDED SOURCE (RETINAL HAZARD REGION) ===================
-      // Only applies to wavelength range 400-1400 nm
-      
-      if (wavelength < 400 || wavelength > 1400) {
-        return { value: 0, unit: 'N/A' }; // Outside applicable range for extended sources
-      }
-
-      if (wavelength >= 400 && wavelength <= 700) {
-        // Visible region - retinal photochemical and thermal hazards
-        
-        if (t < 1e-11) {
-          baseAEL = 1e-3 * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 1e-11 && t < 5e-6) {
-          baseAEL = 2e-3 * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 5e-6 && t < 10) {
-          baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 10 && t < 100) {
-          if (wavelength >= 400 && wavelength <= 600) {
-            // Photochemical limit (using γph = 11 mrad)
-            let photochemicalLimit: number;
-            photochemicalLimit = 100 * corrections.C3; // J/m²
-            unit = 'J/m²';
-            // Thermal limit
-            let thermalLimit: number;
-            let thermalUnit: string;
-            if (t <= corrections.T2) {
-              thermalLimit = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
-              thermalUnit = 'J/m²';
-            } else {
-              thermalLimit = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
-              thermalUnit = 'W/m²';
-            }
-            
-            // Take the more restrictive limit
-            if (unit === thermalUnit) {
-              // Both limits in J/m²
-              baseAEL = Math.min(photochemicalLimit, thermalLimit);
-              unit = 'J/m²';
-            } else {
-              // Photochemical in W/m², thermal depends on T2 comparison
-              const photochemicalPower = photochemicalLimit;
-              const thermalPower = thermalLimit / t;
-              if (photochemicalPower <= thermalPower) {
-                baseAEL = photochemicalLimit;
-                unit = 'W/m²';
-              } else {
-                baseAEL = thermalPower;
-                unit = 'W/m²';
-              }
-            }
-            
-          } else {
-            // 600-700 nm: Only retinal thermal hazard
-            if (t <= corrections.T2) {
-              baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
-              unit = 'J/m²';
-            } else {
-              baseAEL = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
-              unit = 'W/m²';
-            }
-          }
-        } else if (t >= 100) {
-          if (wavelength >= 400 && wavelength <= 600) {
-            // Photochemical limit (using γph = 11 mrad)
-            let photochemicalLimit: number;
-            photochemicalLimit = corrections.C3; // J/m²
-            unit = 'W/m²';
-            // Thermal limit
-            let thermalLimit: number;
-            let thermalUnit: string;
-            if (t <= corrections.T2) {
-              thermalLimit = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
-              thermalUnit = 'J/m²';
-            } else {
-              thermalLimit = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
-              thermalUnit = 'W/m²';
-            }
-            
-            // Take the more restrictive limit
-            if (unit === thermalUnit) {
-              // Both limits in J/m²
-              baseAEL = Math.min(photochemicalLimit, thermalLimit);
-              unit = 'J/m²';
-            } else {
-              // Photochemical in W/m², thermal depends on T2 comparison
-              const photochemicalPower = photochemicalLimit;
-              const thermalPower = thermalLimit / t;
-              if (photochemicalPower <= thermalPower) {
-                baseAEL = photochemicalLimit;
-                unit = 'W/m²';
-              } else {
-                baseAEL = thermalPower;
-                unit = 'W/m²';
-              }
-            }
-            
-          } else {
-            // 600-700 nm: Only retinal thermal hazard
-            if (t <= corrections.T2) {
-              baseAEL = 18 * Math.pow(t, 0.75) * corrections.C6; // J/m²
-              unit = 'J/m²';
-            } else {
-              baseAEL = 18 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
-              unit = 'W/m²';
-            }
-          }
-        } 
-
-      } else if (wavelength >= 700 && wavelength <= 1050) {
-        // Near-infrared region - retinal thermal hazard only
-        
-        if (t < 1e-11) {
-          baseAEL = 1e-3 * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 1e-11 && t < 5e-6) {
-          baseAEL = 2e-3 * corrections.C4 * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 5e-6 && t < 10) {
-          baseAEL = 18 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 10) {
-          if (t <= corrections.T2) {
-            baseAEL = 18 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J/m²
-            unit = 'J/m²';
-          } else {
-            baseAEL = 18 * corrections.C4 * corrections.C6 * Math.pow(corrections.T2, -0.25); // W/m²
-            unit = 'W/m²';
-          }
-        }
-        
-      } else if (wavelength >= 1050 && wavelength <= 1400) {
-        // Near-infrared region (1050-1400 nm) - retinal thermal hazard only
-        
-        if (t < 1e-11) {
-          baseAEL = 1e-3 * corrections.C6 * corrections.C7; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 1e-11 && t < 1.3e-5) {
-          baseAEL = 2e-2 * corrections.C6 * corrections.C7; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 1.3e-5 && t < 10) {
-          baseAEL = 90 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J/m²
-          unit = 'J/m²';
-        } else if (t >= 10) {
-          if (t <= corrections.T2) {
-            baseAEL = 90 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J/m²
-            unit = 'J/m²';
-          } else {
-            baseAEL = 90 * corrections.C6 * corrections.C7 * Math.pow(corrections.T2, -0.25); // W/m²
-            unit = 'W/m²';
-          }
-        }
-      }
+      // =================== TABLE A.2: EXTENDED SOURCE (RETINAL HAZARD REGION, 400-1400 nm) ===================
+      const extended = retinalExtendedMPE('A2', wavelength, exposureTime, angularSubtense);
+      return { value: extended.value * c5Factor, unit: extended.unit };
     }
     return { value: baseAEL * c5Factor, unit };
   },
   // Maximum permissible exposure (MPE) calculation for extended sources
-  getMPEPowerEnergy: (wavelength: number, exposureTime: number, c5Factor: number = 1): MPEResult => {
-    const corrections = IEC_AEL_TABLES.getCorrectionFactors(wavelength, exposureTime);
-    const t = exposureTime;
-
-    let baseAEL = 0;
-    let unit = 'W';
-    let photochemicalLimit: [number, string] = [0, 'J'];
-    let thermalLimit: [number, string] = [0, 'J'];
-    
-    if (wavelength < 400 || wavelength > 1400) {
-        return { value: 0, unit: 'N/A' }; // Outside applicable range
-      }
-
-    if (wavelength >= 400 && wavelength < 700) {
-      // 400 nm to 700 nm range
-      if (t < 1e-11) {
-        baseAEL = 3.8e-8 * corrections.C6; // J
-        unit = 'J';
-      } else if (t >= 1e-11 && t < 5e-6) { // Fixed: was 5e-8, should be 5e-6
-        baseAEL = 7.7e-8 * corrections.C6; // J
-        unit = 'J';
-      } else if (t >= 5e-6 && t < 10) {
-        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
-        unit = 'J';
-      } else if (t >= 10 && t < 100) {
-        // Retinal photochemical hazard limit (400-600 nm)
-        if (wavelength >= 400 && wavelength <= 600) {
-          // Photochemical limit
-          photochemicalLimit = [3.9e-3 * corrections.C3, 'J']; // J using αlim = 11 mrad
-          // Thermal limit
-          if (t <= corrections.T2) {
-            thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
-          } else {
-            thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
-          }
-          
-          if (photochemicalLimit[1] === thermalLimit[1]) {
-            baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
-            unit = photochemicalLimit[1];
-          } else {
-            const photochemicalPower = photochemicalLimit[0] / t;
-            if (photochemicalPower <= thermalLimit[0]) {
-              baseAEL = photochemicalLimit[0];
-              unit = photochemicalLimit[1];
-            } else {
-              baseAEL = thermalLimit[0];
-              unit = thermalLimit[1];
-            }
-          }
-        } else {
-          // Retinal thermal hazard (600-700 nm)
-          if (t <= corrections.T2) {
-            baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
-            unit = 'J';
-          } else {
-            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
-            unit = 'W';
-          }
-        }
-      } else if (t >= 100 && t < 3e4) {
-        // Retinal photochemical hazard limit (400-600 nm)
-        if (wavelength >= 400 && wavelength <= 600) {
-          // Photochemical limit
-          photochemicalLimit = [3.9e-5 * corrections.C3, 'J']; // J using αlim = 11 mrad
-          // Thermal limit
-          if (t <= corrections.T2) {
-            thermalLimit = [7e-4 * Math.pow(t, 0.75) * corrections.C6, 'J']; // J
-          } else {
-            thermalLimit = [7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t, 'W']; // W (t > T2)
-          }
-          
-          if (photochemicalLimit[1] === thermalLimit[1]) {
-            baseAEL = Math.min(photochemicalLimit[0], thermalLimit[0]);
-            unit = photochemicalLimit[1];
-          } else {
-            const photochemicalPower = photochemicalLimit[0] / t;
-            if (photochemicalPower <= thermalLimit[0]) {
-              baseAEL = photochemicalLimit[0];
-              unit = photochemicalLimit[1];
-            } else {
-              baseAEL = thermalLimit[0];
-              unit = thermalLimit[1];
-            }
-          }
-        } else {
-          // Retinal thermal hazard (600-700 nm)
-          if (t <= corrections.T2) {
-            baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C6; // J
-            unit = 'J';
-          } else {
-            baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C6 / t; // W (t > T2)
-            unit = 'W';
-          }
-        }
-      } 
-    } else if (wavelength >= 700 && wavelength < 1050) {
-      // 700 nm to 1050 nm range
-      if (t < 1e-11) {
-        baseAEL = 3.8e-8 * corrections.C4; // J
-        unit = 'J';
-      } else if (t >= 1e-11 && t < 5e-6) { // Fixed: was 5e-8, should be 5e-6
-        baseAEL = 7.7e-8 * corrections.C4 * corrections.C6; // J
-        unit = 'J';
-      } else if (t >= 5e-6 && t < 10) {
-        baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6; // J
-        unit = 'J';
-      } else if (t >= 10 && t < 3e4) {
-        // Retinal thermal hazard
-        if (t <= corrections.T2) {
-          baseAEL = 7e-4 * Math.pow(t, 0.75) * corrections.C4 * corrections.C6 / t; // W (t ≤ T2)
-          unit = 'W';
-        } else {
-          baseAEL = 7e-4 * Math.pow(corrections.T2, 0.75) * corrections.C4 * corrections.C6 / t; // W (t > T2)
-          unit = 'W';
-        }
-      }
-    } else if (wavelength >= 1050 && wavelength <= 1400) {
-      // 1050 nm to 1400 nm range
-      if (t < 1e-11) {
-        baseAEL = 3.8e-8 * corrections.C6 * corrections.C7; // J
-        unit = 'J';
-      } else if (t >= 1e-11 && t < 1.3e-5) {
-        baseAEL = 7.7e-7 * corrections.C6 * corrections.C7; // J
-        unit = 'J';
-      } else if (t >= 1.3e-5 && t < 10) {
-        baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7; // J
-        unit = 'J';
-      } else if (t >= 10 && t < 3e4) {
-        // Retinal thermal hazard
-        if (t <= corrections.T2) {
-          baseAEL = 3.5e-3 * Math.pow(t, 0.75) * corrections.C6 * corrections.C7 / t; // W (t ≤ T2)
-          unit = 'W';
-        } else {
-          baseAEL = 3.5e-3 * Math.pow(corrections.T2, 0.75) * corrections.C6 * corrections.C7 / t; // W (t > T2)
-          unit = 'W';
-        }
-      }
-    }
+  // Table A.4: MPE of Table A.2 expressed as power or energy through a 7 mm aperture (400-1400 nm)
+  getMPEPowerEnergy: (wavelength: number, exposureTime: number, c5Factor: number = 1, angularSubtense: number = 1.5): MPEResult => {
+    const result = retinalExtendedMPE('A4', wavelength, exposureTime, angularSubtense);
     // Apply C5 correction for pulse trains
-    return { value: baseAEL * c5Factor, unit };
+    return { value: result.value * c5Factor, unit: result.unit };
   },
   
   // Table A.5: Maximum permissible exposure (MPE) of the skin to laser radiation
@@ -1777,13 +1471,13 @@ export const IEC_AEL_TABLES = {
       if (t < 1e-9) {
         mpeValue = 3e10; // W/m²
         unit = 'W/m²';
-      } else if (t >= 1e-8 && t < 10) {
+      } else if (t >= 1e-9 && t < 10) {
         mpeValue = corrections.C1; // J/m²
         unit = 'J/m²';
       } else if (t >= 10 && t < 1e3) {
         mpeValue = 1e4; // J/m²
         unit = 'J/m²';
-      } else if (t >= 1e3 && t < 3e4) {
+      } else if (t >= 1e3 && t <= 3e4) {
         mpeValue = 10; // W/m²
         unit = 'W/m²';
       }
@@ -1972,6 +1666,68 @@ export const validatePulseParameters = (
 };
 
 // Correction factors for different wavelengths (IEC 60825-1:2014)
+// Retinal MPE for 400-1400 nm, IEC 60825-1:2014 Table A.2 (irradiance / radiant exposure, 'A2')
+// and Table A.4 (power / energy through a 7 mm aperture, 'A4'). C6 = 1 gives the point-source values.
+function retinalExtendedMPE(
+  table: 'A2' | 'A4',
+  wavelength: number,
+  t: number,
+  angularSubtense: number
+): MPEResult {
+  if (wavelength < 400 || wavelength > 1400) return { value: 0, unit: 'N/A' };
+
+  const energyUnit = table === 'A2' ? 'J/m²' : 'J';
+  const powerUnit = table === 'A2' ? 'W/m²' : 'W';
+  // Coefficients as printed in the two tables
+  const k = table === 'A2'
+    ? { first: 1e-3, second: 2e-3, thermal: 18, ph10: 100, ph: 1, nir2: 2e-2, nirThermal: 90 }
+    : { first: 3.8e-8, second: 7.7e-8, thermal: 7e-4, ph10: 3.9e-3, ph: 3.9e-5, nir2: 7.7e-7, nirThermal: 3.5e-3 };
+
+  const c = IEC_AEL_TABLES.getCorrectionFactors(wavelength, t, angularSubtense);
+  const visible = wavelength < 700;
+  const nir1 = wavelength >= 700 && wavelength < 1050;
+
+  // Coefficient of the thermal limit (t^0.75 law), including C4 / C7 as applicable
+  const thermalCoeff = (visible ? k.thermal : nir1 ? k.thermal * c.C4 : k.nirThermal * c.C7) * c.C6;
+
+  // ---- exposure times below 10 s ----
+  if (t < 10) {
+    let energy: number;
+    if (t < 1e-11) {
+      energy = k.first * c.C6 * (wavelength >= 1050 ? c.C7 : 1);
+    } else if (wavelength < 1050) {
+      if (t < 5e-6) energy = k.second * c.C6 * (visible ? 1 : c.C4);
+      else energy = thermalCoeff * Math.pow(t, 0.75);
+    } else {
+      if (t < 13e-6) energy = k.nir2 * c.C6 * c.C7;
+      else energy = thermalCoeff * Math.pow(t, 0.75);
+    }
+    // Table A.2 note b: for 400-484 nm and apparent source sizes of 1.5-82 mrad the
+    // photochemical limit (100 C3 J/m²) already applies from 1 s
+    if (t >= 1 && wavelength >= 400 && wavelength <= 484 && angularSubtense > 1.5 && angularSubtense <= 82) {
+      energy = Math.min(energy, k.ph10 * c.C3);
+    }
+    return { value: energy, unit: energyUnit };
+  }
+
+  // ---- exposure times of 10 s and longer ----
+  // Retinal thermal limit: energy k·t^0.75 up to T2, constant power k·T2^-0.25 beyond
+  const thermalIsEnergy = t <= c.T2;
+  const thermalValue = thermalIsEnergy ? thermalCoeff * Math.pow(t, 0.75) : thermalCoeff * Math.pow(c.T2, -0.25);
+  const thermalEnergyEquivalent = thermalIsEnergy ? thermalValue : thermalValue * t;
+
+  if (wavelength <= 600) {
+    // Photochemical limit (dual limits apply): 100 C3 J/m² for t < 100 s, C3 W/m² beyond
+    const phIsEnergy = t < 100;
+    const phValue = phIsEnergy ? k.ph10 * c.C3 : k.ph * c.C3;
+    const phEnergyEquivalent = phIsEnergy ? phValue : phValue * t;
+    if (phEnergyEquivalent <= thermalEnergyEquivalent) {
+      return { value: phValue, unit: phIsEnergy ? energyUnit : powerUnit };
+    }
+  }
+  return { value: thermalValue, unit: thermalIsEnergy ? energyUnit : powerUnit };
+}
+
 export const getCorrectionFactors = (wavelength: number) => {
   let CA = 1;
   let CB = 1;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
 import NOHDCalculator from './NOHDCalculator';
 import LaserClassificationCalculator from './LaserClassificationCalculator';
@@ -23,6 +23,17 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
   // State for the selected calculator type
   const [activeTab, setActiveTab] = useState<'nohd' | 'classification' | 'eyewear'>('classification');
 
+  // NOHD results feed the export / history actions (history is saved once the user stops editing)
+  const saveTimer = useRef<number | undefined>(undefined);
+  const handleNohdResults = useCallback((inputs: Record<string, any>, results: Record<string, any>) => {
+    const taggedInputs = { calculator: 'NOHD Calculator', ...inputs };
+    const taggedResults = { calculator: 'NOHD Calculator', ...results };
+    prepareExportData(taggedInputs, taggedResults);
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveCalculation(taggedInputs, taggedResults), 1000);
+  }, [prepareExportData, saveCalculation]);
+  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
+
   return (
     <CalculatorWrapper
       title="Laser Safety Calculator"
@@ -31,7 +42,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
       onShowTutorial={onShowTutorial}
       exportData={exportData}
     >
-      <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
 
         {/* Tab Selector */}
         <div className="flex border-b mb-6">
@@ -68,7 +79,7 @@ const LaserSafetyCalculator: React.FC<LaserSafetyCalculatorProps> = ({ onShowTut
         </div>
         
         {/* Content Based on Active Tab */}
-        {activeTab === 'nohd' && <NOHDCalculator onShowTutorial={onShowTutorial} />}
+        {activeTab === 'nohd' && <NOHDCalculator onShowTutorial={onShowTutorial} onResults={handleNohdResults} />}
         {activeTab === 'classification' && <LaserClassificationCalculator onShowTutorial={onShowTutorial} />}
         {activeTab === 'eyewear' && <ProtectiveEyewearCalculator onShowTutorial={onShowTutorial} />}
       </div>
